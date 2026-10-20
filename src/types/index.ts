@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'home_guard';
+export type UserRole = 'admin' | 'commander' | 'home_guard';
 
 export type AccountStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 
