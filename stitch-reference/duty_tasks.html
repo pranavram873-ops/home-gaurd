@@ -1,0 +1,965 @@
+<!DOCTYPE html><html lang="en" style="width: 2542px; height: 1024px; overflow: hidden; position: relative;"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary": "#ffffff",
+          "on-secondary-fixed": "#131b2e",
+          "on-primary-fixed": "#001551",
+          "on-primary-fixed-variant": "#0039b5",
+          "secondary-fixed": "#dae2fd",
+          "inverse-surface": "#213145",
+          "on-surface": "#0b1c30",
+          "tertiary-fixed-dim": "#79db8d",
+          "surface-variant": "#d3e4fe",
+          "on-background": "#0b1c30",
+          "surface-container": "#e5eeff",
+          "on-primary-container": "#cad3ff",
+          "secondary-container": "#dae2fd",
+          "on-secondary-container": "#5c647a",
+          "surface-container-low": "#eff4ff",
+          "surface-tint": "#2151da",
+          "primary": "#0037b0",
+          "inverse-primary": "#b7c4ff",
+          "tertiary-container": "#006b2f",
+          "outline-variant": "#c4c5d7",
+          "secondary": "#565e74",
+          "outline": "#747686",
+          "primary-container": "#1d4ed8",
+          "tertiary-fixed": "#95f8a7",
+          "primary-fixed": "#dce1ff",
+          "background": "#f8f9ff",
+          "error": "#ba1a1a",
+          "surface-container-lowest": "#ffffff",
+          "on-surface-variant": "#434655",
+          "surface-container-highest": "#d3e4fe",
+          "error-container": "#ffdad6",
+          "tertiary": "#005022",
+          "surface-dim": "#cbdbf5",
+          "surface-bright": "#f8f9ff",
+          "on-tertiary-container": "#88ea9a",
+          "on-secondary": "#ffffff",
+          "on-tertiary-fixed-variant": "#005323",
+          "on-tertiary": "#ffffff",
+          "on-tertiary-fixed": "#00210a",
+          "on-error-container": "#93000a",
+          "surface-container-high": "#dce9ff",
+          "on-error": "#ffffff",
+          "inverse-on-surface": "#eaf1ff",
+          "primary-fixed-dim": "#b7c4ff",
+          "secondary-fixed-dim": "#bec6e0",
+          "surface": "#f8f9ff",
+          "on-secondary-fixed-variant": "#3f465c"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "margin-md": "2rem",
+          "margin": "1rem",
+          "space-2xl": "3rem",
+          "space-xl": "2rem",
+          "gutter-md": "1.5rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem"
+        },
+        "fontFamily": {
+          "headline-lg": [
+            "Inter"
+          ],
+          "label-sm": [
+            "Inter"
+          ],
+          "label-lg": [
+            "Inter"
+          ],
+          "headline-md": [
+            "Inter"
+          ],
+          "title-md": [
+            "Inter"
+          ],
+          "label-md": [
+            "Inter"
+          ],
+          "body-md": [
+            "Inter"
+          ],
+          "headline-sm": [
+            "Inter"
+          ],
+          "body-sm": [
+            "Inter"
+          ],
+          "display-sm": [
+            "Inter"
+          ],
+          "display-lg": [
+            "Inter"
+          ],
+          "body-lg": [
+            "Inter"
+          ]
+        },
+        "fontSize": {
+          "headline-lg": [
+            "1.5rem",
+            {
+              "lineHeight": "2rem",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-sm": [
+            "0.6875rem",
+            {
+              "lineHeight": "0.875rem",
+              "letterSpacing": "0.05em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-lg": [
+            "0.875rem",
+            {
+              "lineHeight": "1.25rem",
+              "letterSpacing": "0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "1.25rem",
+            {
+              "lineHeight": "1.75rem",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "1rem",
+            {
+              "lineHeight": "1.5rem",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "0.75rem",
+            {
+              "lineHeight": "1rem",
+              "letterSpacing": "0.025em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-md": [
+            "0.875rem",
+            {
+              "lineHeight": "1.375rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "1.125rem",
+            {
+              "lineHeight": "1.5rem",
+              "fontWeight": "600"
+            }
+          ],
+          "body-sm": [
+            "0.75rem",
+            {
+              "lineHeight": "1.125rem",
+              "fontWeight": "400"
+            }
+          ],
+          "display-sm": [
+            "1.75rem",
+            {
+              "lineHeight": "2.25rem",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-lg": [
+            "2.25rem",
+            {
+              "lineHeight": "2.75rem",
+              "letterSpacing": "-0.025em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "1rem",
+            {
+              "lineHeight": "1.625rem",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between border-r"><div class="flex flex-col"><div class="px-space-md py-space-md flex items-center gap-space-sm bg-surface-container-high"><img alt="Tamil Nadu Home Guards Emblem" class="w-[42px] h-[42px] object-contain shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0cHG2Vq8Q7TOxm6jBRdAENAvMOBevkXvlQ-7Byu_fefGA-lx-n6ToFgxskUWIRTFEM5So_rsZKYqZzUaIDnyr_Z6xeXjsoZdVo-nWj_RgTY7qAMUFxEturyi9BqcWEsNt5mjrANI3uXdShz8HqIoh_reNy7u3kIGFc3jXH0nU34x2vkaogQewvzfzOiBw0cZkqP4YqXvYoNSQ7x2Cd9E6-raVBzzaOZbDaYZdgb6fXBKxb2s0MgfDytoSDXdXYxhvJw"><div class="flex flex-col min-w-0"><span class="font-label-sm text-label-sm text-primary uppercase tracking-wider truncate">Government of Tamil Nadu</span><span class="font-title-md text-title-md text-on-surface uppercase font-bold tracking-tight truncate">Tamil Nadu Home Guards</span><span class="font-label-sm text-[10px] text-secondary tracking-widest uppercase font-semibold truncate">Headquarters Command</span></div></div><div class="px-space-md pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Operational Menu</span></div><nav class="flex flex-col gap-space-xs px-space-sm" data-active-classes="bg-primary-container text-on-primary font-bold shadow-sm"><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-lg text-label-lg">Overview</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="employees" href="#"><span class="material-symbols-outlined text-[20px]">group</span><span class="font-label-lg text-label-lg">Home Guards</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg transition-colors bg-primary-container text-on-primary font-bold shadow-sm" data-path="tasks" href="#"><span class="material-symbols-outlined text-[20px]">fact_check</span><span class="font-label-lg text-label-lg">Tasks</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="event-planner" href="#"><span class="material-symbols-outlined text-[20px]">event</span><span class="font-label-lg text-label-lg">Event Planner</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="reports" href="#"><span class="material-symbols-outlined text-[20px]">bar_chart</span><span class="font-label-lg text-label-lg">Reports</span></a></nav></div><div class="p-space-sm m-space-sm rounded-xl bg-surface-container flex flex-col gap-space-sm"><div class="flex items-center gap-space-sm px-space-xs"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-md text-label-md uppercase font-bold shrink-0">SR</div><div class="flex flex-col min-w-0"><span class="font-label-lg text-label-lg text-on-surface font-semibold truncate">Insp. S. Rajendran</span><span class="font-label-sm text-label-sm text-secondary font-mono truncate">TN-HG-44029</span></div></div><div class="flex items-center justify-between pt-space-xs"><span class="inline-flex items-center px-space-sm py-0.5 rounded-lg font-label-sm text-label-sm bg-tertiary-container text-on-tertiary">Duty Active</span><a class="flex items-center gap-space-xs text-on-surface-variant hover:text-error transition-colors" data-path="login" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="font-label-sm text-label-sm">Logout</span></a></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-md"><div class="flex items-center gap-space-md min-w-0"><nav class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm"><a class="hover:text-primary transition-colors text-on-surface-variant" data-path="overview" href="#">Home Guards Portal</a><span class="material-symbols-outlined text-[14px]">chevron_right</span><span class="text-on-surface font-semibold">Duty Command Console</span></nav></div><div class="flex items-center gap-space-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-secondary text-[18px]">search</span><input class="h-10 pl-9 pr-4 w-72 rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container shadow-[0_1px_3px_rgba(15,23,42,0.05)]" placeholder="Search badge, service ID, personnel..." type="text"></div><div class="hidden md:inline-flex items-center bg-surface-container-low rounded-lg p-1 shadow-sm font-label-sm text-label-sm"><button class="px-2.5 py-1 rounded-md text-on-surface-variant hover:text-on-surface transition-all" type="button">Admin</button><button class="px-2.5 py-1 rounded-md bg-primary-container text-on-primary font-bold shadow-sm transition-all" type="button">Manager</button><button class="px-2.5 py-1 rounded-md text-on-surface-variant hover:text-on-surface transition-all" type="button">Home Guard</button></div><div class="h-6 w-px bg-outline-variant"></div><button aria-label="Notifications" class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><div class="flex items-center gap-space-sm pl-space-xs"><div class="flex flex-col text-right"><span class="font-label-md text-label-md text-on-surface font-semibold">Platoon Superintendent</span><span class="font-label-sm text-label-sm text-secondary">Zone IV • Chennai Command</span></div><img alt="Profile" class="w-8 h-8 rounded-full object-cover shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1UkF-Mo5uyssT6Q-g2LTp2UYfmvGbzIFS2JbFKixKSgzqtdOZQpUSlBc5_szlZ8sRtSiw6q3YpsmHJ34aXuHq28WQ2874ZSY59t7J2gK8a5SyxFtDWzpu6d-hkeKr8xBuaMx0lbRfE3rZ-pQEV4fbFHoUs5f0VJr8nkWW7_NkI5Io6xXq65-9nOUsvfXfX3x8HR1KF_cbhym0hXjptx78W7hVifqRp2usRLy8YswyH8Vv6-rtGk5DVKXknoWyF15J4uSIX1-ic5vw"></div></div></header><main class="relative pt-16 w-full min-h-screen px-gutter-md py-margin-md bg-surface"><div class="flex flex-col w-full">
+<!-- Command Banner & Quick Status Bar -->
+<div class="flex flex-col xl:flex-row xl:items-end justify-between gap-space-lg mb-space-lg">
+<div>
+<div class="flex items-center gap-space-xs mb-space-xs">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm uppercase tracking-wider">
+<span class="w-2 h-2 rounded-full bg-tertiary-container animate-pulse"></span>
+          Live Tactical Feed
+        </span>
+<span class="text-secondary font-label-sm text-label-sm">|</span>
+<span class="font-label-sm text-label-sm text-secondary font-mono">ZONE-04 • SOUTH CHENNAI JURISDICTION</span>
+</div>
+<h1 class="font-display-sm text-display-sm text-on-surface tracking-tight">Duty &amp; Task Management</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl mt-1">
+        Assign bandobast duties, monitor field patrol progress, and review daily task completion across operational divisions.
+      </p>
+</div>
+<!-- Actions & View Toggles -->
+<div class="flex flex-wrap items-center gap-space-sm shrink-0">
+<div class="inline-flex items-center bg-surface-container-low rounded-lg p-1 shadow-sm">
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all" id="viewListBtn" type="button">
+<span class="material-symbols-outlined text-[18px]">view_list</span>
+<span class="">List View</span>
+</button>
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md bg-primary-container text-on-primary transition-all shadow-sm" id="viewKanbanBtn" type="button">
+<span class="material-symbols-outlined text-[18px]">view_kanban</span>
+<span class="">Task Progress</span>
+</button>
+</div>
+<div class="inline-flex items-center gap-2 px-space-md py-2 rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-primary">calendar_month</span>
+<span class="font-semibold">Current Muster:</span>
+<span class="font-mono text-secondary">Week 42 (Oct 14 - Oct 20)</span>
+</div>
+<button class="flex items-center gap-2 h-10 px-space-md rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-lg text-label-lg transition-colors shadow-md" id="openNewDutyModal" type="button">
+<span class="material-symbols-outlined text-[20px]">add_task</span>
+<span class="">Create New Duty Assignment</span>
+</button>
+</div>
+</div>
+<!-- Operational KPI Metrics Ribbon -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mb-space-xl">
+<!-- Total Scheduled -->
+
+<!-- Active Shifts -->
+
+<!-- Completed Today -->
+
+<!-- Overdue Muster Logs (Action required) -->
+
+<!-- Pending Dispatch -->
+
+</div>
+<!-- Operational Context Card: Live Bandobast Briefing & Division Highlights -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-space-md mb-space-lg">
+<!-- Visual Briefing / Map Card -->
+
+<!-- Active Field Supervisor Brief -->
+
+</div>
+<!-- Task Filters & Search Ribbon -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm bg-surface-container-lowest p-space-sm rounded-xl shadow-sm mb-space-sm">
+<div class="flex flex-wrap items-center gap-space-xs flex-1">
+<!-- Search Input -->
+<div class="relative flex-1 min-w-[240px]">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">search</span>
+<input class="w-full h-9 pl-9 pr-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary-container" id="dutyTableSearch" placeholder="Search duty title, Task ID, assigned guard or station..." type="text">
+</div>
+<!-- Status Filter -->
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="filterStatus">
+<option value="all">All Statuses</option>
+<option value="in_progress">In Progress</option>
+<option value="pending">Pending Check-in</option>
+<option value="completed">Completed</option>
+<option value="blocked">Blocked / Incident</option>
+</select>
+<!-- Priority Filter -->
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="filterPriority">
+<option value="all">All Priorities</option>
+<option value="urgent">Urgent</option>
+<option value="high">High</option>
+<option value="normal">Normal</option>
+</select>
+<!-- Platoon Filter -->
+<select class="h-9 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="filterPlatoon">
+<option value="all">All Platoons</option>
+<option value="b4">Platoon B-4</option>
+<option value="c2">Platoon C-2</option>
+<option value="a1">Platoon A-1</option>
+<option value="v1">Special VVIP Platoon</option>
+</select>
+</div>
+<!-- Quick Table View Actions -->
+<div class="flex items-center gap-space-xs shrink-0">
+<button class="h-9 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+<span class="">Filter</span>
+</button>
+<button class="h-9 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+<span class="">Export Muster (CSV)</span>
+</button>
+</div>
+</div>
+<!-- Primary Duty & Task Table Container -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-space-xl hidden" id="dutyListView">
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-md text-body-md">
+<!-- Table Header -->
+<thead class="bg-inverse-surface text-inverse-on-surface">
+<tr>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold" scope="col">Task ID</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold min-w-[240px]" scope="col">Duty / Task Title</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold min-w-[200px]" scope="col">Assigned Personnel</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold" scope="col">Supervisor</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold" scope="col">Duty Location</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold" scope="col">Shift Hours</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold text-center" scope="col">Priority</th>
+<th class="py-3 px-4 font-label-sm text-label-sm uppercase tracking-wider font-bold text-center" scope="col">Status</th>
+
+
+
+</tr>
+</thead>
+<tbody class="divide-none">
+<!-- Row 1: TSK-BND-402 (Marina Beach Bandobast) -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-3.5 px-4 font-mono font-bold text-primary text-label-md">
+              TSK-BND-402
+            </td>
+<td class="py-3.5 px-4">
+<div class="font-headline-sm text-headline-sm text-on-surface">Marina Beach Promenade Evening Crowd Bandobast</div>
+<div class="font-body-sm text-body-sm text-secondary">Sector Beach Road, Gandhi Statue to Light House • Crowd safety &amp; water line watch</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<img class="w-8 h-8 rounded-full object-cover shrink-0" data-alt="Passport size officer ID photograph of Tamil Nadu Home Guard personnel R. Murugan in uniform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGDCd0TiIVsB5-HP11m7bl51FPrJghVjzW8t26Vv8d02_62SQWmczw_i8lzv_Fv8Ft69vBwrnVtxDLTlLVGOqsCaCsAnbgvnW7Omr-GPWhTMcHyqF5pERj4mqB6LCGoTlGw5Wil3uQ6yMGPKP0buEWkHVjtqr2W5XmO93r0cEopLTEHuUIjO00Snj0FIXJ1crWomQzMoIBU0l-3Jj29QYJw1felt8eemJ0jizb65NNGHJNyfnW4rFI">
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">R. Murugan <span class="font-mono text-secondary font-normal">[HG-3819]</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Squad of 8 Guards • <span class="font-bold text-primary">Platoon B-4</span></div>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-semibold">Insp. S. Rajendran</div>
+<div class="font-label-sm text-label-sm text-secondary">E-5 Station Head</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-body-sm text-body-sm text-on-surface font-semibold">Station E-5 Foreshore Estate</div>
+<div class="font-label-sm text-label-sm text-secondary">Booth Post #4</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-mono">Today, 16:00 - 22:00</div>
+<div class="font-label-sm text-label-sm text-tertiary-container font-semibold">Active (4 hrs remaining)</div>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-bold uppercase">
+                Normal
+              </span>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                In Progress
+              </span>
+</td>
+
+
+
+</tr>
+<!-- Row 2: TSK-TRF-385 (Kathipara Junction Peak Hour) -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-high/20">
+<td class="py-3.5 px-4 font-mono font-bold text-primary text-label-md">
+              TSK-TRF-385
+            </td>
+<td class="py-3.5 px-4">
+<div class="font-headline-sm text-headline-sm text-on-surface">Kathipara Junction Peak Hour Traffic Diversion</div>
+<div class="font-body-sm text-body-sm text-secondary">Guindy Flyover cloverleaf interchange • Regulate GST Road &amp; Mount Road merger</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<img class="w-8 h-8 rounded-full object-cover shrink-0" data-alt="Police personnel identity headshot of P. Saravanan, Home Guard, Tamil Nadu Police division." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8WpcR_7n7X_l4VMpya5YmnqnVUVv4dCBx1uMXNCH8FvTiy6wWs6IkNZO8kVpF7iBQlaEVIl3sJqWFyzTKDQpEo_pGxKSa1I2WfZTGj1Sbon5xY4dd4Kcv7WWZKF-8NjqBOQ3PjzkuZS_TfEM1h6hkSHSWrw1bkKn3SB-KDOxmIsqCWCrbaeA_m5Kdi17k0QrWsvIgEg8wsARU3xvf5EDNPLQ_iPbpvrpbTBQeGhVoQSnSZiB3kgyy">
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">P. Saravanan <span class="font-mono text-secondary font-normal">[HG-2490]</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Squad of 12 Guards • <span class="font-bold text-primary">Platoon C-2</span></div>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-semibold">DSP K. Sundaram</div>
+<div class="font-label-sm text-label-sm text-secondary">Traffic Command South</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-body-sm text-body-sm text-on-surface font-semibold">Guindy Kathipara Hub</div>
+<div class="font-label-sm text-label-sm text-secondary">Sector Point G-1 &amp; G-3</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-mono">Today, 17:30 - 21:30</div>
+<div class="font-label-sm text-label-sm text-error font-semibold">Peak Surge Active</div>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-surface-variant text-on-surface-variant font-label-sm text-label-sm font-bold uppercase">
+                High
+              </span>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                In Progress
+              </span>
+</td>
+
+
+
+</tr>
+<!-- Row 3: TSK-SEC-209 (Mylapore Temple Festival Sector Security) -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-3.5 px-4 font-mono font-bold text-primary text-label-md">
+              TSK-SEC-209
+            </td>
+<td class="py-3.5 px-4">
+<div class="font-headline-sm text-headline-sm text-on-surface">Mylapore Temple Festival Sector Security</div>
+<div class="font-body-sm text-body-sm text-secondary">Kapaleeshwarar Sannidhi Street &amp; Tank bund perimeter • Queue management</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center font-label-sm text-label-sm text-on-secondary-fixed font-bold">
+                  AK
+                </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">A. Krishnakumar <span class="font-mono text-secondary font-normal">[HG-1904]</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Squad of 16 Guards • <span class="font-bold text-primary">Platoon A-1</span></div>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-semibold">Insp. S. Rajendran</div>
+<div class="font-label-sm text-label-sm text-secondary">E-4 Sector Inspector</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-body-sm text-body-sm text-on-surface font-semibold">E-4 Abhiramapuram PS</div>
+<div class="font-label-sm text-label-sm text-secondary">Mylapore Sannidhi Gate</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-mono">Today, 05:00 - 14:00</div>
+<div class="font-label-sm text-label-sm text-secondary">Shift Completed</div>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-surface-variant text-on-surface-variant font-label-sm text-label-sm font-bold uppercase">
+                High
+              </span>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                Completed
+              </span>
+</td>
+
+
+
+</tr>
+<!-- Row 4: TSK-EVT-501 (VVIP Convoy Route Lining - Secretariat to Raj Bhavan) -->
+<tr class="hover:bg-surface-container-low transition-colors bg-error-container/20">
+<td class="py-3.5 px-4 font-mono font-bold text-primary text-label-md">
+              TSK-EVT-501
+            </td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">VVIP Convoy Route Lining - Secretariat to Raj Bhavan</span>
+<span class="material-symbols-outlined text-error text-[18px]" title="High Protocol">priority_high</span>
+</div>
+<div class="font-body-sm text-body-sm text-secondary">Kamarajar Salai &amp; Rajaji Salai route sealing • Zero unauthorized access</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-error-container text-on-error-container flex items-center justify-center font-label-sm text-label-sm font-bold">
+                  VP
+                </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">V. Pandian <span class="font-mono text-secondary font-normal">[HG-1102]</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Squad of 24 Guards • <span class="font-bold text-primary">Special VVIP Unit</span></div>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-semibold">DSP K. Sundaram</div>
+<div class="font-label-sm text-label-sm text-secondary">Convoy Commander</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-body-sm text-body-sm text-on-surface font-semibold">Secretariat Sector North</div>
+<div class="font-label-sm text-label-sm text-secondary">Route Post SV-01 to SV-14</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-mono">Today, 19:00 - 23:00</div>
+<div class="font-label-sm text-label-sm text-error font-semibold">Mobilizing (T-15 mins)</div>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-error-container text-on-error-container font-label-sm text-label-sm font-bold uppercase">
+                Urgent
+              </span>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-variant text-on-surface font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                Pending Check-in
+              </span>
+</td>
+
+
+
+</tr>
+<!-- Row 5: TSK-PAT-118 (Night Patrol & Checkpost Surveillance #12) -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-3.5 px-4 font-mono font-bold text-primary text-label-md">
+              TSK-PAT-118
+            </td>
+<td class="py-3.5 px-4">
+<div class="font-headline-sm text-headline-sm text-on-surface">Night Patrol &amp; Checkpost Surveillance #12</div>
+<div class="font-body-sm text-body-sm text-secondary">Adyar Bridge / Besant Nagar border vehicular inspection &amp; anti-theft vigil</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-label-sm text-label-sm font-bold">
+                  SK
+                </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">S. Karthikeyan <span class="font-mono text-secondary font-normal">[HG-4891]</span></div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Squad of 6 Guards • <span class="font-bold text-primary">Platoon D-1</span></div>
+</div>
+</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-semibold">Insp. S. Rajendran</div>
+<div class="font-label-sm text-label-sm text-secondary">Adyar Sector Duty Off.</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-body-sm text-body-sm text-on-surface font-semibold">J-5 Shastri Nagar PS</div>
+<div class="font-label-sm text-label-sm text-secondary">Checkpost #12 Adyar</div>
+</td>
+<td class="py-3.5 px-4 whitespace-nowrap">
+<div class="font-label-md text-label-md text-on-surface font-mono">Today, 22:00 - 05:00</div>
+<div class="font-label-sm text-label-sm text-secondary">Scheduled Next Shift</div>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-bold uppercase">
+                Normal
+              </span>
+</td>
+<td class="py-3.5 px-4 text-center whitespace-nowrap">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                Standby
+              </span>
+</td>
+
+
+
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination & Record Counter -->
+<div class="flex flex-col sm:flex-row items-center justify-between p-space-md bg-surface-container-lowest gap-space-sm">
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+        Showing <span class="font-semibold text-on-surface">5</span> of <span class="font-semibold text-on-surface">412</span> recorded bandobast assignments across 4 Chennai sectors.
+      </div>
+<div class="flex items-center gap-space-xs">
+<button class="p-2 rounded-lg bg-surface-container-low text-secondary hover:bg-surface-container disabled:opacity-40" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-label-sm text-label-sm font-bold" type="button">1</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm" type="button">2</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm" type="button">3</button>
+<span class="text-secondary px-1">...</span>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm" type="button">83</button>
+<button class="p-2 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Alternate Kanban View Container (Hidden initially, togglable via JavaScript) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-space-md mb-space-xl" id="dutyKanbanView">
+<!-- Column: Pending Dispatch -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+<div class="flex items-center justify-between pb-space-sm mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-secondary"></span>
+<span class="font-label-md text-label-md text-on-surface uppercase font-bold">Pending Dispatch</span>
+</div>
+<span class="px-2 py-0.5 rounded-lg bg-surface-container text-on-surface font-label-sm text-label-sm font-mono">44</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="font-mono text-label-sm text-primary font-bold">TSK-PAT-118</span>
+<span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm">Normal</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">Night Patrol &amp; Checkpost #12</div>
+<div class="font-body-sm text-body-sm text-secondary mt-1">J-5 Shastri Nagar • Squad of 6</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="">22:00 - 05:00</span>
+<span class="font-semibold text-primary">Platoon D-1</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: Pending Check-in -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+<div class="flex items-center justify-between pb-space-sm mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-primary-container"></span>
+<span class="font-label-md text-label-md text-on-surface uppercase font-bold">Pending Check-in</span>
+</div>
+<span class="px-2 py-0.5 rounded-lg bg-surface-container text-on-surface font-label-sm text-label-sm font-mono">1</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-sm rounded-lg bg-error-container/20 shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="font-mono text-label-sm text-primary font-bold">TSK-EVT-501</span>
+<span class="px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Urgent</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">VVIP Convoy Route Lining</div>
+<div class="font-body-sm text-body-sm text-secondary mt-1">Secretariat to Raj Bhavan • Squad of 24</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 my-2">
+<div class="bg-error h-1.5 rounded-full" style="width: 45%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-error font-semibold">11/24 Reported</span>
+<span class="">19:00 - 23:00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: In Progress (Live) -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+<div class="flex items-center justify-between pb-space-sm mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-tertiary-container animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface uppercase font-bold">In Progress</span>
+</div>
+<span class="px-2 py-0.5 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-mono font-bold">312</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="font-mono text-label-sm text-primary font-bold">TSK-BND-402</span>
+<span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm">Normal</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">Marina Beach Evening Bandobast</div>
+<div class="font-body-sm text-body-sm text-secondary mt-1">Station E-5 • 8 Guards</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 my-2">
+<div class="bg-primary-container h-1.5 rounded-full" style="width: 75%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-tertiary-container font-semibold">75% Verified</span>
+<span class="">16:00 - 22:00</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="font-mono text-label-sm text-primary font-bold">TSK-TRF-385</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">High</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">Kathipara Peak Hour Diversion</div>
+<div class="font-body-sm text-body-sm text-secondary mt-1">Guindy Hub • 12 Guards</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 my-2">
+<div class="bg-tertiary-container h-1.5 rounded-full" style="width: 100%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-tertiary-container font-semibold">100% Signed</span>
+<span class="">17:30 - 21:30</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: Completed -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+<div class="flex items-center justify-between pb-space-sm mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-tertiary"></span>
+<span class="font-label-md text-label-md text-on-surface uppercase font-bold">Completed</span>
+</div>
+<span class="px-2 py-0.5 rounded-lg bg-surface-container text-on-surface font-label-sm text-label-sm font-mono">356</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-sm rounded-lg bg-surface-container-low opacity-90 shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="font-mono text-label-sm text-primary font-bold">TSK-SEC-209</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">High</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface">Mylapore Festival Security</div>
+<div class="font-body-sm text-body-sm text-secondary mt-1">E-4 PS • Squad of 16</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-tertiary-container font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">check_circle</span> Debriefed
+            </span>
+<span class="">05:00 - 14:00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Operational Side Panel Modal for Creating New Duty Assignment -->
+<div class="fixed inset-0 z-50 hidden" id="dutyModal">
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-inverse-surface/60 backdrop-blur-sm transition-opacity" id="dutyModalBackdrop"></div>
+<!-- Modal Dialog / Drawer -->
+<div class="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface-container-lowest shadow-2xl flex flex-col justify-between overflow-hidden">
+<!-- Modal Header -->
+<div class="flex items-center justify-between px-space-lg py-space-md bg-inverse-surface text-inverse-on-surface">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[20px]">assignment_add</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-inverse-on-surface">Create New Duty Assignment</h2>
+<p class="font-body-sm text-body-sm text-secondary-fixed">Bandobast deployment order • Police Station Muster Roll</p>
+</div>
+</div>
+<button class="p-1 rounded-lg text-secondary-fixed hover:text-inverse-on-surface hover:bg-inverse-surface/50 transition-colors" id="closeNewDutyModal" type="button">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+</div>
+<!-- Modal Body (Form Fields) -->
+<div class="flex-1 overflow-y-auto p-space-lg space-y-space-md">
+<!-- Task Identification -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+<div class="sm:col-span-2">
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Duty / Task Title *</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="e.g., Marina Beach Pongal Bandobast Special Patrol" type="text">
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Generated ID</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container text-secondary font-mono font-bold text-label-md" readonly="" type="text" value="TSK-BND-409">
+</div>
+</div>
+<!-- Task Detailed Description -->
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Operational Description &amp; Directives</label>
+<textarea class="w-full p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Provide detailed sector perimeter instructions, crowd regulation instructions, emergency dispersal points..." rows="3"></textarea>
+</div>
+<!-- Personnel & Platoon Assignment -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Assign Platoon / Squad *</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container">
+<option value="platoon_b4">Platoon B-4 (South Coast Squad)</option>
+<option value="platoon_c2">Platoon C-2 (Traffic Division)</option>
+<option value="platoon_a1">Platoon A-1 (Mylapore Sector)</option>
+<option value="platoon_d1">Platoon D-1 (Adyar Checkpost Squad)</option>
+<option value="vvip_unit">Special VVIP Convoy Escort</option>
+</select>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Lead Guard / Squad In-Charge</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="Search badge or personnel (e.g. HG-3819)" type="text">
+</div>
+</div>
+<!-- Date & Shift Timing -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Shift Date *</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" type="date" value="2024-10-18">
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Start Time *</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" type="time" value="16:00">
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">End Time *</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container" type="time" value="22:00">
+</div>
+</div>
+<!-- Duty Location & Station -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Jurisdiction Police Station *</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container">
+<option value="e5">Station E-5 Foreshore Estate</option>
+<option value="e4">Station E-4 Abhiramapuram</option>
+<option value="j5">Station J-5 Shastri Nagar</option>
+<option value="g1">Station G-1 Guindy Kathipara</option>
+<option value="d1">Station D-1 Triplicane</option>
+</select>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Specific Sector / Point</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" placeholder="e.g., Gate 3, Light House promenade" type="text">
+</div>
+</div>
+<!-- Priority & Assigning Supervisor -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Priority Level</label>
+<div class="grid grid-cols-3 gap-2">
+<label class="flex items-center justify-center p-2 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer font-label-sm text-label-sm">
+<input checked="" class="mr-1.5" name="priority_lvl" type="radio" value="normal">
+                Normal
+              </label>
+<label class="flex items-center justify-center p-2 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer font-label-sm text-label-sm">
+<input class="mr-1.5" name="priority_lvl" type="radio" value="high">
+                High
+              </label>
+<label class="flex items-center justify-center p-2 rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer font-label-sm text-label-sm text-error font-bold">
+<input class="mr-1.5" name="priority_lvl" type="radio" value="urgent">
+                Urgent
+              </label>
+</div>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Assigning Supervisor</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container">
+<option value="insp_rajendran">Insp. S. Rajendran (TN-HG-44029)</option>
+<option value="dsp_sundaram">DSP K. Sundaram (TN-HG-SUP-0182)</option>
+<option value="commandant_state">Commandant General HQ</option>
+</select>
+</div>
+</div>
+<!-- Equipment / Kit Instructions -->
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Required Equipment &amp; Kit Dispatch</label>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 p-space-sm rounded-lg bg-surface-container-low">
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input checked="" class="rounded" type="checkbox">
+<span class="">Reflective High-Vis Vest</span>
+</label>
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input checked="" class="rounded" type="checkbox">
+<span class="">Standard Lathi</span>
+</label>
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input checked="" class="rounded" type="checkbox">
+<span class="">VHF Radio (Ch-08)</span>
+</label>
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input class="rounded" type="checkbox">
+<span class="">Traffic Baton Torch</span>
+</label>
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input class="rounded" type="checkbox">
+<span class="">Megaphone / PA Horn</span>
+</label>
+<label class="flex items-center gap-2 font-body-sm text-body-sm cursor-pointer">
+<input class="rounded" type="checkbox">
+<span class="">Raincoat &amp; Boots</span>
+</label>
+</div>
+</div>
+<!-- Linked Google Form -->
+<div>
+<label class="block font-label-sm text-label-sm uppercase font-bold text-on-surface mb-1">Linked Google Form for Attendance / Duty Debrief *</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container font-mono">
+<option value="gf_daily_duty_v4">GF-Daily-Duty-v4 (Standard Law &amp; Order Roll)</option>
+<option value="gf_traffic_bandobast_v2">GF-Traffic-Bandobast-v2 (Vehicle Diversion &amp; Challans)</option>
+<option value="gf_vvip_protocol_v1">GF-VVIP-Route-Protocol-v1 (Zero Clearance Log)</option>
+<option value="gf_festival_muster_v3">GF-Temple-Festival-Crowd-v3 (Muster &amp; Incident Log)</option>
+</select>
+<p class="font-body-sm text-body-sm text-secondary mt-1">Guards will scan the muster QR at roll call to sync responses directly to this duty record.</p>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="flex items-center justify-end gap-space-sm px-space-lg py-space-md bg-surface-container-low border-t-0">
+<button class="px-space-md py-2 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-label-md font-semibold transition-colors" id="cancelNewDutyModal" type="button">
+          Cancel &amp; Discard
+        </button>
+<button class="px-space-md py-2 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md font-bold transition-colors shadow-sm flex items-center gap-1.5" id="submitNewDutyModal" type="button">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="">Dispatch &amp; Publish Duty Order</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function initDutyManagement() {
+    // View Switcher logic (List vs Kanban)
+    const viewListBtn = document.getElementById('viewListBtn');
+    const viewKanbanBtn = document.getElementById('viewKanbanBtn');
+    const dutyListView = document.getElementById('dutyListView');
+    const dutyKanbanView = document.getElementById('dutyKanbanView');
+
+    function setView(isList) {
+      if (isList) {
+        dutyListView.classList.remove('hidden');
+        dutyKanbanView.classList.add('hidden');
+        viewListBtn.className = 'flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md bg-primary-container text-on-primary transition-all shadow-sm';
+        viewKanbanBtn.className = 'flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all';
+      } else {
+        dutyListView.classList.add('hidden');
+        dutyKanbanView.classList.remove('hidden');
+        viewKanbanBtn.className = 'flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md bg-primary-container text-on-primary transition-all shadow-sm';
+        viewListBtn.className = 'flex items-center gap-1.5 px-space-md py-1.5 rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all';
+      }
+    }
+
+    if (viewListBtn && viewKanbanBtn) {
+      viewListBtn.addEventListener('click', () => setView(true));
+      viewKanbanBtn.addEventListener('click', () => setView(false));
+    }
+
+    // Modal Drawer logic
+    const modal = document.getElementById('dutyModal');
+    const openBtn = document.getElementById('openNewDutyModal');
+    const closeBtn = document.getElementById('closeNewDutyModal');
+    const cancelBtn = document.getElementById('cancelNewDutyModal');
+    const backdrop = document.getElementById('dutyModalBackdrop');
+    const submitBtn = document.getElementById('submitNewDutyModal');
+
+    function openModal() {
+      if (modal) modal.classList.remove('hidden');
+    }
+    function closeModal() {
+      if (modal) modal.classList.add('hidden');
+    }
+
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        // Quick visual feedback
+        submitBtn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> Dispatching...';
+        setTimeout(() => {
+          submitBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span> Published!';
+          setTimeout(() => {
+            closeModal();
+            submitBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span> <span>Dispatch & Publish Duty Order</span>';
+          }, 600);
+        }, 800);
+      });
+    }
+
+    // Quick Live search filter on table rows
+    const searchInput = document.getElementById('dutyTableSearch');
+    if (searchInput && dutyListView) {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const rows = dutyListView.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const text = row.textContent.toLowerCase();
+          row.style.display = text.includes(query) ? '' : 'none';
+        });
+      });
+    }
+  })();
+</script></main></div>
+
+
+
+
+
+
+
+
+
+</body></html>

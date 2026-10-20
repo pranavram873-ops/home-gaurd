@@ -1,0 +1,467 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary": "#ffffff",
+          "on-secondary-fixed": "#131b2e",
+          "on-primary-fixed": "#001551",
+          "on-primary-fixed-variant": "#0039b5",
+          "secondary-fixed": "#dae2fd",
+          "inverse-surface": "#213145",
+          "on-surface": "#0b1c30",
+          "tertiary-fixed-dim": "#79db8d",
+          "surface-variant": "#d3e4fe",
+          "on-background": "#0b1c30",
+          "surface-container": "#e5eeff",
+          "on-primary-container": "#cad3ff",
+          "secondary-container": "#dae2fd",
+          "on-secondary-container": "#5c647a",
+          "surface-container-low": "#eff4ff",
+          "surface-tint": "#2151da",
+          "primary": "#0037b0",
+          "inverse-primary": "#b7c4ff",
+          "tertiary-container": "#006b2f",
+          "outline-variant": "#c4c5d7",
+          "secondary": "#565e74",
+          "outline": "#747686",
+          "primary-container": "#1d4ed8",
+          "tertiary-fixed": "#95f8a7",
+          "primary-fixed": "#dce1ff",
+          "background": "#f8f9ff",
+          "error": "#ba1a1a",
+          "surface-container-lowest": "#ffffff",
+          "on-surface-variant": "#434655",
+          "surface-container-highest": "#d3e4fe",
+          "error-container": "#ffdad6",
+          "tertiary": "#005022",
+          "surface-dim": "#cbdbf5",
+          "surface-bright": "#f8f9ff",
+          "on-tertiary-container": "#88ea9a",
+          "on-secondary": "#ffffff",
+          "on-tertiary-fixed-variant": "#005323",
+          "on-tertiary": "#ffffff",
+          "on-tertiary-fixed": "#00210a",
+          "on-error-container": "#93000a",
+          "surface-container-high": "#dce9ff",
+          "on-error": "#ffffff",
+          "inverse-on-surface": "#eaf1ff",
+          "primary-fixed-dim": "#b7c4ff",
+          "secondary-fixed-dim": "#bec6e0",
+          "surface": "#f8f9ff",
+          "on-secondary-fixed-variant": "#3f465c"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "margin-md": "2rem",
+          "margin": "1rem",
+          "space-2xl": "3rem",
+          "space-xl": "2rem",
+          "gutter-md": "1.5rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem"
+        },
+        "fontFamily": {
+          "headline-lg": [
+            "Inter"
+          ],
+          "label-sm": [
+            "Inter"
+          ],
+          "label-lg": [
+            "Inter"
+          ],
+          "headline-md": [
+            "Inter"
+          ],
+          "title-md": [
+            "Inter"
+          ],
+          "label-md": [
+            "Inter"
+          ],
+          "body-md": [
+            "Inter"
+          ],
+          "headline-sm": [
+            "Inter"
+          ],
+          "body-sm": [
+            "Inter"
+          ],
+          "display-sm": [
+            "Inter"
+          ],
+          "display-lg": [
+            "Inter"
+          ],
+          "body-lg": [
+            "Inter"
+          ]
+        },
+        "fontSize": {
+          "headline-lg": [
+            "1.5rem",
+            {
+              "lineHeight": "2rem",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-sm": [
+            "0.6875rem",
+            {
+              "lineHeight": "0.875rem",
+              "letterSpacing": "0.05em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-lg": [
+            "0.875rem",
+            {
+              "lineHeight": "1.25rem",
+              "letterSpacing": "0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "1.25rem",
+            {
+              "lineHeight": "1.75rem",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "1rem",
+            {
+              "lineHeight": "1.5rem",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "0.75rem",
+            {
+              "lineHeight": "1rem",
+              "letterSpacing": "0.025em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-md": [
+            "0.875rem",
+            {
+              "lineHeight": "1.375rem",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "1.125rem",
+            {
+              "lineHeight": "1.5rem",
+              "fontWeight": "600"
+            }
+          ],
+          "body-sm": [
+            "0.75rem",
+            {
+              "lineHeight": "1.125rem",
+              "fontWeight": "400"
+            }
+          ],
+          "display-sm": [
+            "1.75rem",
+            {
+              "lineHeight": "2.25rem",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-lg": [
+            "2.25rem",
+            {
+              "lineHeight": "2.75rem",
+              "letterSpacing": "-0.025em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "1rem",
+            {
+              "lineHeight": "1.625rem",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between"><div class="flex flex-col"><div class="px-space-md py-space-md flex items-center gap-space-sm bg-surface-container-high"><img alt="Tamil Nadu Home Guards Emblem" class="w-10 h-10 object-contain shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0cHG2Vq8Q7TOxm6jBRdAENAvMOBevkXvlQ-7Byu_fefGA-lx-n6ToFgxskUWIRTFEM5So_rsZKYqZzUaIDnyr_Z6xeXjsoZdVo-nWj_RgTY7qAMUFxEturyi9BqcWEsNt5mjrANI3uXdShz8HqIoh_reNy7u3kIGFc3jXH0nU34x2vkaogQewvzfzOiBw0cZkqP4YqXvYoNSQ7x2Cd9E6-raVBzzaOZbDaYZdgb6fXBKxb2s0MgfDytoSDXdXYxhvJw"><div class="flex flex-col min-w-0"><span class="font-label-sm text-label-sm text-primary uppercase tracking-wider truncate">Government of Tamil Nadu</span><span class="font-title-md text-title-md text-on-surface uppercase font-bold tracking-tight truncate">Tamil Nadu Home Guards</span><span class="font-label-sm text-[10px] text-secondary uppercase font-semibold tracking-wider truncate">Headquarters Command</span></div></div><div class="px-space-md pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Operational Menu</span></div><nav class="flex flex-col gap-space-xs px-space-sm" data-active-classes="bg-primary-container text-on-primary font-bold shadow-sm"><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-lg text-label-lg">Overview</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="employees" href="#"><span class="material-symbols-outlined text-[20px]">group</span><span class="font-label-lg text-label-lg">Home Guards</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="tasks" href="#"><span class="material-symbols-outlined text-[20px]">fact_check</span><span class="font-label-lg text-label-lg">Tasks</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="event-planner" href="#"><span class="material-symbols-outlined text-[20px]">calendar_month</span><span class="font-label-lg text-label-lg">Event Planner</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg transition-colors bg-primary-container text-on-primary font-bold shadow-sm" data-path="reports" href="#"><span class="material-symbols-outlined text-[20px]">bar_chart</span><span class="font-label-lg text-label-lg">Reports</span></a></nav></div><div class="p-space-sm m-space-sm rounded-xl bg-surface-container flex flex-col gap-space-sm"><div class="flex items-center gap-space-sm px-space-xs"><img alt="Tamil Nadu Home Guards Emblem" class="w-10 h-10 object-contain shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0cHG2Vq8Q7TOxm6jBRdAENAvMOBevkXvlQ-7Byu_fefGA-lx-n6ToFgxskUWIRTFEM5So_rsZKYqZzUaIDnyr_Z6xeXjsoZdVo-nWj_RgTY7qAMUFxEturyi9BqcWEsNt5mjrANI3uXdShz8HqIoh_reNy7u3kIGFc3jXH0nU34x2vkaogQewvzfzOiBw0cZkqP4YqXvYoNSQ7x2Cd9E6-raVBzzaOZbDaYZdgb6fXBKxb2s0MgfDytoSDXdXYxhvJw"><div class="flex flex-col min-w-0"><span class="font-label-sm text-label-sm text-primary uppercase tracking-wider truncate">Government of Tamil Nadu</span><span class="font-title-md text-title-md text-on-surface uppercase font-bold tracking-tight truncate">Tamil Nadu Home Guards</span><span class="font-label-sm text-[10px] text-secondary uppercase font-semibold tracking-wider truncate">Headquarters Command</span></div></div><div class="flex items-center justify-between pt-space-xs"><span class="inline-flex items-center px-space-sm py-0.5 rounded-lg font-label-sm text-label-sm bg-tertiary-container text-on-tertiary">Duty Active</span><a class="flex items-center gap-space-xs text-on-surface-variant hover:text-error transition-colors" data-path="login" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="font-label-sm text-label-sm">Logout</span></a></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-md"><div class="flex items-center gap-space-md min-w-0"><nav class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm"><a class="hover:text-primary transition-colors text-on-surface-variant" data-path="overview" href="#">Home Guards Portal</a><span class="material-symbols-outlined text-[14px]">chevron_right</span><span class="text-on-surface font-semibold">Duty Command Console</span></nav></div><div class="flex items-center gap-space-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-secondary text-[18px]">search</span><input class="h-10 pl-9 pr-4 w-72 rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-secondary font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container shadow-[0_1px_3px_rgba(15,23,42,0.05)]" placeholder="Search badge, service ID, personnel..." type="text"></div><div class="h-6 w-px bg-outline-variant"></div><button aria-label="Notifications" class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><div class="flex items-center gap-space-sm pl-space-xs"><div class="flex flex-col text-right"><span class="font-label-md text-label-md text-on-surface font-semibold">Platoon Superintendent</span><span class="font-label-sm text-label-sm text-secondary">Zone IV • Chennai Command</span></div><img alt="Profile" class="w-8 h-8 rounded-full object-cover shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0cHG2Vq8Q7TOxm6jBRdAENAvMOBevkXvlQ-7Byu_fefGA-lx-n6ToFgxskUWIRTFEM5So_rsZKYqZzUaIDnyr_Z6xeXjsoZdVo-nWj_RgTY7qAMUFxEturyi9BqcWEsNt5mjrANI3uXdShz8HqIoh_reNy7u3kIGFc3jXH0nU34x2vkaogQewvzfzOiBw0cZkqP4YqXvYoNSQ7x2Cd9E6-raVBzzaOZbDaYZdgb6fXBKxb2s0MgfDytoSDXdXYxhvJw"></div></div></header><main class="relative pt-16 w-full min-h-screen px-gutter-md py-margin-md bg-surface"><div class="flex flex-col w-full">
+<!-- Command Banner / Institutional Context Header -->
+<div class="relative overflow-hidden rounded-xl bg-inverse-surface text-inverse-on-surface p-space-lg shadow-md mb-space-lg">
+<div class="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs"><div class="flex items-center gap-space-xs"><span class="inline-flex items-center px-space-sm py-0.5 rounded-DEFAULT bg-error text-on-error font-label-sm text-label-sm uppercase tracking-wider font-bold">Vigilance &amp; Disciplinary Wing</span><span class="text-outline-variant font-label-sm text-label-sm">•</span><span class="font-label-sm text-label-sm text-surface-variant uppercase tracking-wider">Tamil Nadu Home Guards Central Command</span></div><h1 class="font-display-sm text-display-sm tracking-tight text-on-primary">Personnel Complaint &amp; Vigilance Register</h1><p class="font-body-md text-body-md text-surface-container max-w-2xl">Review disciplinary complaints, citizen grievances, conduct reports, and supervisory inquiries filed on Home Guards personnel across territorial muster divisions.</p></div>
+<!-- Quick Operational Action Cluster -->
+<div class="flex items-center flex-wrap gap-space-sm shrink-0"><button class="h-10 px-space-md bg-error hover:bg-error-container hover:text-on-error-container text-on-error rounded-lg font-label-md text-label-md flex items-center gap-space-xs transition-colors shadow-sm" id="btn-lodge-complaint"><span class="material-symbols-outlined text-[18px]">add_moderator</span><span class="">Lodge New Complaint</span></button><button class="h-10 px-space-md bg-surface-container-low/10 hover:bg-surface-container-low/20 text-inverse-on-surface rounded-lg font-label-md text-label-md flex items-center gap-space-xs transition-colors backdrop-blur-sm" id="btn-export-csv"><span class="material-symbols-outlined text-[18px]">download</span><span class="">Export Inquiry Dossier (CSV)</span></button><button class="h-10 px-space-md bg-primary-container text-on-primary hover:bg-primary transition-colors rounded-lg font-label-md text-label-md flex items-center gap-space-xs shadow-sm" id="btn-print-gazette"><span class="material-symbols-outlined text-[18px]">print</span><span class="">Print Gazette Notice</span></button></div>
+</div>
+</div>
+<!-- KPI Matrix Ribbon -->
+
+<!-- Command Filters Bar -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm mb-space-lg flex flex-col gap-space-md"><div class="flex items-center justify-between"><div class="flex items-center gap-space-xs text-on-surface font-label-lg text-label-lg"><span class="material-symbols-outlined text-[18px] text-primary">policy</span><span class="">Disciplinary &amp; Vigilance Filters</span></div><button class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-1" id="reset-filters-btn"><span class="material-symbols-outlined text-[14px]">refresh</span> Reset Default</button></div><div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-space-sm"><div class="flex flex-col gap-1"><label class="font-label-sm text-label-sm text-secondary uppercase tracking-wider" for="filter-date">Incident Date Range</label><div class="relative"><select class="w-full h-10 pl-3 pr-8 bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer" id="filter-date"><option value="30">Last 30 Days (Active Quarter)</option><option value="7">Last 7 Days (Immediate)</option><option value="90">Current Fiscal Half</option><option value="all">All Records (Complete Archive)</option></select><span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[20px] text-secondary pointer-events-none">expand_more</span></div></div><div class="flex flex-col gap-1"><label class="font-label-sm text-label-sm text-secondary uppercase tracking-wider" for="filter-division">Division / Station</label><div class="relative"><select class="w-full h-10 pl-3 pr-8 bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer" id="filter-division"><option value="all">All Divisions (Greater Chennai)</option><option value="adyar">Platoon 4 • Adyar Sub-Division</option><option value="mylapore">Platoon 2 • Mylapore Sector</option><option value="triplicane">Platoon 1 • Triplicane Beat</option><option value="central">Platoon 3 • Central Secretariat</option><option value="t-nagar">Platoon 5 • T. Nagar Division</option></select><span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[20px] text-secondary pointer-events-none">expand_more</span></div></div><div class="flex flex-col gap-1"><label class="font-label-sm text-label-sm text-secondary uppercase tracking-wider" for="filter-category">Complaint Nature</label><div class="relative"><select class="w-full h-10 pl-3 pr-8 bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer" id="filter-category"><option value="all">All Complaint Categories</option><option value="bribery">Extortion / Bribery Allegation</option><option value="absence">Absence from Bandobast Beat</option><option value="conduct">Conduct Unbecoming / Insubordination</option><option value="harassment">Civilian Harassment / Public Dispute</option><option value="dereliction">Dereliction of Mandatory Duty</option></select><span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[20px] text-secondary pointer-events-none">expand_more</span></div></div><div class="flex flex-col gap-1"><label class="font-label-sm text-label-sm text-secondary uppercase tracking-wider" for="filter-source">Complaint Source</label><div class="relative"><select class="w-full h-10 pl-3 pr-8 bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer" id="filter-source"><option value="all">All Intake Sources</option><option value="public">Citizen Grievance Portal</option><option value="events">Event Planner Vigilance Log</option><option value="supervisor">Supervisor Vigilance Inspection</option><option value="interdept">Police / Hospital Liaison Report</option></select><span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[20px] text-secondary pointer-events-none">expand_more</span></div></div><div class="flex flex-col gap-1"><label class="font-label-sm text-label-sm text-secondary uppercase tracking-wider" for="filter-status">Inquiry Status</label><div class="relative"><select class="w-full h-10 pl-3 pr-8 bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer" id="filter-status"><option value="all">All Inquiry Statuses</option><option value="investigation">Under Active Inquiry</option><option value="showcause">Show-Cause Notice Issued</option><option value="substantiated">Action Taken / Substantiated</option><option value="dismissed">Exonerated / Dismissed</option></select><span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[20px] text-secondary pointer-events-none">expand_more</span></div></div></div></div>
+<!-- Primary Workspace: Split Grid (Left: Table 7 Cols, Right: Dynamic Dossier Detail 5 Cols) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- Left Section: Reports Registry (7 cols) -->
+<div class="lg:col-span-7 flex flex-col gap-space-md">
+<!-- Table Container -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Table Header Bar -->
+<div class="px-space-md py-space-sm bg-inverse-surface text-inverse-on-surface flex items-center justify-between"><div class="flex items-center gap-space-xs"><span class="font-title-md text-title-md text-on-primary">Vigilance Inquiries &amp; Disciplinary Grievances</span><span class="px-space-xs py-0.5 rounded-DEFAULT bg-primary font-label-sm text-label-sm font-mono text-on-primary">5 of 48 Active</span></div><div class="flex items-center gap-space-xs text-surface-variant font-label-sm text-label-sm"><span class="inline-block w-2 h-2 rounded-full bg-error animate-pulse"></span><span class="">Vigilance Registry Live</span></div></div>
+<!-- Responsive Table Wrapper -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high font-label-sm text-label-sm uppercase tracking-wider text-secondary"><th class="py-space-sm px-space-md font-semibold">Complaint Ref / Date</th><th class="py-space-sm px-space-md font-semibold">Accused Personnel</th><th class="py-space-sm px-space-md font-semibold">Complainant / Source</th><th class="py-space-sm px-space-md font-semibold">Allegation / Nature</th><th class="py-space-sm px-space-md font-semibold">Risk / Severity</th><th class="py-space-sm px-space-md font-semibold">Inquiry Status</th></tr>
+</thead>
+<tbody class="divide-y divide-surface-container font-body-sm text-body-sm text-on-surface" id="reports-table-body"><tr class="hover:bg-surface-container-low transition-colors cursor-pointer bg-primary-container/10" data-report-id="CMP-2023-089"><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-mono font-bold text-primary">CMP-2023-089</span><span class="font-mono text-secondary text-[11px]">24 Oct, 09:15</span></div></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface">R. Murugan</span><span class="font-mono text-secondary text-[11px]">HG-3819 • Platoon 4</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">public</span> Public / Citizen Form</span></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface truncate max-w-[140px]" title="Allegation of unauthorized vehicle stalling at Kathipara flyover">Unauthorized Vehicle Stalling</span><span class="text-secondary text-[11px]">Alleged extortion/parking levy</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold">High Risk</span></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">pending_actions</span> Under Inquiry</span></td></tr><tr class="hover:bg-surface-container-low transition-colors cursor-pointer" data-report-id="CMP-2023-084"><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-mono font-bold text-primary">CMP-2023-084</span><span class="font-mono text-secondary text-[11px]">23 Oct, 18:40</span></div></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface">P. Saravanan</span><span class="font-mono text-secondary text-[11px]">HG-2490 • Platoon 2</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-secondary-container text-on-secondary-fixed font-label-sm text-label-sm whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">military_tech</span> Platoon Commander</span></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface truncate max-w-[140px]" title="Absence from designated bandobast post during temple procession">Absence from Beat</span><span class="text-secondary text-[11px]">Mylapore float procession</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">Medium</span></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">notification_important</span> Show-Cause Issued</span></td></tr><tr class="hover:bg-surface-container-low transition-colors cursor-pointer" data-report-id="CMP-2023-081"><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-mono font-bold text-primary">CMP-2023-081</span><span class="font-mono text-secondary text-[11px]">22 Oct, 23:15</span></div></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface">D. Loganathan</span><span class="font-mono text-secondary text-[11px]">HG-5122 • Platoon 1</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-secondary-container text-on-secondary-fixed font-label-sm text-label-sm whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">policy</span> Sector Vigilance SI</span></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface truncate max-w-[140px]" title="Insubordination and conduct breach during night patrol">Insubordination Breach</span><span class="text-secondary text-[11px]">Refusal to log checkpost roster</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-error text-on-error font-label-sm text-label-sm font-bold">Severe</span></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">gavel</span> Action Taken</span></td></tr><tr class="hover:bg-surface-container-low transition-colors cursor-pointer" data-report-id="CMP-2023-078"><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-mono font-bold text-primary">CMP-2023-078</span><span class="font-mono text-secondary text-[11px]">21 Oct, 11:20</span></div></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface">A. Senthil Nathan</span><span class="font-mono text-secondary text-[11px]">HG-4491 • Platoon 3</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface font-label-sm text-label-sm whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">local_hospital</span> GH Hospital Liaison</span></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface truncate max-w-[140px]" title="Public dispute regarding queue control at Royapettah GH">Public Queue Dispute</span><span class="text-secondary text-[11px]">Verbal altercation at casualty gate</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">Medium</span></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">verified</span> Resolved / Cleared</span></td></tr><tr class="hover:bg-surface-container-low transition-colors cursor-pointer" data-report-id="CMP-2023-075"><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-mono font-bold text-primary">CMP-2023-075</span><span class="font-mono text-secondary text-[11px]">19 Oct, 14:10</span></div></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface">K. Rajesh</span><span class="font-mono text-secondary text-[11px]">HG-4012 • Platoon 5</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm whitespace-nowrap"><span class="material-symbols-outlined text-[13px]">event_available</span> Event Planner #EP-VIG-204</span></td><td class="py-space-md px-space-md"><div class="flex flex-col"><span class="font-semibold text-on-surface truncate max-w-[140px]" title="Harassment complaint filed by roadside auto driver">Harassment Allegation</span><span class="text-secondary text-[11px]">T. Nagar Panagal Park beat</span></div></td><td class="py-space-md px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">Low Risk</span></td><td class="py-space-md px-space-md"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">verified</span> Dismissed</span></td></tr></tbody>
+</table>
+</div>
+<!-- Table Pagination Footer -->
+<div class="px-space-md py-space-sm bg-surface-container flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-secondary">Displaying 1-5 of 48 active vigilance complaints</span>
+<div class="flex items-center gap-space-xs">
+<button class="h-8 px-space-sm bg-surface-container-lowest text-on-surface rounded-DEFAULT font-label-sm text-label-sm hover:bg-surface-container-high transition-colors disabled:opacity-50" disabled="">
+              Previous
+            </button>
+<span class="px-2 font-label-sm text-label-sm font-bold text-primary">1</span>
+<button class="h-8 px-space-sm bg-surface-container-lowest text-on-surface rounded-DEFAULT font-label-sm text-label-sm hover:bg-surface-container-high transition-colors">
+              Next
+            </button>
+</div>
+</div>
+</div>
+<!-- Compliance Trend Inline Visualization -->
+
+</div>
+<!-- Right Section: Full Dossier Detail & Supervisory Audit Panel (5 cols) -->
+<div class="lg:col-span-5 flex flex-col gap-space-md" id="dossier-panel"><div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col"><div class="h-2 w-full bg-error"></div><div class="p-space-md flex flex-col gap-space-md"><div class="flex items-start justify-between gap-space-sm pb-space-sm border-b border-surface-container"><div class="flex items-center gap-space-sm"><div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center font-display-sm text-display-sm text-error font-bold shrink-0">RM</div><div class="flex flex-col min-w-0"><div class="flex items-center gap-space-xs"><span class="font-mono font-bold text-headline-sm text-error" id="detail-report-id">CMP-2023-089</span><span class="inline-flex items-center px-1.5 py-0.5 rounded-DEFAULT bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">High Severity</span></div><span class="font-title-md text-title-md text-on-surface font-semibold truncate" id="detail-officer">R. Murugan (HG-3819)</span><span class="font-body-sm text-body-sm text-secondary" id="detail-division">Platoon B-4 • Adyar Division</span></div></div><div class="px-space-sm py-1 rounded-DEFAULT bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-bold flex items-center gap-1 shrink-0" id="detail-status-badge"><span class="material-symbols-outlined text-[16px]">pending_actions</span><span class="">Under Inquiry</span></div></div><div class="grid grid-cols-2 gap-space-sm bg-surface-container-low p-space-sm rounded-lg font-body-sm text-body-sm"><div class="flex flex-col"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Incident Date &amp; Time</span><span class="font-semibold text-on-surface" id="detail-incident-time">24 Oct 2023 • 08:45 IST</span></div><div class="flex flex-col"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Assigned Beat Post</span><span class="font-mono font-semibold text-primary" id="detail-linked-task">Kathipara Junction Flyover</span></div><div class="flex flex-col"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Complainant Source</span><span class="font-semibold text-on-surface" id="detail-source">Citizen Grievance Portal</span></div><div class="flex flex-col"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Complainant Contact</span><span class="font-mono font-semibold text-secondary" id="detail-contact">K. Ramesh (Adyar) [Verified]</span></div></div><div class="flex flex-col gap-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-bold">Allegation Summary &amp; Narrative</span><div class="p-space-sm rounded-lg bg-surface font-body-md text-body-md text-on-surface"><p class="italic" id="detail-form-response">“Reported personnel demanding unauthorized toll/parking levy from commercial transport van at Kathipara interchange during morning peak bandobast. Stalled carrier truck for 15 minutes causing lane obstruction.”</p></div></div><div class="flex flex-col gap-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-bold">Personnel Explanation / Counter-Statement</span><div class="p-space-sm rounded-lg bg-surface-container-low font-body-sm text-body-sm text-on-surface"><p class="" id="detail-explanation">“Officer claims he was directing heavy vehicle away from fast lane towards service corridor as per peak-hour traffic advisory; denies financial exchange or unauthorized stalling.”</p></div></div><div class="flex flex-col gap-space-xs"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-bold">Patrol Checkpoint &amp; Evidence Reference</span><span class="font-mono text-[10px] text-secondary">GPS 13.0067° N, 80.2017° E</span></div><div class="relative w-full h-36 rounded-lg overflow-hidden bg-surface-container flex items-center justify-center"><img class="w-full h-full object-cover" data-alt="Tamil Nadu Home Guard officer at Kathipara junction flyover in Chennai with police barricades" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADdND05-MXgtL7yYMsr-MFcg-gXzn1gwt3r208rpkrDEg-n_738VvVa9LKtCPav09axQGSqQL8U1OwcsuPgV6ai7BbLrXnQaWDgGdBbLTJIuzVHcL__k0PgZ3TGLfmeDxIDJ4kpDbtbAHVduGXSO8FFmHpZUfwdEVlzHcsNKCLhtjdHNgPpDozTROZvahlomad9zLjD9d2jMhmumZYgqjsFnoqtsRt3-4QcLjY-OueceVGLBlMHbwq"><div class="absolute bottom-2 left-2 bg-inverse-surface/85 backdrop-blur-sm text-inverse-on-surface px-2 py-0.5 rounded-DEFAULT font-mono text-[10px] flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-error">location_on</span><span class="">Outpost E-4 Cross-Checked</span></div></div></div><div class="flex flex-col gap-space-xs pt-space-xs border-t border-surface-container"><div class="flex items-center justify-between"><label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface font-bold" for="confidential-notes">Inquiry Officer Notes (Command Confidential)</label><span class="font-label-sm text-label-sm text-secondary">Superintendent Eyes Only</span></div><textarea class="w-full p-space-sm bg-surface-container rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary-container" id="confidential-notes" placeholder="Enter inquiry findings, witness statements, and disciplinary recommendations..." rows="3">Summoned Kathipara Outpost Beat Inspector for CCTV corroboration. Show-cause explanation sought within 48 hours.</textarea></div><div class="flex flex-col gap-space-xs pt-space-xs"><div class="grid grid-cols-2 gap-space-sm"><button class="h-10 bg-error hover:bg-error-container hover:text-on-error-container text-on-error rounded-lg font-label-md text-label-md flex items-center justify-center gap-space-xs transition-colors shadow-sm" id="btn-show-cause"><span class="material-symbols-outlined text-[18px]">notification_important</span><span class="">Issue Show-Cause</span></button><button class="h-10 bg-primary-container hover:bg-primary text-on-primary rounded-lg font-label-md text-label-md flex items-center justify-center gap-space-xs transition-colors shadow-sm" id="btn-hearing"><span class="material-symbols-outlined text-[18px]">groups</span><span class="">Summon Hearing</span></button></div><div class="grid grid-cols-2 gap-space-sm"><button class="h-9 bg-tertiary-container hover:bg-tertiary text-on-tertiary rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-space-xs transition-colors" id="btn-dismiss"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="">Dismiss as Unsubstantiated</span></button><button class="h-9 bg-surface-container hover:bg-surface-container-high text-error rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-space-xs transition-colors font-bold" id="btn-suspend"><span class="material-symbols-outlined text-[16px]">block</span><span class="">Recommend Suspension</span></button></div></div><div class="flex items-center justify-between text-secondary font-mono text-[10px] pt-1 border-t border-surface-container"><span class="">Inquiry Officer: Insp. S. Rajendran [Cmdr]</span><span class="">Gazette Roll: TN-VIG-2023</span></div></div></div></div>
+</div>
+<!-- Toast Notification Container -->
+<div class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-inverse-surface text-inverse-on-surface shadow-xl" id="toast">
+<span class="material-symbols-outlined text-[20px] text-tertiary-fixed" id="toast-icon">check_circle</span>
+<span class="font-label-md text-label-md" id="toast-message">Report GF-TNHG-1049 approved successfully.</span>
+</div>
+</div>
+<script>
+  (function () {
+    // Mock dataset for interactive dossier preview switching
+    const reportsData = {
+      'GF-TNHG-1049': {
+        id: 'GF-TNHG-1049',
+        officer: 'R. Murugan (HG-3819)',
+        initials: 'RM',
+        division: 'Platoon 4 • Adyar Sub-Division',
+        status: 'Approved',
+        statusClass: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+        dutyHours: '24 Oct 2023 • 06.0 hrs',
+        linkedTask: 'TRF-GND-04',
+        location: 'Kathipara Junction Flyover',
+        outpost: 'Verified: Outpost E-4',
+        response: 'Executed peak hour vehicular segregation. Zero gridlock incidents reported. Coordinated smoothly with Traffic Law Enforcement sub-team to divert heavy container vehicles from inner arterial avenues.',
+        notes: 'Exemplary turnout verified by Sub-Inspector.'
+      },
+      'GF-TNHG-1048': {
+        id: 'GF-TNHG-1048',
+        officer: 'P. Saravanan (HG-2490)',
+        initials: 'PS',
+        division: 'Platoon 2 • Mylapore Sector',
+        status: 'Pending Review',
+        statusClass: 'bg-secondary-fixed text-on-secondary-fixed-variant',
+        dutyHours: '24 Oct 2023 • 08.0 hrs',
+        linkedTask: 'SEC-MYL-11',
+        location: 'Mylapore Temple Mada Street',
+        outpost: 'Verified: Outpost M-2',
+        response: 'Maintained strict temple crowd barricading during annual float festivities. Managed designated emergency corridor for ambulance clearance.',
+        notes: ''
+      },
+      'GF-TNHG-1047': {
+        id: 'GF-TNHG-1047',
+        officer: 'D. Loganathan (HG-5122)',
+        initials: 'DL',
+        division: 'Platoon 1 • Triplicane Beat',
+        status: 'Needs Correction',
+        statusClass: 'bg-error-container text-on-error-container',
+        dutyHours: '24 Oct 2023 • 04.5 hrs',
+        linkedTask: 'PAT-MRN-03',
+        location: 'Marina Promenade Service Lane',
+        outpost: 'Flagged: Checkpoint P-1 mismatch',
+        response: 'Beach night patrol duty executed between lighthouse and swimming pool sector. Checkpost log book missing stamp.',
+        notes: 'Needs counter-signature from Beat Inspector.'
+      },
+      'SA-TNHG-092': {
+        id: 'SA-TNHG-092',
+        officer: 'Insp. S. Rajendran [Cmdr]',
+        initials: 'SR',
+        division: 'Superintendent Office • Chennai Central',
+        status: 'Approved',
+        statusClass: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+        dutyHours: '23 Oct 2023 • Platoon Review',
+        linkedTask: 'AUD-PLT-Q3',
+        location: 'St. Thomas Mount Parade Grounds',
+        outpost: 'Central Registry Logged',
+        response: 'Completed quarterly inspection of 45 Home Guards. Turnout, drill accuracy, and emergency response kit readiness rated 92%.',
+        notes: 'Commended Platoon 4 for standard drill performance.'
+      },
+      'GF-TNHG-1045': {
+        id: 'GF-TNHG-1045',
+        officer: 'A. Senthil Nathan (HG-4491)',
+        initials: 'SN',
+        division: 'Platoon 3 • Central Secretariat',
+        status: 'Approved',
+        statusClass: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+        dutyHours: '23 Oct 2023 • 08.0 hrs',
+        linkedTask: 'SEC-GH-09',
+        location: 'Government Hospital Perimeter',
+        outpost: 'Verified: Outpost C-1',
+        response: 'Stationed at casualty ambulance gate. Monitored parking restrictions and escorted vital patient transfers during emergency influx.',
+        notes: 'Shift completed with full muster sync.'
+      }
+    };
+
+    function showToast(msg, iconName = 'check_circle', iconColor = 'text-tertiary-fixed') {
+      const toast = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-message');
+      const iconEl = document.getElementById('toast-icon');
+
+      if (!toast || !msgEl || !iconEl) return;
+      msgEl.textContent = msg;
+      iconEl.textContent = iconName;
+      iconEl.className = `material-symbols-outlined text-[20px] ${iconColor}`;
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3200);
+    }
+
+    // Row selection handling
+    const tableBody = document.getElementById('reports-table-body');
+    if (tableBody) {
+      tableBody.addEventListener('click', (e) => {
+        const row = e.target.closest('tr');
+        if (!row) return;
+
+        const reportId = row.getAttribute('data-report-id');
+        const data = reportsData[reportId];
+        if (!data) return;
+
+        // Visual selection on rows
+        tableBody.querySelectorAll('tr').forEach((r) => {
+          r.classList.remove('bg-primary-container/10');
+        });
+        row.classList.add('bg-primary-container/10');
+
+        // Update Dossier Panel View
+        document.getElementById('detail-report-id').textContent = data.id;
+        document.getElementById('detail-officer').textContent = data.officer;
+        document.getElementById('detail-division').textContent = data.division;
+        document.getElementById('detail-duty-hours').textContent = data.dutyHours;
+        document.getElementById('detail-linked-task').textContent = data.linkedTask;
+        document.getElementById('detail-location').textContent = data.location;
+        document.getElementById('detail-outpost').textContent = data.outpost;
+        document.getElementById('detail-form-response').textContent = `\u201C${data.response}\u201D`;
+        document.getElementById('confidential-notes').value = data.notes;
+
+        const badge = document.getElementById('detail-status-badge');
+        badge.className = `px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm font-bold flex items-center gap-1 shrink-0 ${data.statusClass}`;
+        badge.innerHTML = `<span class="material-symbols-outlined text-[16px]">${
+          data.status === 'Approved' ? 'verified' : data.status === 'Pending Review' ? 'schedule' : 'priority_high'
+        }</span><span>${data.status}</span>`;
+
+        // Smoothly scroll dossier into view on smaller displays
+        if (window.innerWidth < 1024) {
+          document.getElementById('dossier-panel').scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    }
+
+    // Action button listeners
+    const approveBtn = document.getElementById('btn-approve');
+    if (approveBtn) {
+      approveBtn.addEventListener('click', () => {
+        const currentId = document.getElementById('detail-report-id').textContent;
+        showToast(`Report ${currentId} certified & approved for stipend muster roll.`);
+      });
+    }
+
+    const correctBtn = document.getElementById('btn-request-correction');
+    if (correctBtn) {
+      correctBtn.addEventListener('click', () => {
+        const currentId = document.getElementById('detail-report-id').textContent;
+        showToast(`Revision request dispatched to reporting officer for ${currentId}`, 'warning', 'text-error');
+      });
+    }
+
+    const pdfBtn = document.getElementById('btn-export-dossier-pdf');
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', () => {
+        const currentId = document.getElementById('detail-report-id').textContent;
+        showToast(`Preparing signed Gazette certificate for ${currentId}...`, 'file_download', 'text-primary-container');
+      });
+    }
+
+    const btnCsv = document.getElementById('btn-export-csv');
+    if (btnCsv) {
+      btnCsv.addEventListener('click', () => {
+        showToast('Duty records CSV exported (894 entries).', 'table_chart', 'text-primary');
+      });
+    }
+
+    const btnMuster = document.getElementById('btn-export-muster');
+    if (btnMuster) {
+      btnMuster.addEventListener('click', () => {
+        showToast('Muster Roll Excel generated with Biometric hashes.', 'description', 'text-primary');
+      });
+    }
+
+    const btnPrint = document.getElementById('btn-print-gazette');
+    if (btnPrint) {
+      btnPrint.addEventListener('click', () => {
+        window.print();
+      });
+    }
+
+    const resetFiltersBtn = document.getElementById('reset-filters-btn');
+    if (resetFiltersBtn) {
+      resetFiltersBtn.addEventListener('click', () => {
+        document.getElementById('filter-date').value = '30';
+        document.getElementById('filter-division').value = 'all';
+        document.getElementById('filter-category').value = 'all';
+        document.getElementById('filter-source').value = 'all';
+        document.getElementById('filter-status').value = 'all';
+        showToast('Filters reset to standard 30-day operational muster.', 'tune', 'text-primary');
+      });
+    }
+  })();
+</script></main></div>
+
+
+
+
+
+
+
+
+
+</body></html>
