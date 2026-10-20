@@ -214,3 +214,4 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
    - `NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION=true`
 4. Click **Deploy**. Next.js will automatically compile all 32 static and dynamic routes.
 "# home-gaurd" 
+"# home-gaurd" 
