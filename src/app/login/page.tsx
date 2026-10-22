@@ -5,33 +5,52 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/authContext';
-import { UserRole } from '@/types';
-import { Lock, Mail, Eye, EyeOff, ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
+import { LOGIN_ROUTE_ERRORS } from '@/lib/auth/errors';
+import { loginSchema } from '@/lib/validation';
+import { Lock, Mail, Eye, EyeOff, ShieldAlert, ArrowRight, Loader2, Info } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, demoMode } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(
-    searchParams.get('error') === 'pending_approval'
-      ? 'Your enrolment is pending approval by Command Headquarters.'
-      : searchParams.get('error') === 'inactive_account'
-      ? 'This personnel account is currently suspended or inactive.'
+    LOGIN_ROUTE_ERRORS[searchParams.get('error') || ''] || null
+  );
+  const [infoMsg, setInfoMsg] = useState<string | null>(
+    searchParams.get('notice') === 'email_confirmed'
+      ? 'Email verified. You can now sign in with your password.'
+      : searchParams.get('notice') === 'password_updated'
+      ? 'Password updated. Sign in with your new password.'
+      : searchParams.get('notice') === 'enlistment_submitted'
+      ? 'Enlistment recorded. Confirm your email, then wait for Command HQ approval.'
       : null
   );
 
-  const handleLogin = async (e?: React.FormEvent, customEmail?: string, roleHint?: UserRole) => {
+  const handleLogin = async (e?: React.FormEvent, override?: { email: string; password: string }) => {
     if (e) e.preventDefault();
     setErrorMsg(null);
+    setInfoMsg(null);
 
-    const loginEmail = customEmail || email;
-    if (!loginEmail) {
+    const credentials = override ?? { email, password };
+
+    // Demo fast-track supplies its own credentials; typed input is validated.
+    if (!override) {
+      const validation = loginSchema.safeParse({
+        email: credentials.email,
+        password: credentials.password,
+      });
+      if (!validation.success) {
+        setErrorMsg(validation.error.errors[0]?.message || 'Enter your official email and password.');
+        return;
+      }
+    }
+
+    if (!credentials.email) {
       setErrorMsg('Please enter your registered official email address.');
       return;
     }
@@ -39,11 +58,21 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      const res = await login(loginEmail, roleHint);
+      const res = await login(credentials.email, credentials.password);
       if (res.success && res.role) {
-        if (res.role === 'admin') router.push('/admin/dashboard');
-        else if (res.role === 'commander') router.push('/commander/dashboard');
-        else router.push('/homeguard/dashboard');
+        // Honour the page middleware remembered, but only for in-app paths whose
+        // prefix matches the signed-in role (no open redirects).
+        const requested = searchParams.get('redirect') || '';
+        const fallback =
+          res.role === 'admin'
+            ? '/admin/dashboard'
+            : res.role === 'commander'
+            ? '/commander/dashboard'
+            : '/homeguard/dashboard';
+        const allowed =
+          (requested.startsWith('/admin') && res.role === 'admin') ||
+          (requested.startsWith('/homeguard') && res.role !== 'admin');
+        router.push(allowed ? requested : fallback);
         router.refresh();
       } else {
         setErrorMsg(res.error || 'Authentication failed. Please verify your credentials.');
@@ -56,10 +85,10 @@ function LoginForm() {
     }
   };
 
-  const quickFill = (userEmail: string, role: UserRole) => {
+  const quickFill = (userEmail: string) => {
     setEmail(userEmail);
     setPassword('Police@TN2024');
-    handleLogin(undefined, userEmail, role);
+    handleLogin(undefined, { email: userEmail, password: 'Police@TN2024' });
   };
 
   return (
@@ -68,6 +97,13 @@ function LoginForm() {
         <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
           <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {infoMsg && (
+        <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2">
+          <Info className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+          <span>{infoMsg}</span>
         </div>
       )}
 
@@ -83,6 +119,7 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. officer@tnhomeguards.gov.in"
+              autoComplete="username"
               required
               className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
             />
@@ -108,6 +145,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete="current-password"
               required
               className="block w-full pl-9 pr-10 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
             />
@@ -119,18 +157,6 @@ function LoginForm() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="rounded border-slate-300 text-blue-800 focus:ring-blue-800 w-3.5 h-3.5"
-            />
-            <span>Remember session securely</span>
-          </label>
         </div>
 
         <button
@@ -152,41 +178,50 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Quick Demo Switcher / Evaluator Fast-Track */}
-      <div className="mt-6 pt-4 border-t border-slate-200">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-          Fast-Track Role Access (One-Click Testing)
-        </span>
-        <div className="grid grid-cols-1 gap-2">
-          <button
-            type="button"
-            onClick={() => quickFill('admin@tnhomeguards.gov.in', 'admin')}
-            className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-left transition-colors cursor-pointer"
-          >
-            <div>
-              <span className="text-xs font-bold text-slate-900 block">State Administrator</span>
-              <span className="text-[11px] text-slate-500">Dr. K. Vijayakumar, IPS</span>
-            </div>
-            <span className="text-[10px] font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded">
-              Admin Roster
+      {/* Demo-only fast track. Never rendered in a production build. */}
+      {demoMode && (
+        <div className="mt-6 pt-4 border-t border-slate-200">
+          <div className="mb-2 p-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold flex items-start gap-2">
+            <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              DEMO MODE — in-memory sample data. These buttons do not authenticate
+              anyone and are disabled in production.
             </span>
-          </button>
+          </div>
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+            Fast-Track Role Access (Demo Data Only)
+          </span>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={() => quickFill('admin@tnhomeguards.gov.in')}
+              className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-left transition-colors cursor-pointer"
+            >
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">State Administrator</span>
+                <span className="text-[11px] text-slate-500">Dr. K. Vijayakumar, IPS</span>
+              </div>
+              <span className="text-[10px] font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded">
+                Admin Roster
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => quickFill('homeguard@tnhomeguards.gov.in', 'home_guard')}
-            className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-left transition-colors cursor-pointer"
-          >
-            <div>
-              <span className="text-xs font-bold text-slate-900 block">Home Guard Volunteer</span>
-              <span className="text-[11px] text-slate-500">HG A. Venkatesh (Platoon A-2)</span>
-            </div>
-            <span className="text-[10px] font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">
-              Duty & Check-in
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => quickFill('homeguard@tnhomeguards.gov.in')}
+              className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-left transition-colors cursor-pointer"
+            >
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">Home Guard Volunteer</span>
+                <span className="text-[11px] text-slate-500">HG A. Venkatesh (Platoon A-2)</span>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">
+                Duty &amp; Check-in
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Registration link */}
       <div className="mt-6 text-center text-xs text-slate-600">
