@@ -82,6 +82,8 @@ export interface DutyAssignment {
   location?: DutyLocation | null;
   personnel?: Profile | null;
   supervisor?: Profile | null;
+  district?: District | null;
+  unit?: Unit | null;
 }
 
 export type AttendanceEventType = 'check_in' | 'check_out';
@@ -160,6 +162,7 @@ export interface EventItem {
   updated_at: string;
   commander?: Profile | null;
   location?: DutyLocation | null;
+  district?: District | null;
   assigned_count?: number;
 }
 

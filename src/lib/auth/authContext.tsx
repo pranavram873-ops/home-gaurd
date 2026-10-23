@@ -4,30 +4,30 @@ import React, { createContext, useContext, useEffect, useRef, useState, useTrans
 import { useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { Profile, UserRole } from '@/types';
-import { dataService, initialProfiles } from '@/lib/services/dataService';
 import { createClient } from '@/lib/supabase/client';
-import { isDemoModeEnabled } from '@/lib/supabase/env';
 import { describeSignInError } from './errors';
 
 interface AuthContextType {
   user: Profile | null;
   role: UserRole | null;
   isLoading: boolean;
-  /** True only for a deliberate local demo build; demo users are NOT authenticated. */
-  demoMode: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>;
   logout: () => Promise<void>;
-  switchDemoRole: (newRole: UserRole) => void;
   refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // RLS policy "Users can view own profile" allows reading this row.
+// The district and unit are embedded by their foreign-key constraint names: an
+// unhinted join between the same pair of tables is refused by PostgREST, and
+// every screen that shows a guard's command reads these off the session.
 const PROFILE_SELECT = [
   'id', 'full_name', 'email', 'phone', 'personnel_id', 'role', 'district_id',
   'unit_id', 'account_status', 'rank_designation', 'avatar_url',
   'emergency_contact', 'blood_group', 'address', 'created_at', 'updated_at',
+  'district:districts!profiles_district_id_fkey ( id, name, code )',
+  'unit:units!profiles_unit_id_fkey ( id, name, code )',
 ].join(', ');
 
 async function loadProfile(userId: string): Promise<Profile | null> {
@@ -51,34 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, startTransition] = useTransition();
   const [user, setUser] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [demoMode] = useState(() => isDemoModeEnabled());
   // Guards against applying an async profile result after a newer one landed.
   const sessionRef = useRef<Session | null>(null);
   const sessionVersionRef = useRef(0);
 
   useEffect(() => {
     let active = true;
-
-    if (demoMode) {
-      const storedRole = getCookie('tnhg_demo_role') as UserRole | null;
-      const storedUserId = getCookie('tnhg_demo_user_id');
-      const profile =
-        (storedRole && storedUserId && dataService.getPersonnelById(storedUserId)) || initialProfiles[0];
-
-      console.warn(
-        '[DEMO MODE] Auth bypassed — showing in-memory personnel "' +
-          profile.full_name +
-          '". This is NOT a real authenticated session.'
-      );
-      setUser(profile);
-      setCookie('tnhg_demo_role', profile.role, 7);
-      setCookie('tnhg_demo_user_id', profile.id, 7);
-      setCookie('tnhg_demo_status', profile.account_status, 7);
-      setIsLoading(false);
-      return () => {
-        active = false;
-      };
-    }
 
     async function applySession(session: Session | null, version: number) {
       if (!active) return;
@@ -139,14 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
       unsubscribe?.();
     };
-  }, [demoMode]);
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-
-    if (demoMode) {
-      return demoLogin(email);
-    }
 
     if (!password) {
       setIsLoading(false);
@@ -191,8 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       sessionRef.current = data.session;
       setUser(profile);
-      // NOTE: writing the sign-in event to the real `audit_logs` table is a
-      // separate increment; the in-memory log is demo data and is not written here.
+      // Signing in is not an audited action: the trail holds the operational
+      // decisions (approvals, deployments, task and event changes) a command
+      // enquiry is actually answered from.
       return { success: true, role: profile.role };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication service is unavailable.';
@@ -202,24 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  function demoLogin(email: string): { success: boolean; error?: string; role?: UserRole } {
-    const matched = dataService.getPersonnel().find((p) => p.email.toLowerCase() === email.toLowerCase().trim());
-    if (!matched) {
-      setIsLoading(false);
-      return { success: false, error: 'DEMO MODE: no in-memory personnel matches that email.' };
-    }
-    if (matched.account_status !== 'active') {
-      setIsLoading(false);
-      return { success: false, error: 'DEMO MODE: this demo profile is not active.' };
-    }
-    setUser(matched);
-    setCookie('tnhg_demo_role', matched.role, 7);
-    setCookie('tnhg_demo_user_id', matched.id, 7);
-    setCookie('tnhg_demo_status', matched.account_status, 7);
-    setIsLoading(false);
-    return { success: true, role: matched.role };
-  }
-
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -228,9 +185,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore — session cookies are cleared below regardless
     }
-    deleteCookie('tnhg_demo_role');
-    deleteCookie('tnhg_demo_user_id');
-    deleteCookie('tnhg_demo_status');
     sessionRef.current = null;
     setUser(null);
     setIsLoading(false);
@@ -241,31 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const switchDemoRole = (newRole: UserRole) => {
-    if (!demoMode) return; // real sessions must never be swapped client-side
-    const targetUser = initialProfiles.find((p) => p.role === newRole && p.account_status === 'active');
-    if (!targetUser) return;
-
-    setUser(targetUser);
-    setCookie('tnhg_demo_role', targetUser.role, 7);
-    setCookie('tnhg_demo_user_id', targetUser.id, 7);
-    setCookie('tnhg_demo_status', targetUser.account_status, 7);
-
-    startTransition(() => {
-      if (newRole === 'admin') router.push('/admin/dashboard');
-      else router.push('/homeguard/dashboard');
-      router.refresh();
-    });
-  };
-
   const refreshUser = () => {
-    if (demoMode) {
-      if (user?.id) {
-        const updated = dataService.getPersonnelById(user.id);
-        if (updated) setUser(updated);
-      }
-      return;
-    }
     const userId = sessionRef.current?.user.id ?? user?.id;
     if (!userId) return;
     void loadProfile(userId).then((profile) => {
@@ -279,10 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         role: user?.role || null,
         isLoading,
-        demoMode,
         login,
         logout,
-        switchDemoRole,
         refreshUser,
       }}
     >
@@ -297,24 +225,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
-
-// Client cookie helper utilities (demo mode only)
-function setCookie(name: string, value: string, days: number) {
-  if (typeof document === 'undefined') return;
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function getCookie(name: string) {
-  if (typeof document === 'undefined') return null;
-  return document.cookie.split('; ').reduce((r, v) => {
-    const parts = v.split('=');
-    return parts[0] === name ? decodeURIComponent(parts[1]) : r;
-  }, '');
-}
-
-function deleteCookie(name: string) {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
 }

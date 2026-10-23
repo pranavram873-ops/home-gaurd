@@ -50,13 +50,6 @@ export function getAppUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
 }
 
-// Deliberate, opt-in local demo mode. Never available in a production build:
-// demo identities are not authenticated and must not be reachable there.
-export function isDemoModeEnabled(): boolean {
-  if (process.env.NODE_ENV === 'production') return false;
-  return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-}
-
 // Public enlistment switch (defaults to enabled).
 export function isPublicRegistrationEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION !== 'false';

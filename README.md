@@ -10,8 +10,9 @@ An enterprise-grade, full-stack operational supervision platform designed specif
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript
 - **Styling & Design System:** Tailwind CSS v4, Inter Typography, Official Tamil Nadu Home Guards Emblem & Palette (Navy Blue `#002b7f`, Royal Blue `#0037b0`, Laurel Green `#006b2f`, Crimson Red `#ba1a1a`)
 - **Icons:** Lucide React
-- **Backend & APIs:** Next.js Server Components, Server Actions & Route Handlers (`/api/attendance/check-in`)
-- **Database:** Supabase PostgreSQL with 13 relational tables, foreign key constraints, indexes, and comprehensive Row Level Security (RLS) policies
+- **Backend & APIs:** Route handlers only where a browser cannot go — `/api/attendance/check-in` (server-side geofence calculation) and `/api/admin/personnel` (creating a login, which RLS cannot express)
+- **Database:** Supabase PostgreSQL with 14 relational tables, foreign key constraints, indexes, and comprehensive Row Level Security (RLS) policies
+- **Data access:** every screen reads and writes the database through the browser Supabase client, so RLS decides what an account may see. There is no sample or in-memory data anywhere in the application.
 - **Authentication:** Supabase Auth (SSR session cookies) & Role-Based Access Control (RBAC)
 - **Geofencing:** Server-validated Haversine formula calculation verifying coordinates against circular perimeters (150m - 250m)
 - **Validation:** Zod schemas
@@ -33,8 +34,8 @@ home-guard-supervision/
 │   └── run-tests.mjs                     # Automated security & business rules test runner
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx                      # Public landing page with government branding
-│   │   ├── login/page.tsx                # Role-based login with show/hide password & quick demo access
+│   │   ├── page.tsx                      # Redirects to /login; there is no public landing page
+│   │   ├── login/page.tsx                # Supabase password sign-in with show/hide password
 │   │   ├── register/page.tsx             # Volunteer enrolment (enforces 'pending' status)
 │   │   ├── forgot-password/page.tsx      # Password recovery dispatch
 │   │   ├── reset-password/page.tsx       # Secure password reset
@@ -47,29 +48,46 @@ home-guard-supervision/
 │   │   │   ├── tasks/page.tsx            # Supervision Kanban board (New, Assigned, In Flight, Done)
 │   │   │   ├── events/page.tsx           # Major operations planner (VIP route, festival bandobast)
 │   │   │   ├── reports/page.tsx          # Muster analytics, compliance rate & CSV export
-│   │   │   └── audit/page.tsx            # Immutable security & administrative access logs
 │   │   ├── homeguard/
 │   │   │   ├── dashboard/page.tsx        # Personalized guard duty portal
 │   │   │   ├── location/page.tsx         # GPS & Biometric geofenced check-in / check-out
 │   │   │   ├── duties/page.tsx           # Duty schedule & shift details
 │   │   │   ├── tasks/page.tsx            # Assigned directives with progress toggle
 │   │   │   ├── attendance/page.tsx       # Personal attendance history
+│   │   │   ├── reports/page.tsx          # Personnel report desk (shared component)
 │   │   │   └── profile/page.tsx          # Permitted contact dossier updates
 │   │   ├── api/
-│   │   │   └── attendance/check-in/      # Coordinate validation & attendance stamp API
+│   │   │   ├── admin/personnel/route.ts  # Server-only staff enrolment; mints the Auth login
+│   │   │   └── attendance/check-in/route.ts # Coordinate validation & muster stamp API
 │   │   ├── layout.tsx                    # Root layout with AuthProvider & Inter font
 │   │   └── globals.css                   # Theme definitions & beacon pulse animations
 │   ├── components/
-│   │   └── layout/
-│   │       ├── Header.tsx                # Fixed top bar with live calendar date & notifications
-│   │       ├── Sidebar.tsx               # Persistent left navigation with official emblem
-│   │       └── DashboardLayout.tsx       # Responsive layout shell
+│   │   ├── layout/
+│   │   │   ├── Header.tsx                # Fixed top bar with live calendar date & notifications
+│   │   │   ├── Sidebar.tsx               # Persistent left navigation with official emblem
+│   │   │   └── DashboardLayout.tsx       # Responsive layout shell
+│   │   └── reports/
+│   │       └── ComplaintCenter.tsx       # Report submission, review and response workflow
 │   ├── lib/
 │   │   ├── auth/
 │   │   │   ├── authContext.tsx           # Supabase session, sign-in/out, profile state
 │   │   │   └── errors.ts                 # Supabase Auth errors as departmental messages
+│   │   ├── hooks/
+│   │   │   └── useLiveQuery.ts           # Loading, error and refresh state for a database screen
 │   │   ├── services/
-│   │   │   └── dataService.ts            # Data operations layer with realistic Tamil Nadu seed data
+│   │   │   ├── queryError.ts             # Postgres / PostgREST codes as readable messages
+│   │   │   ├── selects.ts                # The verified column lists every service shares
+│   │   │   ├── referenceService.ts       # Districts, units, duty posts
+│   │   │   ├── personnelService.ts       # Roster reads, own-profile updates, staff enrolment
+│   │   │   ├── assignmentService.ts      # Duty rosters
+│   │   │   ├── attendanceService.ts      # Muster stamps
+│   │   │   ├── taskService.ts            # Tasks and their status history
+│   │   │   ├── eventService.ts           # Events and event deployments
+│   │   │   ├── notificationService.ts    # Header bell
+│   │   │   ├── auditService.ts           # Audit trail writes and reads
+│   │   │   ├── enrolmentService.ts       # Approvals desk queue and decisions
+│   │   │   ├── statsService.ts           # Dashboard head counts and activity panels
+│   │   │   └── reportService.ts          # Row set behind the Reports desk
 │   │   ├── supabase/
 │   │   │   ├── client.ts                 # Browser Supabase client (@supabase/ssr)
 │   │   │   ├── server.ts                 # Server-side Supabase client with Next.js cookies
@@ -84,10 +102,11 @@ home-guard-supervision/
 └── supabase/
     └── migrations/
         ├── 20261019000000_initial_schema.sql  # 13 relational tables, indexes, RLS & escalation triggers
-        ├── 20261019000001_seed_units_and_mock_personnel.sql # Real TN posts (Marina, Central, Meenakshi)
+        ├── 20261019000001_seed_units_and_mock_personnel.sql # District units & real duty posts (reference data)
         ├── 20261021000000_enrolment_hook_and_commander_role.sql # Profile row on signup
         ├── 20261022000000_guard_reports.sql # Guard reports, admin review, scoped RLS
-        └── 20261023000000_remove_commander_role.sql # Retires the Area Commander role
+        ├── 20261023000000_remove_commander_role.sql # Retires the Area Commander role
+        └── 20261024000000_personnel_badge.sql # Issues the service badge when an account is activated
 ```
 
 ---
@@ -101,7 +120,16 @@ session travels in SSR cookies refreshed by `src/middleware.ts` on each request.
 There are **no built-in logins**. Every operational account must exist in
 Supabase Auth with an `active` profile row. Create the first administrator with
 the bootstrap script in section 5, then promote or activate volunteers from the
-approvals desk.
+approvals desk or with **Add Personnel**.
+
+**Every screen behind the sign-in is database-backed.** The two dashboards,
+personnel roster, duty posts, bandobast board, task board, event planner,
+approvals desk, reports, the guard's own duty / task / attendance / profile
+screens and the personnel report desk all query Supabase through the browser
+client, so Row Level Security decides what the signed-in account can read or
+change. There is no demo mode and no in-memory fixture left to remove. A freshly
+provisioned project therefore shows reference data only — districts, units and
+duty posts — and every operational list is honestly empty until records exist.
 
 | Role | Authorized Dashboard | Notes |
 |---|---|---|
@@ -112,15 +140,46 @@ approvals desk.
 Sign-in failures are reported per cause: wrong credentials, e-mail not
 confirmed, no profile row, pending approval, suspended account, rate limiting.
 
-> **Demo mode (not authentication):** set `NEXT_PUBLIC_DEMO_MODE=true` outside a
-> production build to sign in from in-memory sample personnel. It adds a
-> "DEMO DATA" badge to the header and login screen, and a production build
-> ignores the flag entirely, so a demo can never be mistaken for a real session.
+> **No demo mode.** The application has no flag that bypasses authentication
+> and no sample personnel to sign in as. If a screen looks empty, it is because
+> the table beneath it is empty, not because data was withheld.
 
 ### Role Authorization Rules
 - **Home Guards:** Exclusively restricted to their personal dashboard, assigned duty, tasks, and GPS check-in. Attempting to navigate to `/admin/*` is automatically redirected.
 - **Administrators:** Full statewide oversight across all 38 districts, registration approval authority, and geofence post configuration.
-- **Pending Recruits:** If an applicant submits enrolment via `/register`, a `profiles` row is created by the database trigger with role `home_guard` and status `pending`. It waits in the administrator's approvals desk directly — there is no Area Command step. They must confirm their e-mail and be approved before operational access is granted.
+- **Pending Recruits:** If an applicant submits enrolment via `/register`, a `profiles` row is created by the database trigger with role `home_guard` and status `pending`. It waits in the administrator's approvals desk directly — there is no Area Command step. `/admin/approvals` reads and writes that live `profiles` table (visible and editable only to an administrator under RLS), so **Verify & Approve** sets `account_status = 'active'` in the database itself. The applicant must also confirm their e-mail before Supabase Auth will issue a session.
+
+### Adding Personnel from the administrator desk
+
+Volunteers enrol themselves; **Add Personnel** on `/admin/personnel` covers the
+other case — a transfer posting, a direct appointment, an officer who never
+submitted the public form. Creating a *login* is the one operation RLS cannot
+express (`profiles` allows an insert only where `auth.uid() = id`), so the form
+posts to `/api/admin/personnel`, the only place in the application that reads the
+secret key:
+
+1. The route verifies the caller with the cookie-bound session client
+   (`auth.getUser()`) and then asks the database `rpc('is_admin')`. No session is
+   `401`, a signed-in non-administrator is `403`, and a failed authority check is
+   `503` — the account is never created on a guess.
+2. The chosen district and unit ids are resolved to their `code` values first, so
+   the signup trigger can act on them and a stale id is rejected before any Auth
+   user exists.
+3. `auth.admin.createUser({ email_confirm: true, user_metadata })` mints the
+   login. `handle_new_user` writes the `pending` `home_guard` profile row from
+   that metadata. An address already on the roster returns `409`.
+4. The route updates that row by id with the selected role, district, unit, rank
+   and `account_status = 'active'`, or inserts it if the trigger has not been
+   installed. If the profile write fails, the Auth user is deleted again rather
+   than left signing in to a blank dossier.
+5. An `audit_logs` row (`CREATE_STAFF_ACCOUNT`) names the acting administrator and
+   the new officer, and the response returns a generated temporary password
+   **once** for the operator to hand over. It is not stored anywhere; the officer
+   is expected to set their own through the forgot-password flow.
+
+The `assign_personnel_badge` trigger issues the service badge number as the row
+becomes active, whether the account was approved at the approvals desk or created
+here, so `personnel_id` collisions stay inside the database's `UNIQUE` check.
 
 ---
 
@@ -176,18 +235,28 @@ To provision the initial State Administrator without exposing credentials:
 ### Supabase Database Setup
 1. Provision Supabase through the Vercel Marketplace (or at [supabase.com](https://supabase.com)).
 2. For a **new, empty project only**, open the Supabase SQL Editor and apply
-   each migration once, in timestamp order. The first migration creates the
-   schema and the audit table; the second adds sample locations and units; the
-   third adds the signup trigger; the fourth adds personnel reports; the fifth
-   retires the Area Commander role. Do not re-run these files on a project whose
-   schema is already present. Apply only missing migrations, in timestamp order.
+   each migration once, in timestamp order. The first creates the schema,
+   indexes, RLS policies and the escalation trigger; the second seeds the
+   district **units** and the real **duty posts** (reference data — it inserts no
+   personnel, no duties and no attendance); the third adds the signup trigger;
+   the fourth adds personnel reports; the fifth retires the Area Commander role;
+   the sixth issues the service badge when an account is activated. Do not
+   re-run these files on a project whose schema is already present. Apply only
+   missing migrations, in timestamp order.
 3. For the currently connected project, first run the read-only connectivity
-   check below. If it reports all 14 tables, do not apply the first two files
-   again. Check whether `public.handle_new_user()` and the
-   `on_auth_user_created` trigger exist; if they do not, apply the enrolment
-   migration. Apply `20261022000000_guard_reports.sql` once to enable the
-   report workflow, and `20261023000000_remove_commander_role.sql` once to drop
-   the commander role, its `is_commander()` helper and its policy clauses.
+   check below. If it reports all 14 tables, do not apply the first file again.
+   The seed inserts duty posts without an `ON CONFLICT` clause, so run
+   `20261019000001_seed_units_and_mock_personnel.sql` **exactly once**, and only
+   while `units` and `duty_locations` are empty. Check whether
+   `public.handle_new_user()` and the `on_auth_user_created` trigger exist; if
+   they do not, apply the enrolment migration. Apply
+   `20261022000000_guard_reports.sql` once to enable the report workflow,
+   `20261023000000_remove_commander_role.sql` once to drop the commander role,
+   its `is_commander()` helper and its policy clauses, and
+   `20261024000000_personnel_badge.sql` once so an approved or enrolled account
+   receives a badge number. Apply each file once; only the badge migration is
+   written to be safe to repeat (`CREATE OR REPLACE` plus
+   `DROP TRIGGER IF EXISTS`).
 4. Verify from the terminal (read-only, prints no secrets):
    ```bash
    npm run check:supabase
@@ -256,8 +325,6 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
    - `NEXT_PUBLIC_APP_URL` — the deployed origin, used for recovery e-mails
    - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
    - `NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION=true`
-   - `NEXT_PUBLIC_DEMO_MODE` — omit it, or leave it `false`; a production build
-     ignores it either way
-4. Click **Deploy**. Next.js will automatically compile all 32 static and dynamic routes.
+4. Click **Deploy**. Next.js will automatically compile all static and dynamic routes.
 "# home-gaurd" 
 "# home-gaurd" 

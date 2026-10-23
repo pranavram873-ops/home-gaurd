@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { dataService } from '@/lib/services/dataService';
+import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
+import { getReportDataset, type ReportDataset } from '@/lib/services/reportService';
 import type { AttendanceEvent } from '@/types';
 import { ComplaintCenter } from '@/components/reports/ComplaintCenter';
 import {
@@ -21,6 +22,7 @@ import {
   BarChart3,
   Plus,
   FileText,
+  Loader2,
   X,
 } from 'lucide-react';
 
@@ -51,9 +53,20 @@ interface MusterRow {
   radius: number | null;
 }
 
+/**
+ * `start_time` and `end_time` are Postgres `time` values, which arrive as
+ * "HH:MM:SS" rather than the "0900hrs" the fixtures used. Labels drop the
+ * seconds, and the scheduled timestamp must not have them appended twice.
+ */
+function clock(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hh, mm] = timeStr.split(':');
+  return mm ? `${hh}:${mm}` : timeStr;
+}
+
 function toDateTime(dateStr: string, timeStr: string): Date | null {
   if (!dateStr || !timeStr) return null;
-  const d = new Date(`${dateStr}T${timeStr}:00`);
+  const d = new Date(`${dateStr}T${clock(timeStr)}:00`);
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -197,12 +210,25 @@ function Donut({ segments, centerLabel, centerValue }: {
 // ------------------------------------------------------------------
 
 export default function ReportsPage() {
-  const assignments = dataService.getDutyAssignments();
-  const attendance = dataService.getAttendanceEvents();
-  const tasks = dataService.getTasks();
-  const units = dataService.getUnits();
-  const locations = dataService.getDutyLocations();
-  const guards = dataService.getPersonnel({ role: 'home_guard', status: 'active' });
+  const reportQuery = useLiveQuery<ReportDataset>(() => getReportDataset(), null);
+
+  // Every figure on this page is computed from these six arrays, read once in a
+  // single parallel round trip. The arithmetic beneath them is unchanged from
+  // when it ran against the in-memory fixtures; only the source moved. The
+  // empties are stable references, so the memos beneath recompute only when a
+  // refresh actually lands new rows rather than on every render.
+  const dataset = reportQuery.data;
+  const { assignments, attendance, tasks, units, locations, guards } = useMemo(
+    () => ({
+      assignments: dataset?.assignments ?? [],
+      attendance: dataset?.attendance ?? [],
+      tasks: dataset?.tasks ?? [],
+      units: dataset?.units ?? [],
+      locations: dataset?.locations ?? [],
+      guards: dataset?.guards ?? [],
+    }),
+    [dataset],
+  );
 
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [unitFilter, setUnitFilter] = useState('all');
@@ -250,18 +276,20 @@ export default function ReportsPage() {
         badge: a.personnel?.personnel_id || '—',
         name: a.personnel?.full_name || 'Assigned Volunteer',
         unitId: a.personnel?.unit_id || a.unit_id || 'unassigned',
-        unitName: a.personnel?.unit?.name || 'Unassigned Unit',
+        unitName: a.personnel?.unit?.name || a.unit?.name || 'Unassigned Unit',
         duty: a.title,
         locationId: a.duty_location_id || '',
         locationName: a.location?.name || 'Assigned Post',
-        shift: `${a.start_time} – ${a.end_time}`,
+        shift: `${clock(a.start_time)} – ${clock(a.end_time)}`,
         dutyDate: a.duty_date,
-        scheduledAt: scheduled ? `${a.duty_date} ${a.start_time}` : a.duty_date,
+        scheduledAt: scheduled ? `${a.duty_date} ${clock(a.start_time)}` : a.duty_date,
         checkInAt: checkIn?.recorded_at || null,
         checkOutAt: checkOut?.recorded_at || null,
         status,
         geofence,
-        distanceMeters: checkIn?.distance_meters ?? null,
+        // The distance is stored with sub-metre precision; a muster roll reads
+        // it in whole metres.
+        distanceMeters: checkIn ? Math.round(checkIn.distance_meters) : null,
         radius: a.location?.radius_meters ?? null,
       };
     });
@@ -455,6 +483,23 @@ export default function ReportsPage() {
           </div>
           <ComplaintCenter />
         </section>
+
+        {reportQuery.error && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">The reporting data could not be read</span>
+              <p className="mt-0.5">{reportQuery.error}</p>
+            </div>
+          </div>
+        )}
+
+        {reportQuery.loading && (
+          <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Reading duty, muster and task rows from the database…
+          </p>
+        )}
         {/* Header / action bar */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-end gap-3">
           <div className="flex flex-wrap items-end gap-3 flex-1">
@@ -518,10 +563,14 @@ export default function ReportsPage() {
               <Plus className="w-4 h-4" /> New Report
             </button>
             <button
-              onClick={() => setGeneratedAt(new Date().toISOString())}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              onClick={() => {
+                void reportQuery.refresh();
+                setGeneratedAt(new Date().toISOString());
+              }}
+              disabled={reportQuery.loading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className="w-4 h-4" /> Generate Report
+              <RefreshCw className={`w-4 h-4 ${reportQuery.loading ? 'animate-spin' : ''}`} /> Generate Report
             </button>
             <button
               onClick={exportMuster}
@@ -666,7 +715,7 @@ export default function ReportsPage() {
                 ))}
                 {tableRows.length === 0 && (
                   <tr>
-                    <td colSpan={11}><EmptyTable /></td>
+                    <td colSpan={11}><EmptyTable filterActive={filterActive} /></td>
                   </tr>
                 )}
               </tbody>
@@ -683,7 +732,7 @@ export default function ReportsPage() {
             </button>
           </div>
           <div className="divide-y divide-slate-100">
-            {unitGroups.length === 0 && <div className="p-6"><EmptyTable /></div>}
+            {unitGroups.length === 0 && <div className="p-6"><EmptyTable filterActive={filterActive} /></div>}
             {unitGroups.map((u) => {
               const open = expandedUnit === u.id;
               return (
@@ -828,7 +877,7 @@ export default function ReportsPage() {
                     type="text"
                     value={reportForm.title}
                     onChange={(e) => setReportForm({ ...reportForm, title: e.target.value })}
-                    placeholder="e.g. Weekly Muster Compliance – Mylapore"
+                    placeholder="e.g. Weekly Muster Compliance – Last 30 Days"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
                   />
                 </div>
@@ -912,7 +961,7 @@ export default function ReportsPage() {
                 )}
 
                 <p className="text-[11px] text-slate-500 bg-slate-50 rounded-lg p-2.5">
-                  The report is generated from the current application data (duty assignments, attendance and tasks) for the selected date range. Any unit/location/shift filters still applied on the page will be respected on export.
+                  The report is generated from the rows currently held in the database (duty assignments, attendance and tasks) for the selected date range. Any unit/location/shift filters still applied on the page will be respected on export.
                 </p>
 
                 <div className="pt-2 border-t border-slate-100 flex justify-end gap-2">
@@ -970,12 +1019,29 @@ function EmptyHint() {
   return <p className="text-xs text-slate-400 py-4 text-center">No data available for the selected filters.</p>;
 }
 
-function EmptyTable() {
+/**
+ * An empty muster roll means two different things: the filters hid rows that
+ * exist, or no duty has been deployed yet. Only the second is answered by
+ * changing a filter, so the page has to say which one it is showing.
+ */
+function EmptyTable({ filterActive }: { filterActive?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
       <Filter className="w-6 h-6 text-slate-300" />
-      <p className="text-sm font-semibold text-slate-500">No records match the current filters</p>
-      <p className="text-xs text-slate-400">Adjust the date range, unit, location or shift filters above.</p>
+      {filterActive ? (
+        <>
+          <p className="text-sm font-semibold text-slate-500">No records match the current filters</p>
+          <p className="text-xs text-slate-400">Adjust the date range, unit, location or shift filters above.</p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-slate-500">No deployment records on the system yet</p>
+          <p className="text-xs text-slate-400 max-w-md">
+            This roll is built from duty assignments and the check-ins recorded against them. Deploy a bandobast and
+            stamp a muster, and the rows appear here.
+          </p>
+        </>
+      )}
     </div>
   );
 }

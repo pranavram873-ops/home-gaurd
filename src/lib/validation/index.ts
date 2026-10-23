@@ -101,3 +101,28 @@ export const eventSchema = z.object({
 });
 
 export type EventInput = z.infer<typeof eventSchema>;
+
+/**
+ * The Add Personnel payload. There is deliberately no password field: the
+ * server route mints a temporary one, and no field for `account_status`,
+ * because the route always activates the row it creates. Accepting either from
+ * the browser would let a caller shape an account the trigger guards elsewhere.
+ */
+export const staffAccountSchema = z.object({
+  full_name: z.string().min(3, 'Full name must be at least 3 characters'),
+  email: z.string().email('Please enter a valid official email address'),
+  phone: z
+    .string()
+    .regex(/^[0-9]{10}$/, 'Mobile number must be a valid 10-digit number')
+    .optional()
+    .nullable(),
+  role: z.enum(['admin', 'home_guard']),
+  rank_designation: z.string().min(2, 'Rank / designation is required'),
+  district_id: z.string().min(1, 'District is required'),
+  unit_id: z.string().optional().nullable(),
+  blood_group: z.string().optional().nullable(),
+  emergency_contact: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+});
+
+export type StaffAccountForm = z.infer<typeof staffAccountSchema>;

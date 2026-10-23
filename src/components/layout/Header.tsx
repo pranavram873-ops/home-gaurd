@@ -1,17 +1,44 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/authContext';
-import { dataService } from '@/lib/services/dataService';
-import { UserRole } from '@/types';
-import { Bell, ShieldCheck, UserCog, CheckCircle2, AlertTriangle } from 'lucide-react';
+import type { NotificationItem } from '@/types';
+import { listNotifications, markNotificationRead } from '@/lib/services/notificationService';
+import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
+import { Bell, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export function Header({ title, subtitle }: { title?: string; subtitle?: string }) {
-  const { user, role, switchDemoRole, demoMode } = useAuth();
+  const { user, role } = useAuth();
+  const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const notifications = user?.id ? dataService.getNotifications(user.id) : [];
+  // The bell is the signed-in user's own rows: RLS on `notifications` only ever
+  // returns those, so `user.id` is a filter for tidiness, not a permission check.
+  const notificationsQuery = useLiveQuery<NotificationItem[]>(
+    () =>
+      user?.id
+        ? listNotifications(user.id)
+        : Promise.resolve({ data: [], error: null }),
+    user?.id,
+  );
+  const notifications = notificationsQuery.data ?? [];
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  async function handleNotificationClick(notification: NotificationItem) {
+    const wasUnread = !notification.is_read;
+    if (wasUnread && notificationsQuery.data) {
+      // Read it locally first so the badge drops without a round trip, then let
+      // the database agree. A failed write shows on the next open, not as an
+      // error dialog over an alert the operator has already read.
+      notificationsQuery.setData(
+        notificationsQuery.data.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)),
+      );
+      void markNotificationRead(notification.id);
+    }
+    setShowNotifications(false);
+    if (notification.link) router.push(notification.link);
+  }
 
   const todayStr = new Intl.DateTimeFormat('en-IN', {
     weekday: 'long',
@@ -39,44 +66,19 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
         </div>
       </div>
 
-      {/* Right Controls: Role Switcher & Notifications */}
+      {/* Right Controls: Notifications */}
       <div className="flex items-center gap-3">
-        {/* Role switcher exists only in deliberate demo mode; a real session's
-            role comes from the approved profile and cannot be changed client-side. */}
-        {demoMode && (
-          <>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 uppercase">
-              Demo data
-            </span>
-            <div className="hidden md:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-              <button
-                onClick={() => switchDemoRole('admin')}
-                className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                  role === 'admin'
-                    ? 'bg-blue-800 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Admin
-              </button>
-              <button
-                onClick={() => switchDemoRole('home_guard')}
-                className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                  role === 'home_guard'
-                    ? 'bg-blue-800 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Home Guard
-              </button>
-            </div>
-          </>
-        )}
+        {/* There is no role switcher: a session's role comes from the approved
+            personnel row and is decided by the administrator at the desk. */}
 
         {/* Notifications Popover Toggle */}
         <div className="relative">
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              const next = !showNotifications;
+              setShowNotifications(next);
+              if (next) void notificationsQuery.refresh();
+            }}
             aria-label="View notifications"
             className="relative p-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer border border-slate-200 bg-white"
           >
@@ -100,11 +102,22 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
                 </span>
               </div>
               <div className="max-h-64 overflow-y-auto flex flex-col gap-2 divide-y divide-slate-100">
-                {notifications.length === 0 ? (
+                {notificationsQuery.loading ? (
+                  <p className="text-xs text-slate-500 py-3 text-center">Loading alerts…</p>
+                ) : notificationsQuery.error ? (
+                  <p className="text-xs text-rose-700 py-3 text-center">{notificationsQuery.error}</p>
+                ) : notifications.length === 0 ? (
                   <p className="text-xs text-slate-500 py-3 text-center">No notifications</p>
                 ) : (
                   notifications.map((n) => (
-                    <div key={n.id} className="pt-2 first:pt-0 flex items-start gap-2 text-xs">
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => void handleNotificationClick(n)}
+                      className={`pt-2 first:pt-0 flex items-start gap-2 text-xs text-left cursor-pointer hover:bg-slate-50 rounded px-1 -mx-1 transition-colors ${
+                        n.is_read ? '' : 'bg-blue-50/50'
+                      }`}
+                    >
                       <div className="mt-0.5">
                         {n.type === 'alert' ? (
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
@@ -113,10 +126,13 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
                         )}
                       </div>
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-semibold text-slate-800 leading-tight">{n.title}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-800 leading-tight">{n.title}</span>
+                          {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-blue-700 shrink-0" />}
+                        </span>
                         <p className="text-slate-600 text-[11px] leading-snug mt-0.5">{n.message}</p>
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>

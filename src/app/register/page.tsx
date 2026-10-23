@@ -1,22 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { dataService } from '@/lib/services/dataService';
+import type { District, Unit } from '@/types';
+import { listDistricts, listUnits } from '@/lib/services/referenceService';
+import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { registerSchema } from '@/lib/validation';
 import { createClient } from '@/lib/supabase/client';
 import { getAppUrl, isPublicRegistrationEnabled } from '@/lib/supabase/env';
 import { describeSignUpError } from '@/lib/auth/errors';
-import { Lock, Mail, User, Phone, MapPin, Shield, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Lock, Mail, User, Phone, Shield, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const districts = dataService.getDistricts();
-  const [selectedDistrict, setSelectedDistrict] = useState(districts[0]?.id || '');
-  const units = dataService.getUnits(selectedDistrict);
   const registrationOpen = isPublicRegistrationEnabled();
+
+  // Districts and units come from the database, because the enrolment trigger
+  // resolves `district_code` and `unit_code` against these very rows. A code that
+  // is not seeded here lands on a profile with a null district.
+  const districtsQuery = useLiveQuery<District[]>(() => listDistricts());
+  const districts = useMemo(() => districtsQuery.data ?? [], [districtsQuery.data]);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -25,12 +28,40 @@ export default function RegisterPage() {
     password: '',
     confirm_password: '',
     personnel_id: '',
-    district_id: districts[0]?.id || '',
+    district_id: '',
     unit_id: '',
     emergency_contact: '',
     blood_group: 'O+',
     terms: false,
   });
+
+  const unitsQuery = useLiveQuery<Unit[]>(
+    () =>
+      formData.district_id
+        ? listUnits(formData.district_id)
+        : Promise.resolve({ data: [], error: null }),
+    formData.district_id,
+  );
+  const units = useMemo(() => unitsQuery.data ?? [], [unitsQuery.data]);
+
+  // Default to the first district once the list arrives, and drop a unit choice
+  // that belongs to the district the applicant has just left.
+  useEffect(() => {
+    if (districts.length === 0) return;
+    setFormData((prev) => {
+      if (prev.district_id && districts.some((d) => d.id === prev.district_id)) return prev;
+      return { ...prev, district_id: districts[0].id, unit_id: '' };
+    });
+  }, [districts]);
+
+  useEffect(() => {
+    if (!formData.unit_id) return;
+    if (unitsQuery.loading) return;
+    if (units.some((u) => u.id === formData.unit_id)) return;
+    setFormData((prev) => ({ ...prev, unit_id: '' }));
+  }, [units, unitsQuery.loading, formData.unit_id]);
+
+  const referenceError = districtsQuery.error || unitsQuery.error;
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -158,6 +189,16 @@ export default function RegisterPage() {
                 </div>
               )}
 
+              {referenceError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                  <span>
+                    The district and unit list could not be loaded ({referenceError}). Submitting now would
+                    record your application without a district, so it is blocked until the list returns.
+                  </span>
+                </div>
+              )}
+
               {/* Informational security banner */}
               <div className="p-3 rounded-lg bg-blue-50/70 border border-blue-200 text-blue-900 text-xs flex items-start gap-2">
                 <Shield className="w-4 h-4 shrink-0 text-blue-700 mt-0.5" />
@@ -262,11 +303,7 @@ export default function RegisterPage() {
                   <label className="block text-xs font-semibold text-slate-700">District Command</label>
                   <select
                     value={formData.district_id}
-                    onChange={(e) => {
-                      const newDist = e.target.value;
-                      setSelectedDistrict(newDist);
-                      setFormData({ ...formData, district_id: newDist });
-                    }}
+                    onChange={(e) => setFormData({ ...formData, district_id: e.target.value, unit_id: '' })}
                     className="mt-1 block w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 bg-white"
                   >
                     {districts.map((d) => (
@@ -297,6 +334,32 @@ export default function RegisterPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Unit / Battalion
+                  <span className="font-normal text-slate-500"> — optional, an Administrator confirms it at approval</span>
+                </label>
+                <select
+                  value={formData.unit_id}
+                  onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+                  disabled={unitsQuery.loading || units.length === 0}
+                  className="mt-1 block w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {unitsQuery.loading
+                      ? 'Loading units…'
+                      : units.length === 0
+                        ? 'No units recorded for this district yet'
+                        : 'Not sure — assign at approval'}
+                  </option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="flex items-start gap-2 cursor-pointer text-xs text-slate-600 mt-2">
                   <input
                     type="checkbox"
@@ -312,7 +375,7 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={isLoading || !registrationOpen}
+                disabled={isLoading || !registrationOpen || districtsQuery.loading || Boolean(referenceError)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-xs text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isLoading ? (

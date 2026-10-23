@@ -5,7 +5,6 @@ import {
   getSupabaseUrl,
   getSupabasePublishableKey,
   isSupabaseConfigured,
-  isDemoModeEnabled,
 } from './env';
 
 // Routes a signed-in visitor should be sent away from. `/reset-password` is
@@ -42,28 +41,9 @@ export async function updateSession(request: NextRequest) {
   const dashboardFor = (role: string) => (role === 'admin' ? '/admin/dashboard' : '/homeguard/dashboard');
 
   // ---------------------------------------------------------------------------
-  // Deliberate local demo mode only. Never reachable from a production build.
-  // ---------------------------------------------------------------------------
-  if (isDemoModeEnabled()) {
-    const demoRoleCookie = request.cookies.get('tnhg_demo_role')?.value;
-    const demoStatusCookie = request.cookies.get('tnhg_demo_status')?.value || 'active';
-
-    if (demoRoleCookie) {
-      if (demoStatusCookie !== 'active' && isProtectedRoute) {
-        return redirect('/login', { error: 'inactive_account' });
-      }
-      if (isAuthRoute) {
-        return redirect(dashboardFor(demoRoleCookie));
-      }
-      if (isAdminRoute && demoRoleCookie !== 'admin') {
-        return redirect('/homeguard/dashboard');
-      }
-      return supabaseResponse;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Real Supabase sessions.
+  // Supabase sessions. Every decision below is made from the verified JWT and
+  // the personnel row RLS allows the caller to read; no cookie can stand in for
+  // either.
   // ---------------------------------------------------------------------------
   if (!isSupabaseConfigured()) {
     // Fail closed: without a configured auth provider nobody may reach an

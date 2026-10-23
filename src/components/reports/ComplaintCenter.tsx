@@ -55,7 +55,7 @@ const categories: { value: ReportCategory; label: string }[] = [
 const reportColumns = 'id,reporter_id,reporter_name,reporter_personnel_id,subject_id,subject_name,subject_personnel_id,category,description,status,resolution_note,created_at,updated_at';
 
 export function ComplaintCenter() {
-  const { user, role, demoMode } = useAuth();
+  const { user, role } = useAuth();
   const isAdmin = role === 'admin';
   const [guards, setGuards] = useState<ReportableGuard[]>([]);
   const [reports, setReports] = useState<GuardReport[]>([]);
@@ -69,7 +69,7 @@ export function ComplaintCenter() {
   const [adminDrafts, setAdminDrafts] = useState<Record<string, { status: ReportStatus; note: string }>>({});
 
   const load = useCallback(async () => {
-    if (!user || demoMode) {
+    if (!user) {
       setLoading(false);
       return;
     }
@@ -100,7 +100,7 @@ export function ComplaintCenter() {
     } finally {
       setLoading(false);
     }
-  }, [demoMode, user]);
+  }, [user]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -222,49 +222,42 @@ export function ComplaintCenter() {
 
   return (
     <div className="flex flex-col gap-5">
-      {demoMode && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Reports are available after Supabase is connected and the guard reports migration is applied.
-        </div>
-      )}
-      {!demoMode && (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-          <div className="mb-4 flex items-start gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-800"><FileText className="h-5 w-5" /></span>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Submit a personnel report</h2>
-              <p className="mt-1 text-xs text-slate-600">Reports are shared with the administrator and the Home Guard named in the report.</p>
-            </div>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-800"><FileText className="h-5 w-5" /></span>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Submit a personnel report</h2>
+            <p className="mt-1 text-xs text-slate-600">Reports are shared with the administrator and the Home Guard named in the report.</p>
           </div>
-          <form onSubmit={submitReport} className="grid gap-3 md:grid-cols-2">
-            <label className="text-xs font-semibold text-slate-600">
-              Home Guard
-              <select className={`${inputClass} mt-1`} required value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
-                <option value="">Choose a Home Guard</option>
-                {reportableGuards.map((guard) => <option key={guard.id} value={guard.id}>{guard.full_name}{guard.personnel_id ? ` · ${guard.personnel_id}` : ''}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-slate-600">
-              Report category
-              <select className={`${inputClass} mt-1`} value={category} onChange={(event) => setCategory(event.target.value as ReportCategory)}>
-                {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-slate-600 md:col-span-2">
-              What happened?
-              <textarea className={`${inputClass} mt-1 min-h-28 resize-y`} required minLength={10} maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the concern clearly, including relevant dates or duty details." />
-            </label>
-            <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
-              <p className="text-[11px] text-slate-500">Your name and personnel ID will be visible to the administrator and reported Home Guard.</p>
-              <button type="submit" disabled={saving || !reportableGuards.length} className="inline-flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50">
-                {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Submit report
-              </button>
-            </div>
-          </form>
-          {!loading && !reportableGuards.length && <p className="mt-3 text-xs text-amber-800">There are no other active Home Guards available to report yet.</p>}
-        </section>
-      )}
+        </div>
+        <form onSubmit={submitReport} className="grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-semibold text-slate-600">
+            Home Guard
+            <select className={`${inputClass} mt-1`} required value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
+              <option value="">Choose a Home Guard</option>
+              {reportableGuards.map((guard) => <option key={guard.id} value={guard.id}>{guard.full_name}{guard.personnel_id ? ` · ${guard.personnel_id}` : ''}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Report category
+            <select className={`${inputClass} mt-1`} value={category} onChange={(event) => setCategory(event.target.value as ReportCategory)}>
+              {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+            What happened?
+            <textarea className={`${inputClass} mt-1 min-h-28 resize-y`} required minLength={10} maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the concern clearly, including relevant dates or duty details." />
+          </label>
+          <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
+            <p className="text-[11px] text-slate-500">Your name and personnel ID will be visible to the administrator and reported Home Guard.</p>
+            <button type="submit" disabled={saving || !reportableGuards.length} className="inline-flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50">
+              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Submit report
+            </button>
+          </div>
+        </form>
+        {!loading && !reportableGuards.length && <p className="mt-3 text-xs text-amber-800">There are no other active Home Guards available to report yet.</p>}
+      </section>
 
       {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertTriangle className="mr-2 inline h-4 w-4" />{error}</div>}
       {success && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="mr-2 inline h-4 w-4" />{success}</div>}
