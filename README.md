@@ -48,14 +48,6 @@ home-guard-supervision/
 │   │   │   ├── events/page.tsx           # Major operations planner (VIP route, festival bandobast)
 │   │   │   ├── reports/page.tsx          # Muster analytics, compliance rate & CSV export
 │   │   │   └── audit/page.tsx            # Immutable security & administrative access logs
-│   │   ├── commander/
-│   │   │   ├── dashboard/page.tsx        # Area Command overview (Zone IV Mylapore Sector)
-│   │   │   ├── personnel/page.tsx        # Unit personnel roster
-│   │   │   ├── assignments/page.tsx      # Unit duty rosters
-│   │   │   ├── locations/page.tsx        # Unit sector posts
-│   │   │   ├── tasks/page.tsx            # Unit supervisory tasks
-│   │   │   ├── events/page.tsx           # Unit event allocations
-│   │   │   └── reports/page.tsx          # Unit compliance reports
 │   │   ├── homeguard/
 │   │   │   ├── dashboard/page.tsx        # Personalized guard duty portal
 │   │   │   ├── location/page.tsx         # GPS & Biometric geofenced check-in / check-out
@@ -93,8 +85,9 @@ home-guard-supervision/
     └── migrations/
         ├── 20261019000000_initial_schema.sql  # 13 relational tables, indexes, RLS & escalation triggers
         ├── 20261019000001_seed_units_and_mock_personnel.sql # Real TN posts (Marina, Central, Meenakshi)
-        ├── 20261021000000_enrolment_hook_and_commander_role.sql # Profile row on signup, is_commander()
-        └── 20261022000000_guard_reports.sql # Guard reports, admin review, scoped RLS
+        ├── 20261021000000_enrolment_hook_and_commander_role.sql # Profile row on signup
+        ├── 20261022000000_guard_reports.sql # Guard reports, admin review, scoped RLS
+        └── 20261023000000_remove_commander_role.sql # Retires the Area Commander role
 ```
 
 ---
@@ -113,7 +106,6 @@ approvals desk.
 | Role | Authorized Dashboard | Notes |
 |---|---|---|
 | **State Administrator** | `/admin/dashboard` | Only role allowed on `/admin/*` |
-| **Area Commander** | `/commander/dashboard` | Console not implemented yet; routed to the volunteer dashboard |
 | **Home Guard Volunteer** | `/homeguard/dashboard` | Restricted to personal duty, tasks and GPS check-in |
 | **Pending / suspended** | blocked | Redirected to `/login` with the reason shown |
 
@@ -126,10 +118,9 @@ confirmed, no profile row, pending approval, suspended account, rate limiting.
 > ignores the flag entirely, so a demo can never be mistaken for a real session.
 
 ### Role Authorization Rules
-- **Home Guards:** Exclusively restricted to their personal dashboard, assigned duty, tasks, and GPS check-in. Attempting to navigate to `/admin/*` or `/commander/*` is automatically redirected.
-- **Commanders:** Scoped strictly to their assigned district and unit (`Zone IV - Mylapore Division`). Cannot alter system settings or access unrelated district resources.
+- **Home Guards:** Exclusively restricted to their personal dashboard, assigned duty, tasks, and GPS check-in. Attempting to navigate to `/admin/*` is automatically redirected.
 - **Administrators:** Full statewide oversight across all 38 districts, registration approval authority, and geofence post configuration.
-- **Pending Recruits:** If an applicant submits enrolment via `/register`, a `profiles` row is created by the database trigger with role `home_guard` and status `pending`. They must confirm their e-mail and be approved before operational access is granted.
+- **Pending Recruits:** If an applicant submits enrolment via `/register`, a `profiles` row is created by the database trigger with role `home_guard` and status `pending`. It waits in the administrator's approvals desk directly — there is no Area Command step. They must confirm their e-mail and be approved before operational access is granted.
 
 ---
 
@@ -187,15 +178,16 @@ To provision the initial State Administrator without exposing credentials:
 2. For a **new, empty project only**, open the Supabase SQL Editor and apply
    each migration once, in timestamp order. The first migration creates the
    schema and the audit table; the second adds sample locations and units; the
-   third adds the signup trigger and commander role support; the fourth adds
-   personnel reports. Do not re-run these files on a project whose schema is
-   already present. Apply only missing migrations, in timestamp order.
+   third adds the signup trigger; the fourth adds personnel reports; the fifth
+   retires the Area Commander role. Do not re-run these files on a project whose
+   schema is already present. Apply only missing migrations, in timestamp order.
 3. For the currently connected project, first run the read-only connectivity
-   check below. If it reports all 13 tables, do not apply the first two files
+   check below. If it reports all 14 tables, do not apply the first two files
    again. Check whether `public.handle_new_user()` and the
    `on_auth_user_created` trigger exist; if they do not, apply the enrolment
    migration. Apply `20261022000000_guard_reports.sql` once to enable the
-   report workflow.
+   report workflow, and `20261023000000_remove_commander_role.sql` once to drop
+   the commander role, its `is_commander()` helper and its policy clauses.
 4. Verify from the terminal (read-only, prints no secrets):
    ```bash
    npm run check:supabase

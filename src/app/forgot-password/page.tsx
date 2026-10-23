@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-[#f8fafd] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-block">
+        <Link href="/login" className="inline-block">
           <div className="w-14 h-14 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
             <Image
               src="/images/tn-home-guards-logo.png"

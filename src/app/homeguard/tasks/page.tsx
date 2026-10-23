@@ -62,7 +62,7 @@ export default function HomeGuardTasksPage() {
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-500">
-                  Assigned by: <strong>{t.creator?.full_name || 'Area Commander'}</strong>
+                  Assigned by: <strong>{t.creator?.full_name || 'Command Headquarters'}</strong>
                 </span>
 
                 <div className="flex items-center gap-2">

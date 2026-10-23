@@ -22,9 +22,8 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = AUTH_ONLY_ROUTES.some((route) => pathname.startsWith(route));
 
   const isAdminRoute = pathname.startsWith('/admin');
-  const isCommanderRoute = pathname.startsWith('/commander');
   const isHomeGuardRoute = pathname.startsWith('/homeguard');
-  const isProtectedRoute = isAdminRoute || isHomeGuardRoute || isCommanderRoute;
+  const isProtectedRoute = isAdminRoute || isHomeGuardRoute;
 
   const redirect = (target: string, params?: Record<string, string>) => {
     const url = request.nextUrl.clone();
@@ -57,9 +56,6 @@ export async function updateSession(request: NextRequest) {
         return redirect(dashboardFor(demoRoleCookie));
       }
       if (isAdminRoute && demoRoleCookie !== 'admin') {
-        return redirect('/homeguard/dashboard');
-      }
-      if (isCommanderRoute) {
         return redirect('/homeguard/dashboard');
       }
       return supabaseResponse;
@@ -159,11 +155,6 @@ export async function updateSession(request: NextRequest) {
 
   if (isAdminRoute && profile.role !== 'admin') {
     return redirect(dashboardFor(profile.role));
-  }
-
-  if (isCommanderRoute) {
-    // Commander consoles are not implemented yet; keep them out of both roles.
-    return redirect('/homeguard/dashboard');
   }
 
   return supabaseResponse;

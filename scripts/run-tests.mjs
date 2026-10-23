@@ -103,14 +103,13 @@ console.log('\n\x1b[36m[TEST SUITE 4] Role-Based Redirection Target Validation\x
 
 function getDashboardRouteForRole(role) {
   if (role === 'admin') return '/admin/dashboard';
-  if (role === 'commander') return '/commander/dashboard';
   if (role === 'home_guard') return '/homeguard/dashboard';
   return '/login';
 }
 
 assert(getDashboardRouteForRole('admin') === '/admin/dashboard', 'Admin role redirects to /admin/dashboard');
-assert(getDashboardRouteForRole('commander') === '/commander/dashboard', 'Commander role redirects to /commander/dashboard');
 assert(getDashboardRouteForRole('home_guard') === '/homeguard/dashboard', 'Home Guard role redirects to /homeguard/dashboard');
+assert(getDashboardRouteForRole('commander') === '/login', 'Retired commander role is granted no dashboard');
 
 // -----------------------------------------------------------------------------
 // Test 5: Duplicate Check-In Guard (15-min debounce)

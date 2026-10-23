@@ -178,7 +178,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profile.account_status === 'pending') {
         await supabase.auth.signOut();
-        return { success: false, error: 'Your registration is pending approval by the Area Commander.' };
+        return {
+          success: false,
+          error: 'Your enrolment is pending approval by Command Headquarters.',
+        };
       }
 
       if (profile.account_status === 'suspended' || profile.account_status === 'rejected') {

@@ -93,7 +93,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#f8fafd] flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-lg text-center">
-        <Link href="/" className="inline-block">
+        <Link href="/login" className="inline-block">
           <div className="w-14 h-14 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
             <Image
               src="/images/tn-home-guards-logo.png"
@@ -128,8 +128,9 @@ export default function RegisterPage() {
                 A confirmation email is on its way to <strong className="text-slate-900">{formData.email}</strong>.
                 Open that link to activate sign-in. Your roster entry is recorded with status
                 <strong className="text-amber-700"> PENDING APPROVAL</strong> and role
-                <strong className="text-amber-700"> Home Guard Volunteer</strong>; the Area Commander for your
-                selected district will verify your identity before activating operational access.
+                <strong className="text-amber-700"> Home Guard Volunteer</strong>; it goes straight
+                to the <strong className="text-amber-700">State Administrator</strong> at Command
+                Headquarters, who verifies your identity and activates operational access.
               </p>
               <div className="mt-6">
                 <Link

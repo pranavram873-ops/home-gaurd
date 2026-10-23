@@ -63,12 +63,7 @@ function LoginForm() {
         // Honour the page middleware remembered, but only for in-app paths whose
         // prefix matches the signed-in role (no open redirects).
         const requested = searchParams.get('redirect') || '';
-        const fallback =
-          res.role === 'admin'
-            ? '/admin/dashboard'
-            : res.role === 'commander'
-            ? '/commander/dashboard'
-            : '/homeguard/dashboard';
+        const fallback = res.role === 'admin' ? '/admin/dashboard' : '/homeguard/dashboard';
         const allowed =
           (requested.startsWith('/admin') && res.role === 'admin') ||
           (requested.startsWith('/homeguard') && res.role !== 'admin');
@@ -238,18 +233,17 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#f8fafd] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-block">
-          <div className="w-16 h-16 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
-            <Image
-              src="/images/tn-home-guards-logo.png"
-              alt="Tamil Nadu Home Guards Emblem"
-              width={64}
-              height={64}
-              className="object-contain"
-              priority
-            />
-          </div>
-        </Link>
+        {/* Plain emblem: the landing page is gone, so this page is the entry point. */}
+        <div className="inline-block w-16 h-16 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
+          <Image
+            src="/images/tn-home-guards-logo.png"
+            alt="Tamil Nadu Home Guards Emblem"
+            width={64}
+            height={64}
+            className="object-contain"
+            priority
+          />
+        </div>
         <span className="text-[10px] font-bold text-blue-900 uppercase tracking-widest block mt-3">
           GOVERNMENT OF TAMIL NADU
         </span>

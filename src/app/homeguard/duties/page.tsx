@@ -21,7 +21,7 @@ export default function HomeGuardDutiesPage() {
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
           <h2 className="text-xl font-bold text-slate-900">Personal Duty Schedule ({duties.length})</h2>
           <p className="text-xs text-slate-600 mt-1">
-            Official deployment rosters assigned by your Area Commander.
+            Official deployment rosters assigned by Command Headquarters.
           </p>
         </div>
 

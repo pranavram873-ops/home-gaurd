@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'commander' | 'home_guard';
+export type UserRole = 'admin' | 'home_guard';
 
 export type AccountStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 
@@ -37,6 +37,9 @@ export interface Unit {
   name: string;
   code: string;
   description?: string | null;
+  // `commander_id` is the `units.commander_id` foreign key onto profiles: the
+  // officer in charge of the unit. It is not a login role — the former
+  // 'commander' role was removed, so this always references an admin.
   commander_id?: string | null;
   created_at: string;
   district?: District | null;

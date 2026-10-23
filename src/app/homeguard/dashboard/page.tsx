@@ -113,9 +113,9 @@ export default function HomeGuardDashboardPage() {
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">Reporting Supervisor</span>
                     <span className="font-semibold text-slate-800 block mt-0.5">
-                      {todayAssignment.supervisor?.full_name || 'Insp. S. Rajendran'}
+                      {todayAssignment.supervisor?.full_name || 'Dr. K. Vijayakumar, IPS'}
                     </span>
-                    <span className="text-[11px] font-mono text-slate-500 block mt-0.5">Area Commander</span>
+                    <span className="text-[11px] font-mono text-slate-500 block mt-0.5">State Administrator</span>
                   </div>
                 </div>
 

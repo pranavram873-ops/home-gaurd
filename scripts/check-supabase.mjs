@@ -20,6 +20,22 @@ const TABLES = [
   'districts', 'units', 'profiles', 'duty_locations', 'duty_assignments',
   'attendance_events', 'tasks', 'task_status_history', 'events',
   'event_assignments', 'notifications', 'audit_logs', 'app_settings',
+  'guard_reports',
+];
+
+// Tables that revoke anonymous access deliberately. Postgres answers the
+// keyless probe with "permission denied", which proves the table exists *and*
+// is locked down — a pass, not a problem.
+const ANON_DENIED = new Set(['guard_reports']);
+
+// Functions the API must expose. Two failure modes look identical through REST
+// but mean opposite things, so each entry declares what a correct answer is:
+//   'value'  — an anonymous caller must get a result back (RLS policy helpers)
+//   'exists' — the function must be in the schema cache; refusing an anonymous
+//              caller is the intended behaviour and counts as a pass
+const RPCS = [
+  { name: 'is_admin', expects: 'value' },
+  { name: 'list_reportable_home_guards', expects: 'exists' },
 ];
 
 function mask(v) {
@@ -64,11 +80,19 @@ if (ping.error) {
 console.log(`\n✓ REST endpoint reachable and key valid (RLS enforced).`);
 console.log(`  districts returned for this role: ${ping.data?.length ?? 0} row(s) (RLS may hide all of them)\n`);
 
-// 2. Which expected tables are queryable through the API? (RLS may hide rows.)
+// 2. Which expected tables are reachable through the API? `select('*')` is used
+//    because not every table has an `id` column (app_settings is keyed by `key`).
 const missing = [];
 for (const t of TABLES) {
-  const res = await sb.from(t).select('id').limit(1);
+  const res = await sb.from(t).select('*').limit(1);
   if (res.error) {
+    if (
+      ANON_DENIED.has(t) &&
+      (res.error.code === '42501' || /permission denied/i.test(res.error.message ?? ''))
+    ) {
+      console.log(`  ✓ ${t.padEnd(20)} present and anonymous access denied (by design)`);
+      continue;
+    }
     const note =
       res.error.code === '42P01' || res.error.code === 'PGRST205'
         ? 'not in the PostgREST schema cache — apply the migrations, then reload the schema'
@@ -79,11 +103,38 @@ for (const t of TABLES) {
   }
 }
 
-if (missing.length) {
+// 3. Functions behind the RLS policies and the reports screen. A table can be
+//    queryable while its policy helper is missing, which only breaks things for
+//    signed-in users — so it has to be probed separately.
+console.log('\nDatabase functions referenced by the application:');
+const rpcProblems = [];
+for (const { name, expects } of RPCS) {
+  const res = await sb.rpc(name);
+  const absent =
+    res.error &&
+    (res.error.code === 'PGRST202' || /could not find the function/i.test(res.error.message ?? ''));
+
+  if (!res.error) {
+    console.log(`  ✓ ${name.padEnd(30)} callable, returned ${JSON.stringify(res.data ?? null)}`);
+  } else if (absent) {
+    rpcProblems.push(
+      `${name}  [PGRST202] not in the PostgREST schema cache — apply the migrations, then reload the schema`,
+    );
+  } else if (expects === 'exists') {
+    console.log(
+      `  ✓ ${name.padEnd(30)} present; refused an anonymous caller as designed ` +
+        `(${(res.error.message || '').split('\n')[0].slice(0, 64)})`,
+    );
+  } else {
+    rpcProblems.push(`${name}  [${res.error.code || 'n/a'}] ${res.error.message}`);
+  }
+}
+
+if (missing.length || rpcProblems.length) {
   console.log('\n✗ Problems:');
-  missing.forEach((m) => console.log(`  - ${m}`));
+  [...missing, ...rpcProblems].forEach((m) => console.log(`  - ${m}`));
   process.exit(2);
 }
 
-console.log('\n✓ All 13 expected tables are queryable with this key.');
+console.log(`\n✓ All ${TABLES.length} expected tables and ${RPCS.length} expected functions are exposed to the API.`);
 console.log('  This probe does not verify Auth users, the signup trigger, profile rows, or end-to-end app workflows.');

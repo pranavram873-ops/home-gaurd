@@ -192,7 +192,6 @@ export default function PersonnelDirectoryPage() {
             >
               <option value="all">All Ranks & Roles</option>
               <option value="admin">Administrators</option>
-              <option value="commander">Commanders</option>
               <option value="home_guard">Home Guards</option>
             </select>
           </div>
@@ -429,7 +428,6 @@ export default function PersonnelDirectoryPage() {
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
                     >
                       <option value="home_guard">Home Guard Volunteer</option>
-                      <option value="commander">Area Commander</option>
                       <option value="admin">Administrator</option>
                     </select>
                   </div>

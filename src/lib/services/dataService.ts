@@ -345,7 +345,7 @@ export const initialEvents: EventItem[] = [
     venue: 'Marina Beach Promenade (Kamarajar Salai to Santhome)',
     duty_location_id: 'loc-1',
     district_id: 'dst-chn',
-    commander_id: 'usr-commander-1',
+    commander_id: 'usr-admin-1',
     required_personnel: 80,
     start_time: '2024-10-25T05:00:00Z',
     end_time: '2024-10-25T23:00:00Z',
@@ -448,9 +448,9 @@ export const initialAuditLogs: AuditLog[] = [
   },
   {
     id: 'log-2',
-    actor_id: 'usr-commander-1',
-    actor_email: 'commander@tnhomeguards.gov.in',
-    actor_role: 'commander',
+    actor_id: 'usr-admin-1',
+    actor_email: 'admin@tnhomeguards.gov.in',
+    actor_role: 'admin',
     action: 'CREATE_DUTY_ASSIGNMENT',
     target_type: 'duty_assignment',
     target_id: 'asg-1',
@@ -660,7 +660,7 @@ class DataStore {
       id: `notif-${Date.now()}`,
       user_id: id,
       title: 'Registration Approved',
-      message: 'Your Tamil Nadu Home Guard enrolment has been verified and approved by the Area Command. You may now access your duty roster.',
+      message: 'Your Tamil Nadu Home Guard enrolment has been verified and approved by Command Headquarters. You may now access your duty roster.',
       type: 'approval',
       is_read: false,
       link: '/homeguard/dashboard',
@@ -725,7 +725,7 @@ class DataStore {
       district_id: data.district_id || 'dst-chn',
       unit_id: data.unit_id || 'unt-chn-1',
       assigned_personnel_id: data.assigned_personnel_id || 'usr-guard-1',
-      supervisor_id: data.supervisor_id || 'usr-commander-1',
+      supervisor_id: data.supervisor_id || 'usr-admin-1',
       duty_date: data.duty_date || new Date().toISOString().split('T')[0],
       start_time: data.start_time || '08:00',
       end_time: data.end_time || '16:00',
@@ -904,7 +904,7 @@ class DataStore {
       status: data.status || 'new',
       priority: data.priority || 'medium',
       assigned_to: data.assigned_to || null,
-      assigned_by: data.assigned_by || 'usr-commander-1',
+      assigned_by: data.assigned_by || 'usr-admin-1',
       unit_id: data.unit_id || 'unt-chn-1',
       duty_assignment_id: data.duty_assignment_id || null,
       due_date: data.due_date || new Date(Date.now() + 86400000).toISOString(),
@@ -988,7 +988,7 @@ class DataStore {
       venue: data.venue || 'Chennai City Area',
       duty_location_id: data.duty_location_id || 'loc-1',
       district_id: data.district_id || 'dst-chn',
-      commander_id: data.commander_id || 'usr-commander-1',
+      commander_id: data.commander_id || 'usr-admin-1',
       required_personnel: data.required_personnel || 20,
       start_time: data.start_time || new Date().toISOString(),
       end_time: data.end_time || new Date(Date.now() + 86400000).toISOString(),
@@ -1078,7 +1078,7 @@ class DataStore {
   }
 
   // Aggregated Operational Statistics
-  getDashboardStats(role: UserRole, userId?: string, unitId?: string) {
+  getDashboardStats(role: UserRole, userId?: string) {
     const totalGuards = this.profiles.filter((p) => p.role === 'home_guard').length;
     const activeGuards = this.profiles.filter((p) => p.role === 'home_guard' && p.account_status === 'active').length;
     const pendingGuards = this.profiles.filter((p) => p.account_status === 'pending').length;
@@ -1093,7 +1093,7 @@ class DataStore {
 
     const upcomingEvents = this.events.filter((e) => e.status === 'planned' || e.status === 'active').length;
 
-    // Filtered scoped stats for Home Guard or Commander
+    // Filtered scoped stats for a Home Guard's own records
     if (role === 'home_guard' && userId) {
       const myDuties = this.assignments.filter((a) => a.assigned_personnel_id === userId);
       const myActiveDuty = myDuties.find((a) => a.status === 'in_progress' || a.status === 'scheduled');
@@ -1108,22 +1108,6 @@ class DataStore {
         myCompletedTasksCount: myTasks.filter((t) => t.status === 'completed').length,
         recentAttendance: myAttendance.slice(0, 5),
         myTasks,
-      };
-    }
-
-    if (role === 'commander' && unitId) {
-      const unitPersonnel = this.profiles.filter((p) => p.unit_id === unitId);
-      const unitAssignments = this.assignments.filter((a) => a.unit_id === unitId);
-      const unitOnDuty = unitAssignments.filter((a) => a.status === 'in_progress').length;
-      const unitTasks = this.tasks.filter((t) => t.unit_id === unitId);
-
-      return {
-        unitPersonnelCount: unitPersonnel.length,
-        unitOnDuty,
-        unitScheduled: unitAssignments.filter((a) => a.status === 'scheduled').length,
-        unitPendingTasks: unitTasks.filter((t) => t.status !== 'completed').length,
-        totalLocations: this.locations.filter((l) => l.unit_id === unitId || !l.unit_id).length,
-        recentActivity: this.auditLogs.slice(0, 6),
       };
     }
 
