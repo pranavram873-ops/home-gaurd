@@ -7,7 +7,7 @@ import { UserRole } from '@/types';
 import { Bell, ShieldCheck, UserCog, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export function Header({ title, subtitle }: { title?: string; subtitle?: string }) {
-  const { user, role, switchDemoRole } = useAuth();
+  const { user, role, switchDemoRole, demoMode } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const notifications = user?.id ? dataService.getNotifications(user.id) : [];
@@ -41,29 +41,37 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
       {/* Right Controls: Role Switcher & Notifications */}
       <div className="flex items-center gap-3">
-        {/* Role Quick Switcher for Testing/Demonstration */}
-        <div className="hidden md:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-          <button
-            onClick={() => switchDemoRole('admin')}
-            className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-              role === 'admin'
-                ? 'bg-blue-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Admin
-          </button>
-          <button
-            onClick={() => switchDemoRole('home_guard')}
-            className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-              role === 'home_guard'
-                ? 'bg-blue-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Home Guard
-          </button>
-        </div>
+        {/* Role switcher exists only in deliberate demo mode; a real session's
+            role comes from the approved profile and cannot be changed client-side. */}
+        {demoMode && (
+          <>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 uppercase">
+              Demo data
+            </span>
+            <div className="hidden md:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+              <button
+                onClick={() => switchDemoRole('admin')}
+                className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
+                  role === 'admin'
+                    ? 'bg-blue-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Admin
+              </button>
+              <button
+                onClick={() => switchDemoRole('home_guard')}
+                className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
+                  role === 'home_guard'
+                    ? 'bg-blue-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Home Guard
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Notifications Popover Toggle */}
         <div className="relative">

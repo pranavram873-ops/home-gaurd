@@ -6,12 +6,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+// Same resolution order as src/lib/supabase/env.ts, so the probe exercises the
+// exact credential the application uses rather than a leftover legacy key.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const key =
-  process.env.SUPABASE_PUBLISHABLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
   '';
 
 const TABLES = [
@@ -37,10 +39,14 @@ if (!url || !key) {
 const sb = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 
 // 1. Reachability + key validity (RLS applies for the anon key).
-const ping = await sb.from('districts').select('id', { count: 'exact', head: true });
-if (ping.error && ping.code === '42P01') {
-  console.log('\n✓ Project reachable and key valid, but tables are missing.');
-  console.log('→ Apply the migrations from supabase/migrations/ in the Supabase SQL Editor (or `supabase db push`).');
+//    NOTE: these are GET queries on purpose. A HEAD request (`head: true`) has
+//    no body, so PostgREST errors such as PGRST205 "not in the schema cache"
+//    come back with no error object and would be misread as success.
+const ping = await sb.from('districts').select('id', { count: 'exact' }).limit(1);
+if (ping.error && (ping.code === '42P01' || ping.code === 'PGRST205')) {
+  console.log('\n✓ Project reachable and key valid, but the schema is not exposed to the API yet.');
+  console.log('→ Apply the migrations from supabase/migrations/ in the Supabase SQL Editor (or `supabase db push`),');
+  console.log('  then run `NOTIFY pgrst, \'reload schema\';` if the tables were created out of band.');
   process.exit(2);
 }
 if (ping.error && /relation|schema/i.test(ping.error.message)) {
@@ -56,16 +62,20 @@ if (ping.error) {
 }
 
 console.log(`\n✓ REST endpoint reachable and key valid (RLS enforced).`);
-console.log(`  districts visible with current role: ${ping.count ?? 0} row(s)\n`);
+console.log(`  districts returned for this role: ${ping.data?.length ?? 0} row(s) (RLS may hide all of them)\n`);
 
-// 2. Which expected tables exist? (head-count per table; RLS may hide rows.)
+// 2. Which expected tables are queryable through the API? (RLS may hide rows.)
 const missing = [];
 for (const t of TABLES) {
-  const res = await sb.from(t).select('id', { count: 'exact', head: true });
+  const res = await sb.from(t).select('id').limit(1);
   if (res.error) {
-    missing.push(`${t}  (${res.error.code === '42P01' ? 'table missing' : res.error.message})`);
+    const note =
+      res.error.code === '42P01' || res.error.code === 'PGRST205'
+        ? 'not in the PostgREST schema cache — apply the migrations, then reload the schema'
+        : res.error.message;
+    missing.push(`${t}  [${res.error.code || 'n/a'}] ${note}`);
   } else {
-    console.log(`  ✓ ${t.padEnd(20)} visible rows: ${res.count ?? 0}`);
+    console.log(`  ✓ ${t.padEnd(20)} queryable (rows visible to this role: ${res.data?.length ?? 0}+ / capped by limit)`);
   }
 }
 
@@ -75,4 +85,5 @@ if (missing.length) {
   process.exit(2);
 }
 
-console.log('\n✓ All 13 expected tables are present. Application is ready for incremental feature wiring.');
+console.log('\n✓ All 13 expected tables are queryable with this key.');
+console.log('  This probe does not verify Auth users, the signup trigger, profile rows, or end-to-end app workflows.');

@@ -16,8 +16,8 @@ import {
   LogOut,
   UserCheck,
   History,
-  Shield,
   Radio,
+  FileText,
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -45,6 +45,7 @@ export function Sidebar() {
         { label: 'My Duty Schedule', href: '/homeguard/duties', icon: CalendarCheck },
         { label: 'Assigned Tasks', href: '/homeguard/tasks', icon: ClipboardList },
         { label: 'Attendance History', href: '/homeguard/attendance', icon: History },
+        { label: 'Personnel Reports', href: '/homeguard/reports', icon: FileText },
         { label: 'My Profile', href: '/homeguard/profile', icon: UserCheck },
       ];
     }

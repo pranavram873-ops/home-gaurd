@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { dataService } from '@/lib/services/dataService';
 import type { AttendanceEvent } from '@/types';
+import { ComplaintCenter } from '@/components/reports/ComplaintCenter';
 import {
   Users,
   CheckCircle2,
@@ -447,6 +448,13 @@ export default function ReportsPage() {
   return (
     <DashboardLayout title="Reports & Analytics" subtitle="Duty Performance, Attendance & Operational Compliance">
       <div className="max-w-7xl mx-auto flex flex-col gap-5">
+        <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3">
+            <h2 className="text-base font-bold text-slate-900">Personnel reports & complaints</h2>
+            <p className="mt-1 text-xs text-slate-600">Review reports filed by Home Guards or administrators, update their status, and share the outcome.</p>
+          </div>
+          <ComplaintCenter />
+        </section>
         {/* Header / action bar */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-end gap-3">
           <div className="flex flex-wrap items-end gap-3 flex-1">

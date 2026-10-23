@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, ShieldX } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { resetPasswordSchema } from '@/lib/validation';
+import { describePasswordRecoveryError } from '@/lib/auth/errors';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -15,18 +17,49 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // A reset link is only usable while the recovery session it created is live.
+  const [linkActive, setLinkActive] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    try {
+      const supabase = createClient();
+
+      // @supabase/ssr exchanges the `?code=` from the emailed link automatically;
+      // wait for the initial session so that exchange has settled before deciding.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!active) return;
+        if (event === 'INITIAL_SESSION') {
+          setLinkActive(Boolean(session));
+        } else if (session) {
+          setLinkActive(true);
+        }
+      });
+
+      void supabase.auth.getSession().then(({ data }) => {
+        if (active && linkActive === null) setLinkActive(Boolean(data.session));
+      });
+
+      return () => {
+        active = false;
+        subscription.unsubscribe();
+      };
+    } catch (err) {
+      console.error('Reset-password session check failed:', err);
+      if (active) setLinkActive(false);
+      return undefined;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (password.length < 8) {
-      setErrorMsg('Password must be at least 8 characters long.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match.');
+    const validation = resetPasswordSchema.safeParse({ password, confirm_password: confirmPassword });
+    if (!validation.success) {
+      setErrorMsg(validation.error.errors[0]?.message || 'Passwords do not match.');
       return;
     }
 
@@ -35,15 +68,21 @@ export default function ResetPasswordPage() {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({ password });
+
       if (error) {
-        // Fallback for demo mode
-        setIsSuccess(true);
-      } else {
-        setIsSuccess(true);
+        setErrorMsg(describePasswordRecoveryError(error));
+        setIsLoading(false);
+        return;
       }
-    } catch {
+
+      // Close the single-purpose recovery session before handing control back.
+      await supabase.auth.signOut();
       setIsSuccess(true);
-    } finally {
+      setIsLoading(false);
+      router.replace('/login?notice=password_updated');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Password could not be updated.';
+      setErrorMsg(message);
       setIsLoading(false);
     }
   };
@@ -94,12 +133,41 @@ export default function ResetPasswordPage() {
                 </Link>
               </div>
             </div>
+          ) : linkActive === false ? (
+            <div className="text-center py-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto mb-3">
+                <ShieldX className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Recovery Link Not Active</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                This reset link is invalid, already used, or has expired. Request a new recovery
+                email and open the link it contains.
+              </p>
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <Link
+                  href="/forgot-password"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-blue-800 text-white font-semibold text-xs hover:bg-blue-900"
+                >
+                  Request New Recovery Link
+                </Link>
+                <Link href="/login" className="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                  Back to Login
+                </Link>
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {errorMsg && (
                 <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                   <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {linkActive === null && (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Validating your recovery link&hellip;</span>
                 </div>
               )}
 
@@ -147,7 +215,7 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || linkActive === null}
                 className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-transparent rounded-lg shadow-xs text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isLoading ? (

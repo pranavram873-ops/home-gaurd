@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { dataService } from '@/lib/services/dataService';
 import { registerSchema } from '@/lib/validation';
+import { createClient } from '@/lib/supabase/client';
+import { getAppUrl, isPublicRegistrationEnabled } from '@/lib/supabase/env';
+import { describeSignUpError } from '@/lib/auth/errors';
 import { Lock, Mail, User, Phone, MapPin, Shield, CheckCircle, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -13,6 +16,7 @@ export default function RegisterPage() {
   const districts = dataService.getDistricts();
   const [selectedDistrict, setSelectedDistrict] = useState(districts[0]?.id || '');
   const units = dataService.getUnits(selectedDistrict);
+  const registrationOpen = isPublicRegistrationEnabled();
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -46,20 +50,36 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Create pending recruit record - ALWAYS enforce role 'home_guard' and status 'pending'
-      dataService.createPersonnel({
-        full_name: formData.full_name,
-        email: formData.email,
-        phone: formData.phone,
-        personnel_id: formData.personnel_id || `TN-HG-APP-${Math.floor(100 + Math.random() * 900)}`,
-        role: 'home_guard', // Security: strictly non-privileged
-        district_id: formData.district_id,
-        unit_id: formData.unit_id || (units[0]?.id ?? null),
-        account_status: 'pending', // Security: must be approved by admin
-        emergency_contact: formData.emergency_contact,
-        blood_group: formData.blood_group,
-        rank_designation: 'Recruit Applicant',
+      // Creates the Supabase Auth user. The matching `profiles` row is written by
+      // the database trigger (handle_new_user) with a hardcoded role of
+      // 'home_guard' and status 'pending' — this request never carries a role or
+      // status, so public enrolment cannot escalate privileges.
+      const district = districts.find((d) => d.id === formData.district_id);
+      const unit = units.find((u) => u.id === formData.unit_id);
+
+      const supabase = createClient();
+      const { error } = await supabase.auth.signUp({
+        email: formData.email.trim(),
+        password: formData.password,
+        options: {
+          emailRedirectTo: `${getAppUrl() || window.location.origin}/login?notice=email_confirmed`,
+          data: {
+            full_name: formData.full_name.trim(),
+            phone: formData.phone,
+            personnel_id: formData.personnel_id.trim() || null,
+            blood_group: formData.blood_group,
+            emergency_contact: formData.emergency_contact || null,
+            district_code: district?.code ?? null,
+            unit_code: unit?.code ?? null,
+          },
+        },
       });
+
+      if (error) {
+        setErrorMsg(describeSignUpError(error));
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(false);
       setIsSuccess(true);
@@ -105,8 +125,11 @@ export default function RegisterPage() {
               </div>
               <h3 className="text-lg font-bold text-slate-900">Enlistment Submitted Successfully</h3>
               <p className="mt-2 text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                Your application has been logged into the Command Roster with status <strong className="text-amber-700">PENDING APPROVAL</strong>.
-                The Area Commander for your selected district will verify your identity before activating your operational access.
+                A confirmation email is on its way to <strong className="text-slate-900">{formData.email}</strong>.
+                Open that link to activate sign-in. Your roster entry is recorded with status
+                <strong className="text-amber-700"> PENDING APPROVAL</strong> and role
+                <strong className="text-amber-700"> Home Guard Volunteer</strong>; the Area Commander for your
+                selected district will verify your identity before activating operational access.
               </p>
               <div className="mt-6">
                 <Link
@@ -124,6 +147,13 @@ export default function RegisterPage() {
                 <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                   <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {!registrationOpen && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                  <Shield className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
+                  <span>Public enrolment is currently closed. Report to your District Command office.</span>
                 </div>
               )}
 
@@ -281,7 +311,7 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !registrationOpen}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-xs text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isLoading ? (

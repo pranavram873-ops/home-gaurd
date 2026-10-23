@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Mail, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getAppUrl } from '@/lib/supabase/env';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -19,12 +20,28 @@ export default function ForgotPasswordPage() {
 
     try {
       const supabase = createClient();
-      await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      // Recovery links must land on the deployed app's /reset-password page, so the
+      // redirect is built from NEXT_PUBLIC_APP_URL when available (falls back to the
+      // current origin in local development). The target must also be listed under
+      // Supabase → Authentication → URL Configuration → Redirect URLs.
+      const baseUrl = getAppUrl() || window.location.origin;
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${baseUrl}/reset-password`,
       });
+
+      if (error) {
+        // Never reveal whether the address is enrolled; only surface configuration
+        // problems an operator needs to fix.
+        if (/redirect|url|allow/i.test(error.message)) {
+          setErrorMsg(
+            'Recovery could not be dispatched because the return address is not allowed. Please contact Command HQ.'
+          );
+          return;
+        }
+      }
+      // Generic acknowledgement either way (prevents account enumeration).
       setIsSubmitted(true);
     } catch {
-      // Even if offline/demo, show the verified confirmation screen
       setIsSubmitted(true);
     } finally {
       setIsLoading(false);

@@ -29,6 +29,7 @@ home-guard-supervision/
 │   └── logo.png
 ├── scripts/
 │   ├── bootstrap-admin.mjs               # Secure first administrator setup script
+│   ├── check-supabase.mjs                # Read-only connectivity / schema probe
 │   └── run-tests.mjs                     # Automated security & business rules test runner
 ├── src/
 │   ├── app/
@@ -73,7 +74,8 @@ home-guard-supervision/
 │   │       └── DashboardLayout.tsx       # Responsive layout shell
 │   ├── lib/
 │   │   ├── auth/
-│   │   │   └── authContext.tsx           # Authentication & role switching context
+│   │   │   ├── authContext.tsx           # Supabase session, sign-in/out, profile state
+│   │   │   └── errors.ts                 # Supabase Auth errors as departmental messages
 │   │   ├── services/
 │   │   │   └── dataService.ts            # Data operations layer with realistic Tamil Nadu seed data
 │   │   ├── supabase/
@@ -90,28 +92,44 @@ home-guard-supervision/
 └── supabase/
     └── migrations/
         ├── 20261019000000_initial_schema.sql  # 13 relational tables, indexes, RLS & escalation triggers
-        └── 20261019000001_seed_units_and_mock_personnel.sql # Real TN posts (Marina, Central, Meenakshi)
+        ├── 20261019000001_seed_units_and_mock_personnel.sql # Real TN posts (Marina, Central, Meenakshi)
+        ├── 20261021000000_enrolment_hook_and_commander_role.sql # Profile row on signup, is_commander()
+        └── 20261022000000_guard_reports.sql # Guard reports, admin review, scoped RLS
 ```
 
 ---
 
-## 3. HOW EACH ROLE LOGS IN & DASHBOARD REDIRECTION
+## 3. SIGN-IN, SESSIONS AND ROLE REDIRECTION
 
-The system provides role-based redirection verified on both client and server:
+Sign-in is real Supabase Auth (`signInWithPassword`) against `auth.users`; the
+personnel row in `public.profiles` decides the role and the redirect, and the
+session travels in SSR cookies refreshed by `src/middleware.ts` on each request.
 
-| Role | Test Account Email | Default Password | Badge ID | Authorized Dashboard |
-|---|---|---|---|---|
-| **State Administrator** | `admin@tnhomeguards.gov.in` | `Police@TN2024` | `TNHG-HQ-001` | `/admin/dashboard` |
-| **Area Commander** | `commander@tnhomeguards.gov.in` | `Police@TN2024` | `TN-HG-44029` | `/commander/dashboard` |
-| **Home Guard Volunteer** | `homeguard@tnhomeguards.gov.in` | `Police@TN2024` | `TN-HG-52914` | `/homeguard/dashboard` |
+There are **no built-in logins**. Every operational account must exist in
+Supabase Auth with an `active` profile row. Create the first administrator with
+the bootstrap script in section 5, then promote or activate volunteers from the
+approvals desk.
 
-> **Evaluation Shortcut:** The `/login` page features a **One-Click Fast-Track** panel allowing evaluators to immediately log in as any role without manual typing.
+| Role | Authorized Dashboard | Notes |
+|---|---|---|
+| **State Administrator** | `/admin/dashboard` | Only role allowed on `/admin/*` |
+| **Area Commander** | `/commander/dashboard` | Console not implemented yet; routed to the volunteer dashboard |
+| **Home Guard Volunteer** | `/homeguard/dashboard` | Restricted to personal duty, tasks and GPS check-in |
+| **Pending / suspended** | blocked | Redirected to `/login` with the reason shown |
+
+Sign-in failures are reported per cause: wrong credentials, e-mail not
+confirmed, no profile row, pending approval, suspended account, rate limiting.
+
+> **Demo mode (not authentication):** set `NEXT_PUBLIC_DEMO_MODE=true` outside a
+> production build to sign in from in-memory sample personnel. It adds a
+> "DEMO DATA" badge to the header and login screen, and a production build
+> ignores the flag entirely, so a demo can never be mistaken for a real session.
 
 ### Role Authorization Rules
 - **Home Guards:** Exclusively restricted to their personal dashboard, assigned duty, tasks, and GPS check-in. Attempting to navigate to `/admin/*` or `/commander/*` is automatically redirected.
 - **Commanders:** Scoped strictly to their assigned district and unit (`Zone IV - Mylapore Division`). Cannot alter system settings or access unrelated district resources.
 - **Administrators:** Full statewide oversight across all 38 districts, registration approval authority, and geofence post configuration.
-- **Pending Recruits:** If an applicant submits registration via `/register`, their account remains in `pending` status. Logging in before administrator verification displays a status notice and blocks operational access.
+- **Pending Recruits:** If an applicant submits enrolment via `/register`, a `profiles` row is created by the database trigger with role `home_guard` and status `pending`. They must confirm their e-mail and be approved before operational access is granted.
 
 ---
 
@@ -132,39 +150,69 @@ When a Home Guard clicks **Proceed to GPS Check-In** on `/homeguard/location`:
 
 To provision the initial State Administrator without exposing credentials:
 
-1. Configure your live Supabase credentials in `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-   SUPABASE_SERVICE_ROLE_KEY=<your-service-role-secret-key>
-   ```
-
-2. Execute the bootstrap script via CLI:
+1. Configure live Supabase credentials in `.env.local`. With the Vercel
+   Marketplace integration, pull them instead of pasting keys:
    ```bash
-   node scripts/bootstrap-admin.mjs <admin-email> <password> "<full-name>"
+   npx vercel link
+   npx vercel env pull .env.local
+   ```
+   The script reads `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`) and the
+   server-only secret `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`).
+   Never put the secret key in a `NEXT_PUBLIC_*` variable.
+
+2. Execute the bootstrap script in an interactive PowerShell terminal. It prompts
+   for the password without echoing it, so the password is not part of the
+   command or shell history:
+   ```bash
+   node scripts/bootstrap-admin.mjs <admin-email> "<full-name>"
    ```
 
    **Example:**
    ```bash
-   node scripts/bootstrap-admin.mjs state.commandant@tnhomeguards.gov.in Police@TN2024 "Dr. K. Vijayakumar, IPS"
+   node scripts/bootstrap-admin.mjs admin@your-organization.example "Your Name"
    ```
 
 3. The script:
    - Creates the Supabase Auth user with email pre-confirmed.
    - Upserts the record into `public.profiles` with `role = 'admin'` and `account_status = 'active'`.
-   - Assigns official State Commandant badge `TNHG-HQ-001`.
-   - Records an immutable audit log entry.
+   - Does not invent a phone number, personnel number, or district assignment.
+   - If the Auth user already exists, it keeps that account's current password.
 
 ---
 
 ## 6. SUPABASE & GOOGLE MAPS CONFIGURATION
 
 ### Supabase Database Setup
-1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **SQL Editor** in your Supabase dashboard.
-3. Run `supabase/migrations/20261019000000_initial_schema.sql` to generate all 13 tables, RLS policies, and privilege protection triggers.
-4. Run `supabase/migrations/20261019000001_seed_units_and_mock_personnel.sql` to populate initial districts (Chennai, Coimbatore, Madurai, Salem, etc.) and geofenced posts.
-5. In **Authentication -> URL Configuration**, set the Site URL to `http://localhost:3000` (or your Vercel deployment URL).
+1. Provision Supabase through the Vercel Marketplace (or at [supabase.com](https://supabase.com)).
+2. For a **new, empty project only**, open the Supabase SQL Editor and apply
+   each migration once, in timestamp order. The first migration creates the
+   schema and the audit table; the second adds sample locations and units; the
+   third adds the signup trigger and commander role support; the fourth adds
+   personnel reports. Do not re-run these files on a project whose schema is
+   already present. Apply only missing migrations, in timestamp order.
+3. For the currently connected project, first run the read-only connectivity
+   check below. If it reports all 13 tables, do not apply the first two files
+   again. Check whether `public.handle_new_user()` and the
+   `on_auth_user_created` trigger exist; if they do not, apply the enrolment
+   migration. Apply `20261022000000_guard_reports.sql` once to enable the
+   report workflow.
+4. Verify from the terminal (read-only, prints no secrets):
+   ```bash
+   npm run check:supabase
+   ```
+   If a table exists but PostgREST cannot find it, reload the API schema from
+   SQL Editor with `NOTIFY pgrst, 'reload schema';`.
+
+### Supabase Auth Setup
+1. **Authentication → Providers → Email** stays enabled; confirmation e-mail is
+   on, so a new volunteer must click the link in that e-mail before signing in.
+2. **Authentication → URL Configuration**:
+   - **Site URL**: `http://localhost:3000` locally, the Vercel domain in
+     production (this is also `NEXT_PUBLIC_APP_URL`).
+   - **Redirect URLs**: add `<site URL>/login?notice=email_confirmed` and
+     `<site URL>/reset-password`.
+3. Create the first administrator (section 5). Public enrolment can never
+   produce an administrator: the role is fixed inside the database trigger.
 
 ### Google Maps Setup (Optional)
 1. In Google Cloud Console, enable **Maps JavaScript API**, **Places API**, and **Geocoding API**.
@@ -206,12 +254,16 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 1. Push this repository to GitHub or GitLab.
 2. In the Vercel dashboard, click **Add New Project** and select this repository.
-3. Configure Environment Variables in Vercel:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
+3. Configure Environment Variables in Vercel (the Marketplace Supabase
+   integration supplies the first group automatically):
+   - `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`)
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_ANON_KEY`)
+   - `SUPABASE_SECRET_KEY` (server-only; never a `NEXT_PUBLIC_*` name)
+   - `NEXT_PUBLIC_APP_URL` — the deployed origin, used for recovery e-mails
    - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
    - `NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION=true`
+   - `NEXT_PUBLIC_DEMO_MODE` — omit it, or leave it `false`; a production build
+     ignores it either way
 4. Click **Deploy**. Next.js will automatically compile all 32 static and dynamic routes.
 "# home-gaurd" 
 "# home-gaurd" 

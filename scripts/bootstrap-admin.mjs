@@ -2,41 +2,86 @@
  * TAMIL NADU HOME GUARDS SUPERVISION SYSTEM
  * Secure First Administrator Bootstrap Script
  *
- * Usage:
- *   node scripts/bootstrap-admin.mjs <admin-email> <admin-password> "<full-name>"
- *
- * Example:
- *   node scripts/bootstrap-admin.mjs state.commandant@tnhomeguards.gov.in SecureP@ssw0rd2024 "Dr. K. Vijayakumar, IPS"
+ * Usage (the password is entered without echo and is not saved in shell history):
+ *   node scripts/bootstrap-admin.mjs <admin-email> "<full-name>"
  */
 
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env.local or .env
-dotenv.config({ path: resolve(__dirname, '../.env.local') });
-dotenv.config({ path: resolve(__dirname, '../.env') });
+// Load the local Vercel environment without requiring an extra dotenv package.
+if (typeof process.loadEnvFile === 'function') {
+  for (const envFile of [resolve(__dirname, '../.env.local'), resolve(__dirname, '../.env')]) {
+    if (existsSync(envFile)) process.loadEnvFile(envFile);
+  }
+}
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Prefer Vercel-managed Supabase integration names; fall back to legacy names.
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey || serviceRoleKey.includes('dummy')) {
-  console.error('\x1b[31m[ERROR]\x1b[0m Missing or dummy SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL in .env.local');
-  console.log('Please configure your live Supabase credentials before running this bootstrap script.');
+  console.error('\x1b[31m[ERROR]\x1b[0m Missing or dummy SUPABASE_SECRET_KEY / SUPABASE_URL in .env.local');
+  console.log('Configure the live Vercel-managed Supabase env vars first (vercel link && vercel env pull .env.local).');
   process.exit(1);
 }
 
-const email = process.argv[2];
-const password = process.argv[3];
-const fullName = process.argv[4] || 'State Commandant';
+const email = process.argv[2]?.trim();
+const fullName = process.argv[3]?.trim();
 
-if (!email || !password) {
-  console.log('\x1b[33mUsage:\x1b[0m node scripts/bootstrap-admin.mjs <email> <password> ["<full-name>"]');
+if (!email || !fullName) {
+  console.log('\x1b[33mUsage:\x1b[0m node scripts/bootstrap-admin.mjs <email> "<full-name>"');
   process.exit(1);
+}
+
+function promptPassword() {
+  if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== 'function') {
+    throw new Error('Run this script in an interactive PowerShell terminal so the password can be entered securely.');
+  }
+
+  return new Promise((resolvePassword, rejectPassword) => {
+    let password = '';
+    const stdin = process.stdin;
+    const cleanup = () => {
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+    };
+    const onData = (chunk) => {
+      for (const char of chunk.toString()) {
+        if (char === '\u0003') {
+          cleanup();
+          process.stdout.write('\n');
+          rejectPassword(new Error('Admin setup cancelled.'));
+          return;
+        }
+        if (char === '\r' || char === '\n') {
+          cleanup();
+          process.stdout.write('\n');
+          resolvePassword(password);
+          return;
+        }
+        if (char === '\u007f' || char === '\b') {
+          password = password.slice(0, -1);
+          continue;
+        }
+        password += char;
+      }
+    };
+
+    process.stdout.write('Admin password (input hidden): ');
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.on('data', onData);
+  });
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -44,6 +89,9 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 async function bootstrap() {
+  const password = await promptPassword();
+  if (password.length < 8) throw new Error('Use a password with at least 8 characters.');
+
   console.log(`\n\x1b[34m[TAMIL NADU HOME GUARDS SUPERVISION SYSTEM]\x1b[0m`);
   console.log(`Bootstrapping First State Administrator: ${email}...`);
 
@@ -52,7 +100,10 @@ async function bootstrap() {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, role: 'admin' },
+    // Role is deliberately omitted from untrusted user metadata. The database
+    // trigger creates a pending home_guard profile; this server-only bootstrap
+    // then promotes that profile using the secret key.
+    user_metadata: { full_name: fullName },
   });
 
   let userId = userAuth?.user?.id;
@@ -60,6 +111,7 @@ async function bootstrap() {
   if (authErr) {
     if (authErr.message.includes('already exists') || authErr.status === 422) {
       console.log('Auth user already exists in Supabase. Retrieving existing record...');
+      console.log('The existing account password will not be changed by this script.');
       const { data: listData, error: listErr } = await supabase.auth.admin.listUsers();
       if (listErr) throw listErr;
       const found = listData.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
@@ -72,14 +124,8 @@ async function bootstrap() {
 
   console.log(`Verified Auth User ID: ${userId}`);
 
-  // 2. Fetch Chennai district ID if exists
-  const { data: district } = await supabase
-    .from('districts')
-    .select('id')
-    .eq('code', 'CHN')
-    .single();
-
-  // 3. Upsert admin profile with active status and 'admin' role
+  // 2. Upsert the supplied administrator identity. Do not invent a phone,
+  // personnel number, or district assignment during bootstrap.
   const { data: profile, error: profErr } = await supabase
     .from('profiles')
     .upsert(
@@ -87,12 +133,9 @@ async function bootstrap() {
         id: userId,
         full_name: fullName,
         email,
-        phone: '9840011223',
-        personnel_id: 'TNHG-HQ-001',
         role: 'admin',
         account_status: 'active',
-        rank_designation: 'Director General of Police / State Commandant',
-        district_id: district?.id || null,
+        rank_designation: 'State Administrator',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
@@ -106,7 +149,6 @@ async function bootstrap() {
   console.log(`  Name: ${profile.full_name}`);
   console.log(`  Email: ${profile.email}`);
   console.log(`  Role: ${profile.role}`);
-  console.log(`  Badge ID: ${profile.personnel_id}`);
   console.log(`  Status: ${profile.account_status}`);
   console.log('\nYou may now log in at /login with these credentials.\n');
 }

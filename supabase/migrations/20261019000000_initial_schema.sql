@@ -180,6 +180,20 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 13. AUDIT LOGS
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    actor_email TEXT,
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ip_address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ============================================================================
 -- INDEXES FOR HIGH-PERFORMANCE SEARCH & FILTERING
 -- ============================================================================
@@ -233,6 +247,21 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles 
     WHERE id = auth.uid() AND role = 'admin' AND account_status = 'active'
+  );
+$$;
+
+-- Commander role is used by policies below and supported by the later
+-- enrolment/role migration as well.
+CREATE OR REPLACE FUNCTION public.is_commander()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'commander' AND account_status = 'active'
   );
 $$;
 
