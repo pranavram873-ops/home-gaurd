@@ -254,10 +254,12 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 1. Push this repository to GitHub or GitLab.
 2. In the Vercel dashboard, click **Add New Project** and select this repository.
-3. Configure Environment Variables in Vercel (the Marketplace Supabase
-   integration supplies the first group automatically):
+3. Configure Environment Variables in Vercel for Production (and Preview, if
+   needed). The Marketplace Supabase integration may supply server-side names;
+   `next.config.ts` maps the URL and publishable/anon key to browser-readable
+   names during the build. If you configure them manually, use:
    - `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`)
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_ANON_KEY`)
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_KEY`)
    - `SUPABASE_SECRET_KEY` (server-only; never a `NEXT_PUBLIC_*` name)
    - `NEXT_PUBLIC_APP_URL` — the deployed origin, used for recovery e-mails
    - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
