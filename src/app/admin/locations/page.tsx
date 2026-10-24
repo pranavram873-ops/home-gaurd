@@ -9,6 +9,8 @@ import {
   listUnits,
 } from '@/lib/services/referenceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
+import { GeofenceMap } from '@/components/maps/GeofenceMap';
+import { PostPickerMap } from '@/components/maps/PostPickerMap';
 import { DutyLocation, District, Unit } from '@/types';
 import {
   MapPin,
@@ -48,6 +50,12 @@ export default function LocationsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // The form opens on a default centre, so a coordinate that has never been
+  // chosen is indistinguishable from one that has - until this is flipped by the
+  // first search result or map click. Without it a post could be filed at the
+  // default Chennai centre by someone who only meant to look at the map.
+  const [placed, setPlaced] = useState(false);
+
   // The map shows whichever post is selected, so default it to the first row and
   // drop the selection if a refresh removed the post it pointed at.
   useEffect(() => {
@@ -75,8 +83,28 @@ export default function LocationsPage() {
     [units, newLoc.district_id],
   );
 
+  // The rest of the sector, drawn as context markers on the same map so an
+  // operator can see where a new post would sit among the existing ones.
+  // Excluding the selected post keeps its pin from being drawn twice.
+  const otherPosts = useMemo(
+    () =>
+      locations
+        .filter((l) => l.id !== selectedLoc?.id)
+        .map((l) => ({ id: l.id, name: l.name, latitude: l.latitude, longitude: l.longitude })),
+    [locations, selectedLoc],
+  );
+
+  const selectPost = (id: string) => {
+    const loc = locations.find((l) => l.id === id);
+    if (loc) setSelectedLoc(loc);
+  };
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    // The button is disabled until then, but a form can also be submitted with
+    // Enter, and a geofence filed at the default centre would Muster guards in
+    // the wrong place.
+    if (!placed) return;
     setSaving(true);
     setFormError(null);
 
@@ -103,6 +131,7 @@ export default function LocationsPage() {
 
     if (data) setSelectedLoc(data);
     setNewLoc({ ...blankPost, district_id: newLoc.district_id });
+    setPlaced(false);
     setShowAddModal(false);
     void locationsQuery.refresh();
   }
@@ -129,7 +158,12 @@ export default function LocationsPage() {
           </div>
 
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              // Re-opening a cancelled form must not inherit a pin from the last
+              // attempt, or the next post saves at the previous post's place.
+              setPlaced(false);
+              setShowAddModal(true);
+            }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -154,10 +188,39 @@ export default function LocationsPage() {
             </div>
 
             {/* Map Canvas */}
-            <div className="relative h-96 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-200">
-              <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:20px_20px] opacity-50"></div>
+            {selectedLoc ? (
+              <div className="relative border-b border-slate-200">
+                <GeofenceMap
+                  post={{
+                    name: selectedLoc.name,
+                    latitude: selectedLoc.latitude,
+                    longitude: selectedLoc.longitude,
+                    radiusMeters: selectedLoc.radius_meters,
+                  }}
+                  others={otherPosts}
+                  onSelect={selectPost}
+                  heightClass="h-96"
+                />
 
-              {!selectedLoc ? (
+                {/* Geographic sector markers */}
+                <div className="pointer-events-none absolute top-4 left-4 max-w-[260px] bg-white/90 backdrop-blur-xs p-2.5 rounded-lg border border-slate-200 shadow-xs text-[11px] flex flex-col gap-1">
+                  <span className="font-bold text-slate-900 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-800" />
+                    {selectedLoc.name}
+                  </span>
+                  <span className="text-slate-500 font-mono text-[10px]">
+                    {selectedLoc.latitude.toFixed(4)}° N, {selectedLoc.longitude.toFixed(4)}° E
+                  </span>
+                  <span className="text-slate-600 text-[10px]">{selectedLoc.address}</span>
+                  <span className="text-[10px] font-bold text-blue-900">
+                    {selectedLoc.radius_meters}m perimeter radius
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="relative h-96 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-200">
+                <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:20px_20px] opacity-50"></div>
+
                 <div className="relative z-10 text-center px-6 py-8 bg-white/90 border border-slate-200 rounded-xl shadow-xs">
                   <MapPin className="w-6 h-6 text-slate-400 mx-auto mb-2" />
                   <p className="text-xs font-bold text-slate-700">
@@ -168,45 +231,13 @@ export default function LocationsPage() {
                     record a GPS muster inside one.
                   </p>
                 </div>
-              ) : (
-                <>
-                  {/* Geographic sector markers */}
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-xs p-2.5 rounded-lg border border-slate-200 shadow-xs text-[11px] flex flex-col gap-1">
-                    <span className="font-bold text-slate-900 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-blue-800" />
-                      {selectedLoc.name}
-                    </span>
-                    <span className="text-slate-500 font-mono text-[10px]">
-                      {selectedLoc.latitude.toFixed(4)}° N, {selectedLoc.longitude.toFixed(4)}° E
-                    </span>
-                    <span className="text-slate-600 text-[10px] truncate max-w-xs">{selectedLoc.address}</span>
-                  </div>
-
-                  {/* Center Post & Animated Geofence Circle */}
-                  <div className="relative flex items-center justify-center">
-                    <div
-                      className="rounded-full border-2 border-dashed border-blue-600 bg-blue-500/15 flex items-center justify-center animate-pulse"
-                      style={{ width: '260px', height: '260px' }}
-                    >
-                      <span className="text-[10px] font-bold text-blue-950 bg-white/95 px-2.5 py-1 rounded-full shadow-xs border border-blue-200">
-                        {selectedLoc.radius_meters}m Perimeter Radius
-                      </span>
-                    </div>
-
-                    <div className="absolute flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center shadow-lg border-2 border-white">
-                        <MapPin className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="p-4 flex items-center justify-between text-xs text-slate-600 bg-slate-50/50">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-slate-400" />
-                <span>Geofencing Engine: Server-side Haversine verification against WGS84 coordinates.</span>
+                <span>The circle is drawn to scale; a muster stamp is verified against it server-side.</span>
               </div>
               <span className="font-semibold text-emerald-800">Tamper Resistant GPS Verification</span>
             </div>
@@ -278,7 +309,7 @@ export default function LocationsPage() {
         {/* Add Duty Location Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[92vh] shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
               <div className="p-4 bg-blue-900 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-blue-200" />
@@ -292,7 +323,7 @@ export default function LocationsPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreate} className="p-5 flex flex-col gap-3 text-xs">
+              <form onSubmit={handleCreate} className="p-5 flex flex-col gap-3 text-xs overflow-y-auto">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Post / Location Name</label>
                   <input
@@ -353,30 +384,51 @@ export default function LocationsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Latitude</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      required
-                      value={newLoc.latitude}
-                      onChange={(e) => setNewLoc({ ...newLoc, latitude: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-mono"
-                    />
-                  </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Post Location</label>
 
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Longitude</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      required
-                      value={newLoc.longitude}
-                      onChange={(e) => setNewLoc({ ...newLoc, longitude: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-mono"
-                    />
-                  </div>
+                  <PostPickerMap
+                    position={{ lat: newLoc.latitude, lng: newLoc.longitude }}
+                    radiusMeters={newLoc.radius_meters}
+                    name={newLoc.name}
+                    onPlace={({ position, label }) => {
+                      setNewLoc((prev) => ({
+                        ...prev,
+                        latitude: position.lat,
+                        longitude: position.lng,
+                        // A searched place fills the address only while the field
+                        // is still empty: an operator who has typed the duty
+                        // address has written the more authoritative record.
+                        address: prev.address.trim() || (label ?? ''),
+                      }));
+                      setPlaced(true);
+                    }}
+                    heightClass="h-72"
+                  />
+
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Search the place, then nudge the pin by dragging it or clicking the ground. The
+                    circle is the perimeter a guard has to stand inside to stamp muster.
+                  </p>
+                </div>
+
+                <div
+                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${
+                    placed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <span className="text-[11px] font-mono text-slate-700">
+                    {placed
+                      ? `${newLoc.latitude.toFixed(6)}° N, ${newLoc.longitude.toFixed(6)}° E`
+                      : 'No coordinate chosen yet'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold ${
+                      placed ? 'text-emerald-800' : 'text-amber-800'
+                    }`}
+                  >
+                    {placed ? 'Pin placed' : 'Search or click the map to place the pin'}
+                  </span>
                 </div>
 
                 <div>
@@ -413,10 +465,10 @@ export default function LocationsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving || districts.length === 0}
+                    disabled={saving || !placed || districts.length === 0}
                     className="px-4 py-2 rounded-lg bg-blue-800 text-white font-bold hover:bg-blue-900 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed"
                   >
-                    {saving ? 'Saving Post…' : 'Save Geofence Post'}
+                    {saving ? 'Saving Post…' : placed ? 'Save Geofence Post' : 'Place the pin first'}
                   </button>
                 </div>
               </form>

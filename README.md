@@ -15,6 +15,7 @@ An enterprise-grade, full-stack operational supervision platform designed specif
 - **Data access:** every screen reads and writes the database through the browser Supabase client, so RLS decides what an account may see. There is no sample or in-memory data anywhere in the application.
 - **Authentication:** Supabase Auth (SSR session cookies) & Role-Based Access Control (RBAC)
 - **Geofencing:** Server-validated Haversine formula calculation verifying coordinates against circular perimeters (150m - 250m)
+  - **Maps:** Google Maps JavaScript API draws every duty post's perimeter to scale on real map tiles, and Google Geocoding powers place search. An administrator can search, then fine-tune the pin by dragging or clicking the map. A failed search never prevents manual placement.
 - **Validation:** Zod schemas
 - **Deployment:** Vercel ready
 
@@ -66,6 +67,10 @@ home-guard-supervision/
 │   │   │   ├── Header.tsx                # Fixed top bar with live calendar date & notifications
 │   │   │   ├── Sidebar.tsx               # Persistent left navigation with official emblem
 │   │   │   └── DashboardLayout.tsx       # Responsive layout shell
+│   │   ├── maps/
+│   │   │   ├── MapShell.tsx              # API key gate: loading, refused-key and no-key panels
+│   │   │   ├── GeofenceMap.tsx           # A post, its perimeter to scale, and the guard's GPS fix
+│   │   │   └── PostPickerMap.tsx         # Search-or-click picker for a new duty post
 │   │   └── reports/
 │   │       └── ComplaintCenter.tsx       # Report submission, review and response workflow
 │   ├── lib/
@@ -74,6 +79,9 @@ home-guard-supervision/
 │   │   │   └── errors.ts                 # Supabase Auth errors as departmental messages
 │   │   ├── hooks/
 │   │   │   └── useLiveQuery.ts           # Loading, error and refresh state for a database screen
+│   │   ├── maps/
+│   │   │   ├── config.ts                 # Reads the browser Maps key and optional Map ID
+│   │   │   └── geocode.ts                # Place search via Google Geocoding
 │   │   ├── services/
 │   │   │   ├── queryError.ts             # Postgres / PostgREST codes as readable messages
 │   │   │   ├── selects.ts                # The verified column lists every service shares
@@ -186,13 +194,25 @@ here, so `personnel_id` collisions stay inside the database's `UNIQUE` check.
 ## 4. GEOFENCED BIOMETRIC ATTENDANCE (HAVERSINE ALGORITHM)
 
 When a Home Guard clicks **Proceed to GPS Check-In** on `/homeguard/location`:
-1. The browser requests high-accuracy GPS coordinates (`enableHighAccuracy: true`).
+1. The browser requests high-accuracy GPS coordinates (`enableHighAccuracy: true`),
+   and the map plots that fix against the post's perimeter so the guard can see
+   *Inside perimeter* or *Outside perimeter* before pressing the button.
 2. The coordinates are sent to the server-side validator (`/api/attendance/check-in`).
 3. The server runs the Haversine formula against the authorized duty post:
    $$d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)}\right)$$
 4. If $d \le \text{radius}$ (e.g. 250m for Marina Beach Post), the muster stamp is marked `verified`.
 5. If $d > \text{radius}$, the stamp is flagged with the exact excess distance.
 6. A 15-minute debounce check blocks consecutive duplicate stamps.
+
+The same map components serve the administrator. `/admin/locations` draws the
+selected post's circle to true scale, with the district's other posts as clickable
+context markers, and **Add Duty Location** sites a post by searching a place name,
+then dragging the pin or clicking the ground to fine-tune it. There are no
+latitude/longitude fields to type: the pin is the only way a coordinate enters the
+form, and **Save** stays disabled until one has actually been placed, so a post
+cannot be filed at the map's default centre by accident. Display is
+presentation only: the radius stored in `duty_locations` is the figure the server
+compares a stamp against, whatever the map looks like.
 
 ---
 
@@ -275,13 +295,53 @@ To provision the initial State Administrator without exposing credentials:
 3. Create the first administrator (section 5). Public enrolment can never
    produce an administrator: the role is fixed inside the database trigger.
 
-### Google Maps Setup (Optional)
-1. In Google Cloud Console, enable **Maps JavaScript API**, **Places API**, and **Geocoding API**.
-2. Add your key to `.env.local`:
+### Google Maps Setup
+The map uses **Maps JavaScript API** for the map and **Geocoding API** for place
+search. Google requires a billing account on the Cloud project, even when monthly
+usage remains within a free allowance.
+
+1. In Google Cloud Console, create or open a project and attach a **billing
+   account**. Without billing the key loads and the map refuses to render.
+2. **APIs & Services → Library**: enable **Maps JavaScript API** and **Geocoding API**.
+3. **APIs & Services → Credentials → Create credentials → API key**, then restrict
+   it by **HTTP referrers** so the browser key cannot be lifted from the bundle:
+   add `http://localhost:3000/*` for development and `https://<your-domain>/*`
+   for the deployment. Do not restrict it by IP.
+4. Add the key to `.env.local`:
    ```env
    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSy...
    ```
-   *(If omitted, the application uses its built-in interactive SVG perimeter map with zero external dependencies.)*
+5. If the project was created **since March 2025**, Google also requires a Map ID
+   for the JavaScript API: **Maps → Map IDs → Create Map ID** (map type: Vector or
+   Raster) and then
+   ```env
+   NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=your-map-id
+   ```
+   Older projects can leave this unset.
+
+### Place search
+The search box uses Google's Geocoding service through the Maps JavaScript API,
+restricts matches to India, and waits briefly for typing to settle before
+searching. Search results are suggestions: the administrator still places the
+pin explicitly, and can refine it by dragging or clicking the map. If Google
+search is unavailable, manual placement remains available.
+
+A search is only ever a suggestion. Choosing a result moves the pin and the
+camera, and the operator then fine-tunes by dragging the pin or clicking the
+ground, so a search issue or a wrong match cannot file a geofence in the wrong
+place — the panel says the search failed and the map still takes the post.
+
+Without a key the application still works: every map panel reads *Map tiles are
+not configured* and repeats the post's coordinates and radius, so an operator
+never mistakes an unconfigured deployment for a post with no location. A key that
+is present but refused (billing, referrer restriction, missing Map ID) is
+reported as *Google refused this map key* with the causes listed.
+
+Markers use `google.maps.Marker` rather than `google.maps.marker.AdvancedMarkerElement`,
+so the browser console carries Google's deprecation notice. The legacy marker is
+deliberate: `AdvancedMarkerElement` expects vector rendering (a Map ID) and its
+drag support is newer, while the pin here has to be draggable with no Map ID
+configured. Google has promised at least twelve months' notice before removing it.
 
 ---
 
@@ -323,7 +383,8 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or `SUPABASE_ANON_KEY`)
    - `SUPABASE_SECRET_KEY` (server-only; never a `NEXT_PUBLIC_*` name)
    - `NEXT_PUBLIC_APP_URL` — the deployed origin, used for recovery e-mails
-   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Maps JavaScript API only; see section 6
+   - `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` — only for Google projects created since March 2025
    - `NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION=true`
 4. Click **Deploy**. Next.js will automatically compile all static and dynamic routes.
 "# home-gaurd" 

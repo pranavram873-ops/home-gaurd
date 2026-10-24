@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
+import { GeofenceMap } from '@/components/maps/GeofenceMap';
 import { listDutyAssignments } from '@/lib/services/assignmentService';
 import { recordCheckIn } from '@/lib/services/attendanceService';
 import { useAuth } from '@/lib/auth/authContext';
@@ -295,40 +296,38 @@ export default function HomeGuardLocationPage() {
               </div>
 
               {/* Interactive Visual Map Representation */}
-              <div className="relative h-64 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-200">
-                <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px] opacity-70"></div>
+              <div className="relative border-b border-slate-200">
+                <GeofenceMap
+                  post={{
+                    name: location.name,
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    radiusMeters: location.radius_meters,
+                  }}
+                  position={coords ? { lat: coords.lat, lng: coords.lng } : null}
+                  heightClass="h-64"
+                />
 
-                <div className="relative flex items-center justify-center">
-                  <div className="w-48 h-48 rounded-full border-2 border-dashed border-blue-500 bg-blue-500/10 flex items-center justify-center animate-pulse">
-                    <span className="text-[10px] font-bold text-blue-800 font-mono bg-white/90 px-2 py-0.5 rounded shadow-2xs">
-                      {location.radius_meters}m Perimeter
-                    </span>
+                {/* The finding the map is being read for: is this fix inside the
+                    authorized perimeter? The server still makes it; this is the
+                    guard's chance to check before pressing the button. */}
+                {currentDistance !== null && (
+                  <div
+                    className={`pointer-events-none absolute top-3 left-3 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold shadow-xs ${
+                      isWithin
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}
+                  >
+                    {isWithin ? 'Inside perimeter' : 'Outside perimeter'} · {currentDistance}m from post centre
                   </div>
+                )}
 
-                  {/* Duty Post Center Pin */}
-                  <div className="absolute flex flex-col items-center">
-                    <div className="w-6 h-6 rounded-full bg-blue-900 text-white flex items-center justify-center shadow-md">
-                      <MapPin className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-[10px] font-bold text-blue-950 bg-white px-1.5 py-0.5 rounded shadow-xs mt-1">
-                      Post Center
-                    </span>
+                {accuracy !== null && (
+                  <div className="pointer-events-none absolute bottom-3 right-3 px-2 py-1 rounded-lg bg-white/90 border border-slate-200 text-[10px] font-mono text-slate-600 shadow-xs">
+                    GPS accuracy ±{accuracy}m
                   </div>
-
-                  {/* User Position Indicator */}
-                  {coords && (
-                    <div
-                      className={`absolute flex flex-col items-center transition-all duration-500 ${
-                        isWithin ? 'translate-x-6 translate-y-6' : 'translate-x-28 translate-y-20'
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-emerald-600 ring-4 ring-emerald-300 beacon-pulse shadow-md"></div>
-                      <span className="text-[9px] font-bold text-slate-900 bg-white px-1 rounded shadow-xs mt-1">
-                        You ({currentDistance}m away)
-                      </span>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               {/* Position telemetry bar */}
