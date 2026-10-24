@@ -1,11 +1,25 @@
 # TAMIL NADU HOME GUARDS SUPERVISION SYSTEM
 ### Government of Tamil Nadu — Police Department Auxiliary & Field Operations Platform
 
-An enterprise-grade, full-stack operational supervision platform designed specifically for the **Tamil Nadu Home Guards & Civil Defence**. It delivers role-based dashboards, GPS-geofenced biometric attendance verification using the Haversine algorithm, platoon bandobast duty scheduling, supervisory Kanban task boards, major event coordination, and tamper-resistant audit logs.
+An attendance-focused portal for the **Tamil Nadu Home Guards**. Incharges select a division and date, then mark each Home Guard present or absent. Administrators can add Home Guards, review division totals, and see duty counts. The interface is designed for phones as well as desktop screens.
 
 ---
 
-## 1. ARCHITECTURE & TECHNOLOGY STACK
+## 1. DAILY ATTENDANCE
+
+The current app opens on the attendance workflow. It includes Avinashi,
+Dharapuram, Kangeyam, Palladam, and Udumalaipettai. Incharges can mark a guard
+present or absent for the selected date. Administrators can add one Home Guard
+or paste a tab-separated roster copied from a spreadsheet. Reports summarize
+attendance and present duty days across a chosen date range. Public registration
+is disabled; accounts continue to sign in through the login page.
+
+Attendance is stored in `attendance_divisions`, `home_guard_roster`, and
+`daily_attendance`. The migration `20261024000001_simple_division_attendance.sql`
+must be applied to the Supabase project before the new screens can read or save
+attendance. The migration preserves existing geofence check-in history.
+
+## 2. ARCHITECTURE & TECHNOLOGY STACK
 
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript
 - **Styling & Design System:** Tailwind CSS v4, Inter Typography, Official Tamil Nadu Home Guards Emblem & Palette (Navy Blue `#002b7f`, Royal Blue `#0037b0`, Laurel Green `#006b2f`, Crimson Red `#ba1a1a`)
@@ -389,3 +403,4 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 4. Click **Deploy**. Next.js will automatically compile all static and dynamic routes.
 "# home-gaurd" 
 "# home-gaurd" 
+

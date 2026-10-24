@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Tamil Nadu Home Guards Supervision System',
-  description: 'Official Operational & Field Supervision Platform for Tamil Nadu Home Guards & Civil Defence.',
+  title: 'Home Guard Attendance',
+  description: 'Simple division-based attendance for Tamil Nadu Home Guards.',
   icons: {
     icon: '/images/tn-home-guards-logo.png',
     apple: '/images/tn-home-guards-logo.png',

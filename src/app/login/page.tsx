@@ -55,10 +55,10 @@ function LoginForm() {
         // Honour the page middleware remembered, but only for in-app paths whose
         // prefix matches the signed-in role (no open redirects).
         const requested = searchParams.get('redirect') || '';
-        const fallback = res.role === 'admin' ? '/admin/dashboard' : '/homeguard/dashboard';
+        const fallback = res.role === 'admin' ? '/admin/dashboard' : '/incharge/attendance';
         const allowed =
-          (requested.startsWith('/admin') && res.role === 'admin') ||
-          (requested.startsWith('/homeguard') && res.role !== 'admin');
+          ((requested.startsWith('/admin') || requested.startsWith('/incharge')) && res.role === 'admin') ||
+          (requested.startsWith('/incharge') && res.role !== 'admin');
         router.push(allowed ? requested : fallback);
         router.refresh();
       } else {
@@ -159,13 +159,6 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Registration link */}
-      <div className="mt-6 text-center text-xs text-slate-600">
-        <span>New volunteer seeking enrolment? </span>
-        <Link href="/register" className="font-bold text-blue-800 hover:text-blue-900 underline">
-          Submit Enlistment
-        </Link>
-      </div>
     </div>
   );
 }

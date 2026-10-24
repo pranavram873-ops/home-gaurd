@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'home_guard';
+/** `home_guard` remains in the type for retired screens and legacy records. */
+export type UserRole = 'admin' | 'incharge' | 'home_guard';
 
 export type AccountStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 

@@ -21,8 +21,9 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = AUTH_ONLY_ROUTES.some((route) => pathname.startsWith(route));
 
   const isAdminRoute = pathname.startsWith('/admin');
-  const isHomeGuardRoute = pathname.startsWith('/homeguard');
-  const isProtectedRoute = isAdminRoute || isHomeGuardRoute;
+  const isInchargeRoute = pathname.startsWith('/incharge');
+  const isLegacyGuardRoute = pathname.startsWith('/homeguard');
+  const isProtectedRoute = isAdminRoute || isInchargeRoute || isLegacyGuardRoute;
 
   const redirect = (target: string, params?: Record<string, string>) => {
     const url = request.nextUrl.clone();
@@ -38,7 +39,9 @@ export async function updateSession(request: NextRequest) {
     return response;
   };
 
-  const dashboardFor = (role: string) => (role === 'admin' ? '/admin/dashboard' : '/homeguard/dashboard');
+  const dashboardFor = (role: string) => (role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
+
+  if (pathname.startsWith('/register')) return redirect('/login');
 
   // ---------------------------------------------------------------------------
   // Supabase sessions. Every decision below is made from the verified JWT and
@@ -133,8 +136,22 @@ export async function updateSession(request: NextRequest) {
     return redirect(dashboardFor(profile.role));
   }
 
+  if (isLegacyGuardRoute) return redirect('/incharge/attendance');
+
   if (isAdminRoute && profile.role !== 'admin') {
     return redirect(dashboardFor(profile.role));
+  }
+
+  if (isInchargeRoute && profile.role === 'admin') {
+    return redirect('/admin/dashboard');
+  }
+
+  if (isInchargeRoute && !['/incharge/attendance', '/incharge/reports'].includes(pathname)) {
+    return redirect('/incharge/attendance');
+  }
+
+  if (isAdminRoute && !['/admin/dashboard', '/admin/reports'].includes(pathname)) {
+    return redirect('/admin/dashboard');
   }
 
   return supabaseResponse;

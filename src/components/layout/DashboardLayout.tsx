@@ -12,14 +12,11 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
   return (
-    <div className="min-h-screen bg-[#f8fafd] flex">
-      {/* Fixed Left Sidebar */}
+    <div className="min-h-screen bg-slate-50">
       <Sidebar />
-
-      {/* Main Content Area */}
-      <div className="pl-64 flex flex-col flex-1 min-w-0">
+      <div className="flex min-h-screen min-w-0 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] md:pl-60 md:pb-0">
         <Header title={title} subtitle={subtitle} />
-        <main className="p-6 flex-1">{children}</main>
+        <main className="w-full flex-1 px-3 py-4 sm:px-5 sm:py-6">{children}</main>
       </div>
     </div>
   );
