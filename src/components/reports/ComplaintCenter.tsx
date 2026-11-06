@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, FileText, LoaderCircle, Send } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Icon } from '@/components/ui/Icon';
+import { Chip, EmptyState, PrimaryButton } from '@/components/ui/primitives';
 import { useAuth } from '@/lib/auth/authContext';
 import { createClient } from '@/lib/supabase/client';
 
@@ -38,21 +39,34 @@ const statusLabels: Record<ReportStatus, string> = {
   dismissed: 'Closed',
 };
 
-const statusStyles: Record<ReportStatus, string> = {
-  submitted: 'bg-blue-50 text-blue-800 border-blue-200',
-  under_review: 'bg-amber-50 text-amber-800 border-amber-200',
-  resolved: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  dismissed: 'bg-slate-100 text-slate-700 border-slate-200',
+const statusTones: Record<ReportStatus, 'live' | 'present' | 'inverse'> = {
+  submitted: 'live',
+  under_review: 'live',
+  resolved: 'present',
+  dismissed: 'inverse',
 };
 
-const categories: { value: ReportCategory; label: string }[] = [
-  { value: 'conduct', label: 'Conduct or professionalism' },
-  { value: 'attendance', label: 'Attendance or duty concern' },
-  { value: 'safety', label: 'Safety concern' },
-  { value: 'other', label: 'Other concern' },
+const categories: { value: ReportCategory; label: string; icon: string }[] = [
+  { value: 'attendance', label: 'Late / Absent from Duty', icon: 'schedule' },
+  { value: 'conduct', label: 'Conduct or Insubordination', icon: 'warning' },
+  { value: 'safety', label: 'Safety Concern', icon: 'shield_person' },
+  { value: 'other', label: 'Other Disciplinary Issue', icon: 'notes' },
 ];
 
-const reportColumns = 'id,reporter_id,reporter_name,reporter_personnel_id,subject_id,subject_name,subject_personnel_id,category,description,status,resolution_note,created_at,updated_at';
+const categoryLabel = (value: ReportCategory) => categories.find((item) => item.value === value)?.label ?? 'Other concern';
+
+const reportColumns =
+  'id,reporter_id,reporter_name,reporter_personnel_id,subject_id,subject_name,subject_personnel_id,category,description,status,resolution_note,created_at,updated_at';
+
+const MAX_DESCRIPTION = 4000;
+
+function initials(name: string) {
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
+}
+
+function memoTimestamp(date: Date) {
+  return date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
 export function ComplaintCenter() {
   const { user, role } = useAuth();
@@ -64,8 +78,10 @@ export function ComplaintCenter() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [subjectId, setSubjectId] = useState('');
+  const [guardQuery, setGuardQuery] = useState('');
   const [category, setCategory] = useState<ReportCategory>('conduct');
   const [description, setDescription] = useState('');
+  const [now, setNow] = useState(() => new Date());
   const [adminDrafts, setAdminDrafts] = useState<Record<string, { status: ReportStatus; note: string }>>({});
 
   const load = useCallback(async () => {
@@ -104,9 +120,30 @@ export function ComplaintCenter() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const reportableGuards = useMemo(() => guards.filter((guard) => guard.id !== user?.id), [guards, user?.id]);
   const submittedByMe = reports.filter((report) => report.reporter_id === user?.id);
   const aboutMe = reports.filter((report) => report.subject_id === user?.id);
+
+  const candidates = useMemo(() => {
+    const term = guardQuery.trim().toLowerCase();
+    const filtered = term
+      ? reportableGuards.filter((guard) => `${guard.full_name} ${guard.personnel_id ?? ''}`.toLowerCase().includes(term))
+      : reportableGuards;
+    return filtered.slice(0, 8);
+  }, [guardQuery, reportableGuards]);
+
+  const selectedGuard = reportableGuards.find((guard) => guard.id === subjectId) ?? null;
+  const previousReports = subjectId ? reports.filter((report) => report.subject_id === subjectId).length : 0;
+
+  function selectGuard(guard: ReportableGuard) {
+    setSubjectId(guard.id);
+    setGuardQuery('');
+  }
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -125,7 +162,8 @@ export function ComplaintCenter() {
       if (insertError) throw insertError;
       setDescription('');
       setSubjectId('');
-      setSuccess('Your report was submitted to the administrator and the reported Home Guard.');
+      setGuardQuery('');
+      setSuccess('Report recorded and routed to Command. The filing is visible to the administrator and the reported guard.');
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not submit the report. Please try again.');
@@ -156,54 +194,56 @@ export function ComplaintCenter() {
     }
   }
 
-  const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100';
+  const reviewInputClass =
+    'mt-1 w-full rounded-xl bg-surface-container-low px-3 py-2.5 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary';
 
-  function renderReportCard(report: GuardReport, received = false) {
+  function renderReviewCard(report: GuardReport, received = false) {
     const draft = adminDrafts[report.id] || { status: report.status, note: report.resolution_note || '' };
     return (
-      <article key={report.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+      <article key={report.id} className="flex flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-slate-900">
+          <div className="min-w-0">
+            <p className="text-label-lg font-bold text-on-surface">
               {isAdmin
-                ? `${report.subject_name} · ${report.subject_personnel_id || 'No personnel ID'}`
+                ? `${report.subject_name}${report.subject_personnel_id ? ` · ${report.subject_personnel_id}` : ''}`
                 : received ? 'Report about you' : `Regarding ${report.subject_name}`}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {`Reported by ${report.reporter_name}${report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''} · `}
+            <p className="mt-1 text-label-sm text-on-surface-variant">
+              {`Filed by ${report.reporter_name}${report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''} · `}
               {new Date(report.created_at).toLocaleString('en-IN')}
             </p>
           </div>
-          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyles[report.status]}`}>
-            {statusLabels[report.status]}
-          </span>
+          <Chip tone={statusTones[report.status]}>{statusLabels[report.status]}</Chip>
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-blue-900">
-          <span className="rounded-md bg-blue-50 px-2 py-1">{categories.find((item) => item.value === report.category)?.label || 'Other concern'}</span>
-        </div>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{report.description}</p>
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-1 text-label-sm text-on-surface">
+          <Icon icon="assignment" size={14} className="text-secondary" />
+          {categoryLabel(report.category)}
+        </span>
+        <p className="whitespace-pre-wrap rounded-lg bg-surface-container-low p-2.5 text-body-md text-sm leading-6 text-on-surface">
+          {report.description}
+        </p>
         {report.resolution_note && !isAdmin && (
-          <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 p-3">
-            <p className="text-xs font-bold text-emerald-900">Administrator response</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-emerald-900">{report.resolution_note}</p>
+          <div className="rounded-lg bg-on-tertiary-container/10 p-3">
+            <p className="text-label-sm font-bold uppercase text-on-tertiary-container">Command response</p>
+            <p className="mt-1 whitespace-pre-wrap text-body-md text-sm text-on-tertiary-container">{report.resolution_note}</p>
           </div>
         )}
         {isAdmin && (
-          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-[180px_1fr_auto] md:items-end">
-            <label className="text-xs font-semibold text-slate-600">
+          <div className="grid gap-3 border-t border-outline-variant pt-4 md:grid-cols-[180px_1fr_auto] md:items-end">
+            <label className="text-label-sm font-semibold text-on-surface-variant">
               Status
               <select
-                className={`${inputClass} mt-1`}
+                className={`${reviewInputClass} bg-surface-container-lowest`}
                 value={draft.status}
                 onChange={(event) => setAdminDrafts((old) => ({ ...old, [report.id]: { ...draft, status: event.target.value as ReportStatus } }))}
               >
                 {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
-            <label className="text-xs font-semibold text-slate-600">
+            <label className="text-label-sm font-semibold text-on-surface-variant">
               Response visible to both personnel
               <textarea
-                className={`${inputClass} mt-1 min-h-10 resize-y`}
+                className={`${reviewInputClass} min-h-10 resize-y bg-surface-container-lowest`}
                 rows={2}
                 value={draft.note}
                 maxLength={2000}
@@ -211,7 +251,12 @@ export function ComplaintCenter() {
                 placeholder="Add an update or outcome"
               />
             </label>
-            <button type="button" onClick={() => void saveAdminUpdate(report.id)} disabled={saving} className="rounded-lg bg-blue-800 px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={() => void saveAdminUpdate(report.id)}
+              disabled={saving}
+              className="min-h-11 rounded-xl bg-primary-container px-4 py-2 text-label-md text-on-primary shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50"
+            >
               Save update
             </button>
           </div>
@@ -221,62 +266,256 @@ export function ComplaintCenter() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-        <div className="mb-4 flex items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-800"><FileText className="h-5 w-5" /></span>
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Submit a personnel report</h2>
-            <p className="mt-1 text-xs text-slate-600">Reports are shared with the administrator and the Home Guard named in the report.</p>
+    <div className="mx-auto flex max-w-2xl flex-col gap-5">
+      {/* Writer desk form. */}
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1 rounded-xl bg-surface-container-low p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary/10 px-2 py-0.5 text-label-sm uppercase tracking-wider text-secondary">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-secondary" aria-hidden />
+              Station Log Memo
+            </span>
+            <span className="flex items-center gap-1 text-label-sm text-on-surface-variant">
+              <Icon icon="event" size={15} />
+              {memoTimestamp(now)}
+            </span>
           </div>
+          <h2 className="text-headline-md tracking-tight text-on-surface">Report a Home Guard</h2>
+          <p className="text-label-md text-on-surface-variant">Incharge Writer Desk • Official Non-Punitive Occurrence Entry</p>
         </div>
-        <form onSubmit={submitReport} className="grid gap-3 md:grid-cols-2">
-          <label className="text-xs font-semibold text-slate-600">
-            Home Guard
-            <select className={`${inputClass} mt-1`} required value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
-              <option value="">Choose a Home Guard</option>
-              {reportableGuards.map((guard) => <option key={guard.id} value={guard.id}>{guard.full_name}{guard.personnel_id ? ` · ${guard.personnel_id}` : ''}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Report category
-            <select className={`${inputClass} mt-1`} value={category} onChange={(event) => setCategory(event.target.value as ReportCategory)}>
-              {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600 md:col-span-2">
-            What happened?
-            <textarea className={`${inputClass} mt-1 min-h-28 resize-y`} required minLength={10} maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the concern clearly, including relevant dates or duty details." />
-          </label>
-          <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
-            <p className="text-[11px] text-slate-500">Your name and personnel ID will be visible to the administrator and reported Home Guard.</p>
-            <button type="submit" disabled={saving || !reportableGuards.length} className="inline-flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50">
-              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit report
+
+        {success && (
+          <div role="status" className="flex items-center justify-between gap-3 rounded-xl bg-tertiary-container p-3.5 text-on-tertiary shadow-md">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Icon icon="check_circle" size={24} className="shrink-0 text-tertiary-fixed" />
+              <div className="flex min-w-0 flex-col">
+                <span className="text-label-sm font-bold uppercase tracking-wide text-tertiary-fixed">Entry Acknowledged</span>
+                <span className="truncate text-label-md">{success}</span>
+              </div>
+            </div>
+            <button type="button" onClick={() => setSuccess('')} aria-label="Dismiss" className="rounded p-1 text-tertiary-fixed hover:bg-surface-container-lowest/10">
+              <Icon icon="close" size={18} />
             </button>
           </div>
+        )}
+
+        {error && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+            <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
+            <span className="min-w-0 flex-1 text-sm">{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={submitReport} className="flex flex-col gap-6">
+          {/* Field 2: Search & select guard. */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="guard-search" className="text-label-sm font-bold uppercase tracking-wider text-on-surface">
+              2. Search &amp; Select Home Guard <span className="text-error">*</span>
+            </label>
+            <div className="relative flex items-center">
+              <Icon icon="badge" size={20} className="absolute left-3.5 text-on-surface-variant" />
+              <input
+                id="guard-search"
+                type="text"
+                autoComplete="off"
+                value={selectedGuard ? selectedGuard.full_name : guardQuery}
+                onChange={(event) => { if (selectedGuard) setSubjectId(''); setGuardQuery(event.target.value); }}
+                placeholder="Enter regimental ID or name..."
+                disabled={!!selectedGuard}
+                className="w-full rounded-xl bg-surface-container-lowest py-3 pl-11 pr-10 text-body-md text-on-surface shadow-sm ring-primary/20 focus:outline-none focus:ring-2 disabled:opacity-90"
+              />
+              {(guardQuery || selectedGuard) && (
+                <button
+                  type="button"
+                  onClick={() => { setGuardQuery(''); setSubjectId(''); }}
+                  aria-label="Clear selection"
+                  className="absolute right-3 rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
+                >
+                  <Icon icon="close" size={18} />
+                </button>
+              )}
+            </div>
+
+            {!selectedGuard && candidates.length > 0 && (
+              <ul className="flex flex-col gap-1 rounded-xl bg-surface-container-low p-1">
+                {candidates.map((guard) => (
+                  <li key={guard.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectGuard(guard)}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-container-lowest"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-label-md font-bold text-on-primary-fixed">
+                        {initials(guard.full_name)}
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className="truncate text-body-md text-on-surface">{guard.full_name}</span>
+                        {guard.personnel_id && (
+                          <span className="shrink-0 rounded bg-surface-container-highest px-1.5 py-0.5 font-mono text-label-sm text-on-surface-variant">
+                            {guard.personnel_id}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!loading && reportableGuards.length === 0 && (
+              <p className="text-label-sm text-on-secondary-container">There are no other active Home Guards available to report yet.</p>
+            )}
+
+            {selectedGuard && (
+              <div className="flex flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-container text-headline-sm text-on-primary">
+                      {initials(selectedGuard.full_name)}
+                    </span>
+                    <div className="flex min-w-0 flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-label-lg font-bold text-on-surface">{selectedGuard.full_name}</span>
+                        {selectedGuard.personnel_id && (
+                          <span className="shrink-0 rounded bg-surface-container-highest px-1.5 py-0.5 font-mono text-label-sm text-on-surface-variant">
+                            {selectedGuard.personnel_id}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-tertiary-fixed px-2 py-1 text-label-sm font-bold text-on-tertiary-fixed">
+                    <Icon icon="verified" size={14} />
+                    Verified
+                  </span>
+                </div>
+                {previousReports > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg bg-surface-container-high p-3">
+                    <Icon icon="info" size={18} className="mt-0.5 shrink-0 text-secondary" />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-label-md font-semibold text-on-surface">
+                        {previousReports === 1 ? '1 previous report' : `${previousReports} previous reports`} on file for this guard
+                      </span>
+                      <p className="text-label-sm leading-relaxed text-on-surface-variant">
+                        Informational record only. Does not constitute an official charge or disciplinary suspension.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Field 4: Type of concern. */}
+          <div className="flex flex-col gap-2">
+            <span className="text-label-sm font-bold uppercase tracking-wider text-on-surface">
+              4. Type of Concern <span className="text-error">*</span>
+            </span>
+            <div className="flex flex-col gap-2">
+              {categories.map((option) => {
+                const selected = option.value === category;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl p-3.5 shadow-sm transition-colors ${
+                      selected ? 'bg-primary-container text-on-primary' : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="concern-category"
+                      value={option.value}
+                      checked={selected}
+                      onChange={() => setCategory(option.value)}
+                      className="sr-only"
+                    />
+                    <span className="flex items-center gap-3">
+                      <Icon icon={option.icon} size={20} className={selected ? 'text-secondary-container' : 'text-on-surface-variant'} />
+                      <span className={`text-label-lg ${selected ? 'font-semibold' : ''}`}>{option.label}</span>
+                    </span>
+                    {selected ? (
+                      <Icon icon="check_circle" size={22} fill className="text-secondary-container" />
+                    ) : (
+                      <span className="h-5 w-5 rounded-full bg-surface-container-high" aria-hidden />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Field 5: What happened. */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="incident-description" className="text-label-sm font-bold uppercase tracking-wider text-on-surface">
+                5. What happened? <span className="text-error">*</span>
+              </label>
+              <span className="text-label-sm text-on-surface-variant">GD Entry Format</span>
+            </div>
+            <div className="flex flex-col gap-2 rounded-xl bg-surface-container-lowest p-3 shadow-sm">
+              <textarea
+                id="incident-description"
+                rows={4}
+                required
+                minLength={10}
+                maxLength={MAX_DESCRIPTION}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Describe factual sequence, roll-call timings, and witness statements..."
+                className="w-full resize-none bg-transparent text-body-md text-on-surface placeholder:text-outline focus:outline-none"
+              />
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-on-surface-variant">
+                  <Icon icon="translate" size={16} />
+                  <span className="text-label-sm">Tamil / English accepted</span>
+                </span>
+                <span className="text-label-sm text-on-surface-variant">{description.length} / {MAX_DESCRIPTION} chars</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Field 8: Primary action. */}
+          <div className="flex flex-col gap-2 pt-1">
+            <PrimaryButton type="submit" icon={saving ? null : 'arrow_forward'} disabled={saving || !subjectId || description.trim().length < 10}>
+              {saving && <Icon icon="sync" size={20} className="animate-spin" />}
+              Submit Incident Report
+            </PrimaryButton>
+            <span className="text-center text-label-sm text-on-surface-variant">
+              Digital signature: {user?.full_name ?? 'Station Writer'}
+              {user?.personnel_id ? ` · ${user.personnel_id}` : ''} • TNPG Authenticated
+            </span>
+          </div>
         </form>
-        {!loading && !reportableGuards.length && <p className="mt-3 text-xs text-amber-800">There are no other active Home Guards available to report yet.</p>}
       </section>
 
-      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertTriangle className="mr-2 inline h-4 w-4" />{error}</div>}
-      {success && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="mr-2 inline h-4 w-4" />{success}</div>}
-
+      {/* Review surfaces differ by role. */}
       {isAdmin ? (
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <div><h2 className="text-base font-bold text-slate-900">Personnel reports</h2><p className="mt-1 text-xs text-slate-500">Review submissions and add an outcome visible to both personnel.</p></div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{reports.length} total</span>
+            <div>
+              <h3 className="text-label-lg text-primary">Personnel reports</h3>
+              <p className="mt-1 text-label-sm text-on-surface-variant">Review submissions and add an outcome visible to both personnel.</p>
+            </div>
+            <span className="rounded-full bg-surface-container-highest px-3 py-1 text-label-sm font-bold text-on-surface">{reports.length} total</span>
           </div>
-          {loading ? <p className="py-8 text-center text-sm text-slate-500">Loading reports…</p> : reports.length ? reports.map((report) => renderReportCard(report)) : <EmptyState text="No personnel reports have been submitted." />}
+          {loading ? (
+            <p className="flex items-center justify-center gap-2 py-8 text-sm text-on-surface-variant"><Icon icon="sync" size={18} className="animate-spin" />Loading reports…</p>
+          ) : reports.length ? (
+            reports.map((report) => renderReviewCard(report))
+          ) : (
+            <EmptyState icon="inbox" title="No personnel reports" body="No reports have been submitted yet." />
+          )}
         </section>
       ) : (
         <>
-          <ReportSection title="Reports about me" description="Reports submitted about you, with any administrator response." reports={aboutMe} loading={loading} empty="No reports have been filed about you." render={(report) => renderReportCard(report, true)} />
-          <ReportSection title="Reports I submitted" description="Follow the status of concerns you reported." reports={submittedByMe} loading={loading} empty="You have not submitted a report." render={(report) => renderReportCard(report)} />
+          <ReportSection title="Reports about me" description="Reports submitted about you, with any administrator response." reports={aboutMe} loading={loading} empty="No reports have been filed about you." render={(report) => renderReviewCard(report, true)} />
+          <ReportSection title="Reports I submitted" description="Follow the status of concerns you reported." reports={submittedByMe} loading={loading} empty="You have not submitted a report." render={(report) => renderReviewCard(report)} />
+          <p className="flex items-start gap-2 rounded-lg bg-surface-container-low p-3 text-label-sm leading-5 text-on-surface-variant">
+            <Icon icon="schedule" size={16} className="mt-0.5 shrink-0" />
+            Report details are shared with the administrator and the Home Guard involved. Use the reporting process for operational concerns and include only relevant details.
+          </p>
         </>
       )}
-      {!isAdmin && <p className="flex items-start gap-2 rounded-lg bg-slate-100 p-3 text-xs leading-5 text-slate-600"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" />Report details are shared with the administrator and the Home Guard involved. Use the reporting process for operational concerns and include only relevant details.</p>}
     </div>
   );
 }
@@ -287,16 +526,21 @@ function ReportSection({ title, description, reports, loading, empty, render }: 
   reports: GuardReport[];
   loading: boolean;
   empty: string;
-  render: (report: GuardReport) => ReactNode;
+  render: (report: GuardReport) => React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3">
-      <div><h2 className="text-base font-bold text-slate-900">{title} <span className="text-slate-400">({reports.length})</span></h2><p className="mt-1 text-xs text-slate-500">{description}</p></div>
-      {loading ? <p className="py-5 text-sm text-slate-500">Loading…</p> : reports.length ? reports.map(render) : <EmptyState text={empty} />}
+      <div>
+        <h3 className="text-label-lg text-primary">{title} <span className="text-outline">({reports.length})</span></h3>
+        <p className="mt-1 text-label-sm text-on-surface-variant">{description}</p>
+      </div>
+      {loading ? (
+        <p className="py-5 text-sm text-on-surface-variant">Loading…</p>
+      ) : reports.length ? (
+        reports.map(render)
+      ) : (
+        <EmptyState icon="inbox" title={empty} />
+      )}
     </section>
   );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">{text}</div>;
 }

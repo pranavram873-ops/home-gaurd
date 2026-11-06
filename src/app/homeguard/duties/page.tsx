@@ -7,7 +7,7 @@ import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { listDutyAssignments } from '@/lib/services/assignmentService';
 import { useAuth } from '@/lib/auth/authContext';
 import type { DutyAssignment } from '@/types';
-import { AlertTriangle, CalendarCheck, MapPin, Clock, ArrowRight, Loader2 } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 /** `duty_assignments.start_time` is a Postgres TIME, so 'HH:MM:SS'. */
 function clock(value: string | null | undefined): string {
@@ -15,11 +15,11 @@ function clock(value: string | null | undefined): string {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  scheduled: 'bg-slate-100 text-slate-700',
-  in_progress: 'bg-blue-100 text-blue-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-slate-100 text-slate-400 line-through',
-  absent: 'bg-rose-100 text-rose-800',
+  scheduled: 'bg-surface-container text-on-surface-variant',
+  in_progress: 'bg-primary-fixed text-primary',
+  completed: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+  cancelled: 'bg-surface-container text-outline line-through',
+  absent: 'bg-error-container text-on-error-container',
 };
 
 export default function HomeGuardDutiesPage() {
@@ -51,39 +51,39 @@ export default function HomeGuardDutiesPage() {
       subtitle="Tamil Nadu Home Guards • Personnel Duty Roster"
     >
       <div className="max-w-4xl mx-auto flex flex-col gap-6">
-        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
-          <h2 className="text-xl font-bold text-slate-900">
+        <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs">
+          <h2 className="text-xl font-bold text-on-surface">
             Personal Duty Schedule {!dutiesQuery.loading && `(${duties.length})`}
           </h2>
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-xs text-on-surface-variant mt-1">
             Official deployment rosters assigned by Command Headquarters.
           </p>
         </div>
 
         {dutiesQuery.loading ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-8 flex items-center justify-center gap-2 text-xs text-slate-500">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-8 flex items-center justify-center gap-2 text-xs text-on-surface-variant">
+            <Icon icon="sync" size={16} className="animate-spin" />
             Loading your duty roster...
           </div>
         ) : dutiesQuery.error ? (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-xl bg-error-container border border-error-container text-on-error-container text-xs flex items-start gap-3">
+            <Icon icon="warning" size={20} className="text-on-error-container shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Could not load your duties</span>
               <p className="mt-0.5">{dutiesQuery.error}</p>
               <button
                 onClick={() => void dutiesQuery.refresh()}
-                className="mt-2 px-3 py-1 rounded-lg border border-rose-300 text-rose-800 text-xs font-semibold hover:bg-rose-100 cursor-pointer"
+                className="mt-2 px-3 py-1 rounded-lg border border-error-container text-on-error-container text-xs font-semibold hover:bg-error-container cursor-pointer"
               >
                 Try again
               </button>
             </div>
           </div>
         ) : duties.length === 0 ? (
-          <div className="bg-white p-8 rounded-xl border border-slate-200 text-center flex flex-col gap-2">
-            <CalendarCheck className="w-6 h-6 text-slate-300 mx-auto" />
-            <span className="text-sm font-bold text-slate-700">No duty assignments currently scheduled</span>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
+          <div className="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant text-center flex flex-col gap-2">
+            <Icon icon="fact_check" size={24} className="text-outline mx-auto" />
+            <span className="text-sm font-bold text-on-surface-variant">No duty assignments currently scheduled</span>
+            <p className="text-xs text-on-surface-variant max-w-md mx-auto">
               Your supervising officer has not posted a deployment against your badge yet. Check back after the
               next roster is published.
             </p>
@@ -93,35 +93,35 @@ export default function HomeGuardDutiesPage() {
             {duties.map((duty) => (
               <div
                 key={duty.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold text-primary bg-primary-fixed px-2 py-0.5 rounded">
                       {duty.duty_date.slice(0, 10)}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                        STATUS_STYLE[duty.status] ?? 'bg-slate-100 text-slate-700'
+                      className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${
+                        STATUS_STYLE[duty.status] ?? 'bg-surface-container text-on-surface-variant'
                       }`}
                     >
                       {duty.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">{duty.title}</h3>
-                  {duty.description && <p className="text-xs text-slate-600">{duty.description}</p>}
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+                  <h3 className="text-base font-bold text-on-surface">{duty.title}</h3>
+                  {duty.description && <p className="text-xs text-on-surface-variant">{duty.description}</p>}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-on-surface-variant">
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-blue-800" />
+                      <Icon icon="location_on" size={14} className="text-primary" />
                       {duty.location?.name || 'Post to be advised'}
                     </span>
                     <span className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <Icon icon="schedule" size={14} className="text-outline" />
                       {clock(duty.start_time)} - {clock(duty.end_time)}
                     </span>
                   </div>
                   {duty.reporting_instructions && (
-                    <p className="text-[11px] text-slate-500 border-l-2 border-blue-200 pl-2">
+                    <p className="text-[13px] text-on-surface-variant border-l-2 border-outline-variant pl-2">
                       {duty.reporting_instructions}
                     </p>
                   )}
@@ -129,10 +129,10 @@ export default function HomeGuardDutiesPage() {
 
                 <Link
                   href="/homeguard/location"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs shadow-xs transition-colors shrink-0"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary text-on-primary font-bold text-xs shadow-xs transition-colors shrink-0"
                 >
                   <span>Open Check-In</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <Icon icon="arrow_forward" size={16} />
                 </Link>
               </div>
             ))}

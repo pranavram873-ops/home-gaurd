@@ -8,19 +8,10 @@ import {
   type StaffAccountResult,
 } from '@/lib/services/personnelService';
 import { listDistricts, listUnits } from '@/lib/services/referenceService';
+import { loadGuardDutyHistory, type GuardDutyHistory } from '@/lib/services/simpleAttendanceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
-import { AccountStatus, District, Profile, Unit, UserRole } from '@/types';
-import {
-  Search,
-  Download,
-  UserPlus,
-  Eye,
-  Shield,
-  CheckCircle,
-  AlertTriangle,
-  X,
-  Copy,
-} from 'lucide-react';
+import { District, Profile, Unit, UserRole } from '@/types';
+import { Icon } from '@/components/ui/Icon';
 
 const blankRecruit = {
   full_name: '',
@@ -33,11 +24,21 @@ const blankRecruit = {
   blood_group: '',
 };
 
+const PERSONNEL_DISTRICT_NAMES = [
+  'Avinashi',
+  'Dharapuram',
+  'Kangeyam',
+  'Palladam',
+  'Udumalaipettai',
+];
+
+function normalizeDistrictName(name: string) {
+  return name.trim().replace(/\s+district$/i, '').toLocaleLowerCase('en-IN');
+}
+
 export default function PersonnelDirectoryPage() {
   const [search, setSearch] = useState('');
   const [districtFilter, setDistrictFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | AccountStatus>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -45,25 +46,35 @@ export default function PersonnelDirectoryPage() {
   // administrator sees the statewide cadre, and anyone else would get only
   // their own row - which is why this screen is behind the admin layout.
   //
-  // District, status and role are filtered in the query, because those narrow a
-  // few thousand rows down to a handful cheaply. The free-text box is filtered
-  // in memory on the result: sending it to Postgres would fire a request on
-  // every keystroke for no benefit on a list already in hand.
-  const rosterKey = `${districtFilter}|${statusFilter}|${roleFilter}`;
+  // District is filtered in the query, because it narrows a few thousand rows
+  // down to a handful cheaply. The free-text box is filtered in memory on the
+  // result: sending it to Postgres would fire a request on every keystroke for
+  // no benefit on a list already in hand.
   const rosterQuery = useLiveQuery<Profile[]>(
     () =>
       listPersonnel({
         districtId: districtFilter === 'all' ? null : districtFilter,
         unitId: null,
-        role: roleFilter,
-        status: statusFilter,
+        role: 'all',
+        status: 'all',
       }),
-    rosterKey,
+    districtFilter,
   );
   const personnel = useMemo(() => rosterQuery.data ?? [], [rosterQuery.data]);
 
   const districtsQuery = useLiveQuery<District[]>(() => listDistricts());
-  const districts = useMemo(() => districtsQuery.data ?? [], [districtsQuery.data]);
+  const districts = useMemo(() => {
+    const allowedNames = new Set(PERSONNEL_DISTRICT_NAMES.map((name) => name.toLocaleLowerCase('en-IN')));
+    return (districtsQuery.data ?? [])
+      .filter((district) => allowedNames.has(normalizeDistrictName(district.name)))
+      .map((district) => ({
+        ...district,
+        name: PERSONNEL_DISTRICT_NAMES.find(
+          (name) => name.toLocaleLowerCase('en-IN') === normalizeDistrictName(district.name),
+        ) ?? district.name,
+      }))
+      .sort((a, b) => PERSONNEL_DISTRICT_NAMES.indexOf(a.name) - PERSONNEL_DISTRICT_NAMES.indexOf(b.name));
+  }, [districtsQuery.data]);
   const unitsQuery = useLiveQuery<Unit[]>(() => listUnits());
   const units = useMemo(() => unitsQuery.data ?? [], [unitsQuery.data]);
 
@@ -164,16 +175,16 @@ export default function PersonnelDirectoryPage() {
     >
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         {/* Banner with Action Buttons */}
-        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-900 border border-blue-200">
+              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-primary-fixed text-primary border border-outline-variant">
                 Muster Command
               </span>
-              <span className="text-xs font-mono font-bold text-slate-500">STATEWIDE CADRE</span>
+              <span className="text-xs font-mono font-bold text-on-surface-variant">STATEWIDE CADRE</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">Tamil Nadu Home Guards Directory</h2>
-            <p className="text-xs text-slate-600">
+            <h2 className="text-xl font-bold text-on-surface mt-1">Tamil Nadu Home Guards Directory</h2>
+            <p className="text-xs text-on-surface-variant">
               Active field officers, platoon assignments, service numbers, and muster status.
             </p>
           </div>
@@ -182,9 +193,9 @@ export default function PersonnelDirectoryPage() {
             <button
               onClick={exportCSV}
               disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low text-on-surface-variant font-semibold text-xs shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download className="w-4 h-4" />
+              <Icon icon="download" size={16} />
               <span>Export Roster CSV</span>
             </button>
 
@@ -193,32 +204,35 @@ export default function PersonnelDirectoryPage() {
                 resetForm();
                 setShowAddModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary text-on-primary font-bold text-xs shadow-xs transition-colors cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" />
+              <Icon icon="person_add" size={16} />
               <span>Add Personnel</span>
             </button>
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+        {/* Filter deck: free-text search scoped by district. */}
+        <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/40 shadow-xs flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Icon icon="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name, badge ID, phone..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
+              aria-label="Search personnel"
+              className="h-11 w-full pl-9 pr-3 text-sm border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline bg-surface-container-lowest"
             />
           </div>
 
-          <div>
+          <div className="relative sm:w-72">
+            <Icon icon="location_on" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
             <select
               value={districtFilter}
               onChange={(e) => setDistrictFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 bg-white"
+              aria-label="Filter by district"
+              className="h-11 w-full pl-9 pr-8 text-sm border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-on-surface bg-surface-container-lowest appearance-none cursor-pointer"
             >
               <option value="all">All Districts (Statewide)</option>
               {districts.map((d) => (
@@ -227,265 +241,117 @@ export default function PersonnelDirectoryPage() {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | AccountStatus)}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 bg-white"
-            >
-              <option value="all">All Account Statuses</option>
-              <option value="active">Active On Duty</option>
-              <option value="pending">Pending Approval</option>
-              <option value="suspended">Suspended</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-
-          <div>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as 'all' | UserRole)}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 bg-white"
-            >
-              <option value="all">All Ranks & Roles</option>
-              <option value="admin">Administrators</option>
-              <option value="home_guard">Home Guards</option>
-            </select>
+            <Icon icon="expand_more" size={18} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           </div>
         </div>
 
-        {/* Personnel Directory Data Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-900">
-              Showing <strong className="text-blue-900">{filtered.length}</strong> Personnel
+        {/* Personnel roster: service number + name only. Tapping a row opens
+            that person's profile; everything else lives inside it. */}
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-outline-variant flex items-center justify-between">
+            <span className="text-xs font-bold text-on-surface">
+              <strong className="text-primary">{filtered.length}</strong>{' '}
+              {filtered.length === 1 ? 'person found' : 'people found'}
+              {search.trim() || districtFilter !== 'all' ? ' in this view' : ' in the directory'}
             </span>
             {!rosterQuery.loading && !rosterQuery.error && personnel.length > 0 && (
               <button
                 onClick={() => void rosterQuery.refresh()}
-                className="text-[11px] font-bold text-blue-800 hover:text-blue-950 cursor-pointer"
+                className="text-[13px] font-bold text-primary hover:text-primary cursor-pointer"
               >
                 Refresh roster
               </button>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-blue-900 text-white font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-4">Officer / Guard</th>
-                  <th className="py-3 px-4">Badge Service ID</th>
-                  <th className="py-3 px-4">Rank / Assignment</th>
-                  <th className="py-3 px-4">District / Unit</th>
-                  <th className="py-3 px-4">Contact</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rosterQuery.loading ? (
-                  <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-500">
-                      Loading the cadre roster…
-                    </td>
-                  </tr>
-                ) : rosterQuery.error ? (
-                  <tr>
-                    <td colSpan={7} className="py-10 text-center">
-                      <AlertTriangle className="w-5 h-5 text-rose-600 mx-auto mb-2" />
-                      <p className="text-rose-800 font-semibold">{rosterQuery.error}</p>
-                      <button
-                        onClick={() => void rosterQuery.refresh()}
-                        className="mt-2 text-[11px] font-bold text-blue-800 underline cursor-pointer"
-                      >
-                        Try again
-                      </button>
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-500">
-                      {personnel.length === 0
-                        ? 'No personnel on the roster for these filters. Approved enrolments and added staff both appear here.'
-                        : 'No row matches the search text within these filters.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center shrink-0">
-                            {p.full_name.charAt(0)}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-900">{p.full_name}</span>
-                            <span className="text-[11px] text-slate-500">{p.email}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-blue-900">
-                        <span
-                          className={`px-2 py-0.5 rounded border ${
-                            p.personnel_id
-                              ? 'bg-blue-50 border-blue-200'
-                              : 'bg-slate-50 border-slate-200 text-slate-400'
-                          }`}
-                        >
-                          {p.personnel_id || 'No badge'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-800 block">
-                          {p.rank_designation || 'Volunteer'}
-                        </span>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">
-                          {p.role.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">
-                        <span className="block">{p.district?.name || 'No district linked'}</span>
-                        <span className="text-[10px] text-slate-400 block">
-                          {p.unit?.name || 'Statewide'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-700">
-                        {p.phone || 'N/A'}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            p.account_status === 'active'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : p.account_status === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              p.account_status === 'active'
-                                ? 'bg-emerald-600'
-                                : p.account_status === 'pending'
-                                ? 'bg-amber-600'
-                                : 'bg-rose-600'
-                            }`}
-                          ></span>
-                          {p.account_status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => setSelectedProfile(p)}
-                          className="p-1.5 rounded-lg text-blue-800 hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="View Profile Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {rosterQuery.loading ? (
+            <p className="py-10 text-center text-on-surface-variant text-sm">
+              Loading the cadre roster…
+            </p>
+          ) : rosterQuery.error ? (
+            <div className="py-10 text-center">
+              <Icon icon="warning" size={20} className="text-on-error-container mx-auto mb-2" />
+              <p className="text-on-error-container font-semibold">{rosterQuery.error}</p>
+              <button
+                onClick={() => void rosterQuery.refresh()}
+                className="mt-2 text-[13px] font-bold text-primary underline cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-10 text-center text-on-surface-variant text-sm">
+              {personnel.length === 0
+                ? 'No personnel on the roster for these filters. Approved enrolments and added staff both appear here.'
+                : 'No row matches the search text within these filters.'}
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-outline-variant">
+              {filtered.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfile(p)}
+                    className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+                    aria-label={`Open profile for ${p.full_name}`}
+                  >
+                    <span className="w-24 shrink-0 rounded-md bg-primary-fixed px-2 py-1 text-center font-mono text-[13px] font-bold text-primary">
+                      {p.personnel_id || '—'}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-on-surface">
+                      {p.full_name}
+                    </span>
+                    <Icon icon="chevron_right" size={20} className="shrink-0 text-outline" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
-      {/* Profile Detail Slide-over Modal */}
+      {/* Profile modal: identity only - service number and name. */}
       {selectedProfile && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-            <div className="p-4 bg-blue-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-xl max-w-sm w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+            <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-blue-200" />
-                <h3 className="font-bold text-sm">Personnel Service Dossier</h3>
+                <Icon icon="shield" size={20} className="text-on-primary" />
+                <h3 className="font-bold text-sm">Personnel Profile</h3>
               </div>
               <button
                 onClick={() => setSelectedProfile(null)}
-                className="text-white hover:text-slate-300 cursor-pointer"
+                className="text-on-primary hover:text-outline cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <Icon icon="close" size={20} />
               </button>
             </div>
 
-            <div className="p-5 flex flex-col gap-4 text-xs">
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                <div className="w-12 h-12 rounded-full bg-blue-800 text-white font-extrabold text-lg flex items-center justify-center">
-                  {selectedProfile.full_name.charAt(0)}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-base font-bold text-slate-900">{selectedProfile.full_name}</span>
-                  <span className="font-mono text-blue-800 font-bold">
-                    {selectedProfile.personnel_id || 'Badge not yet issued'}
-                  </span>
-                  <span className="text-slate-500">{selectedProfile.rank_designation}</span>
-                </div>
+            <div className="p-6 flex flex-col items-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-primary text-on-primary font-extrabold text-2xl flex items-center justify-center">
+                {selectedProfile.full_name.charAt(0)}
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-outline font-bold uppercase tracking-wider text-xs">Service Number</span>
+                <span className="font-mono text-xl font-extrabold text-primary">
+                  {selectedProfile.personnel_id || 'Badge not yet issued'}
+                </span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Name</span>
+                <span className="text-lg font-bold text-on-surface">{selectedProfile.full_name}</span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Mobile Number</span>
+                <span className="text-lg font-semibold text-on-surface">
+                  {selectedProfile.phone || 'Not provided'}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-slate-400 font-bold block">Official Email</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5 break-all">{selectedProfile.email}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Mobile Contact</span>
-                  <span className="font-semibold font-mono text-slate-800 block mt-0.5">
-                    {selectedProfile.phone || 'Not recorded'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Assigned District</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5">
-                    {selectedProfile.district?.name || 'No district linked'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Unit / Battalion</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5">
-                    {selectedProfile.unit?.name || 'Statewide (no unit)'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Blood Group</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5">
-                    {selectedProfile.blood_group || 'Not recorded'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Emergency Contact</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5">
-                    {selectedProfile.emergency_contact || 'Not recorded'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Role Category</span>
-                  <span className="font-bold uppercase text-blue-900 block mt-0.5">{selectedProfile.role}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block">Account Status</span>
-                  <span className="font-bold uppercase text-emerald-700 block mt-0.5">{selectedProfile.account_status}</span>
-                </div>
-              </div>
+              <DutyHistorySection phone={selectedProfile.phone} />
 
-              {selectedProfile.address && (
-                <div>
-                  <span className="text-slate-400 font-bold block">Address</span>
-                  <span className="font-semibold text-slate-800 block mt-0.5">{selectedProfile.address}</span>
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-slate-100 flex justify-end">
-                <button
-                  onClick={() => setSelectedProfile(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
-                >
-                  Close Dossier
-                </button>
-              </div>
+              <button
+                onClick={() => setSelectedProfile(null)}
+                className="mt-2 w-full px-4 py-2.5 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -493,81 +359,81 @@ export default function PersonnelDirectoryPage() {
 
       {/* Add Personnel Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-            <div className="p-4 bg-blue-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-xl max-w-lg w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+            <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-blue-200" />
+                <Icon icon="person_add" size={20} className="text-primary" />
                 <h3 className="font-bold text-sm">
                   {created ? 'Account Created' : 'Enrol New Home Guard Personnel'}
                 </h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-white hover:text-slate-300 cursor-pointer"
+                className="text-on-primary hover:text-outline cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <Icon icon="close" size={20} />
               </button>
             </div>
 
             {created ? (
               <div className="p-5 flex flex-col gap-3 text-xs">
-                <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                  <p className="text-emerald-900 font-semibold">
+                <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-tertiary-fixed border border-outline-variant">
+                  <Icon icon="check_circle" size={16} className="text-on-tertiary-container shrink-0 mt-0.5" />
+                  <p className="text-on-tertiary-fixed-variant font-semibold">
                     {newGuard.full_name} can sign in now. Their service badge is issued by the database and
                     appears on the roster.
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-3 flex flex-col gap-2">
+                <div className="border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
                   <div>
-                    <span className="text-slate-400 font-bold block">Sign-in email</span>
-                    <span className="font-mono font-semibold text-slate-900 block mt-0.5 break-all">
+                    <span className="text-outline font-bold block">Sign-in email</span>
+                    <span className="font-mono font-semibold text-on-surface block mt-0.5 break-all">
                       {created.email}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-bold block">Temporary password</span>
+                    <span className="text-outline font-bold block">Temporary password</span>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded border border-slate-300 break-all">
+                      <span className="font-mono font-bold text-on-surface bg-surface-container px-2 py-1 rounded border border-outline-variant break-all">
                         {created.temporaryPassword}
                       </span>
                       <button
                         type="button"
                         onClick={() => void navigator.clipboard?.writeText(created.temporaryPassword)}
-                        className="p-1.5 rounded-lg text-blue-800 hover:bg-blue-50 border border-slate-200 cursor-pointer shrink-0"
+                        className="p-1.5 rounded-lg text-primary hover:bg-primary-fixed border border-outline-variant cursor-pointer shrink-0"
                         title="Copy password"
                       >
-                        <Copy className="w-3.5 h-3.5" />
+                        <Icon icon="content_copy" size={14} />
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <p className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-semibold">
+                <p className="px-3 py-2 rounded-lg bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant font-semibold">
                   This password is shown once and is not stored by the portal. Hand it to the officer
                   directly and have them set their own before the first muster.
                 </p>
 
                 {created.auditWarning && (
-                  <p className="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
+                  <p className="px-3 py-2 rounded-lg bg-error-container border border-error-container text-on-error-container">
                     The account works, but its audit entry failed to save: {created.auditWarning}
                   </p>
                 )}
 
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <div className="pt-3 border-t border-outline-variant flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
                   >
                     Add Another
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 rounded-lg bg-blue-800 text-white font-bold hover:bg-blue-900 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary cursor-pointer"
                   >
                     Done
                   </button>
@@ -576,39 +442,39 @@ export default function PersonnelDirectoryPage() {
             ) : (
               <form onSubmit={handleCreateGuard} className="p-5 flex flex-col gap-3 text-xs">
                 {districts.length === 0 && !districtsQuery.loading && (
-                  <p className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                  <p className="px-3 py-2 rounded-lg bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant">
                     No districts are seeded in the database yet, so a person cannot be filed anywhere.
                     Run the reference-data migration before adding personnel.
                   </p>
                 )}
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Full Legal Name</label>
+                  <label className="font-bold text-on-surface-variant block mb-1">Full Legal Name</label>
                   <input
                     type="text"
                     required
                     minLength={3}
                     value={newGuard.full_name}
                     onChange={(e) => setNewGuard({ ...newGuard, full_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                     placeholder="e.g. S. Kannan"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Email</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Email</label>
                     <input
                       type="email"
                       required
                       value={newGuard.email}
                       onChange={(e) => setNewGuard({ ...newGuard, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                       placeholder="kannan@tnhomeguards.gov.in"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Mobile Number</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Mobile Number</label>
                     <input
                       type="tel"
                       required
@@ -616,7 +482,7 @@ export default function PersonnelDirectoryPage() {
                       maxLength={10}
                       value={newGuard.phone}
                       onChange={(e) => setNewGuard({ ...newGuard, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                       placeholder="9840001122"
                     />
                   </div>
@@ -624,22 +490,22 @@ export default function PersonnelDirectoryPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Rank / Designation</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Rank / Designation</label>
                     <input
                       type="text"
                       required
                       minLength={2}
                       value={newGuard.rank_designation}
                       onChange={(e) => setNewGuard({ ...newGuard, rank_designation: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Role</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Role</label>
                     <select
                       value={newGuard.role}
                       onChange={(e) => setNewGuard({ ...newGuard, role: e.target.value as UserRole })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
                     >
                       <option value="home_guard">Home Guard Volunteer</option>
                       <option value="admin">Administrator</option>
@@ -649,12 +515,12 @@ export default function PersonnelDirectoryPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">District Command</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">District Command</label>
                     <select
                       required
                       value={newGuard.district_id}
                       onChange={(e) => setNewGuard({ ...newGuard, district_id: e.target.value, unit_id: '' })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
                     >
                       <option value="">Select district</option>
                       {districts.map((d) => (
@@ -665,12 +531,12 @@ export default function PersonnelDirectoryPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Unit / Battalion</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Unit / Battalion</label>
                     <select
                       value={newGuard.unit_id}
                       disabled={!newGuard.district_id}
                       onChange={(e) => setNewGuard({ ...newGuard, unit_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest disabled:bg-surface-container disabled:text-outline"
                     >
                       <option value="">
                         {newGuard.district_id ? 'Statewide (no unit)' : 'Select district first'}
@@ -686,17 +552,17 @@ export default function PersonnelDirectoryPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Blood Group</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Blood Group</label>
                     <input
                       type="text"
                       value={newGuard.blood_group}
                       onChange={(e) => setNewGuard({ ...newGuard, blood_group: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                       placeholder="Optional, e.g. O+"
                     />
                   </div>
                   <div className="flex items-end">
-                    <p className="text-[11px] text-slate-500 leading-snug">
+                    <p className="text-[13px] text-on-surface-variant leading-snug">
                       The login is created active, since an administrator is attesting to this person
                       in person. Self-enrolled applicants still go through the approvals desk.
                     </p>
@@ -704,23 +570,23 @@ export default function PersonnelDirectoryPage() {
                 </div>
 
                 {formError && (
-                  <p className="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
+                  <p className="px-3 py-2 rounded-lg bg-error-container border border-error-container text-on-error-container font-semibold">
                     {formError}
                   </p>
                 )}
 
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <div className="pt-3 border-t border-outline-variant flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving || !newGuard.district_id || districtsQuery.loading}
-                    className="px-4 py-2 rounded-lg bg-blue-800 text-white font-bold hover:bg-blue-900 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    className="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary cursor-pointer disabled:bg-surface-container-highest disabled:cursor-not-allowed"
                   >
                     {saving ? 'Creating Login…' : 'Create Personnel Login'}
                   </button>
@@ -731,5 +597,106 @@ export default function PersonnelDirectoryPage() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+/**
+ * Muster-register block inside the profile: Home Guard code and duty counts
+ * for the current month, with a "See history" toggle for the months before.
+ * The register is looked up lazily when a profile opens, keyed on the mobile
+ * number, because `profiles` and the roster have no shared id.
+ */
+function DutyHistorySection({ phone }: { phone?: string | null }) {
+  const [history, setHistory] = useState<GuardDutyHistory | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setState('loading');
+    setShowHistory(false);
+    loadGuardDutyHistory(phone)
+      .then((result) => {
+        if (!live) return;
+        setHistory(result);
+        setState('ready');
+      })
+      .catch(() => {
+        if (live) setState('error');
+      });
+    return () => {
+      live = false;
+    };
+  }, [phone]);
+
+  const monthLabel = (key: string) => {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+  };
+
+  return (
+    <div className="w-full border border-outline-variant rounded-lg divide-y divide-outline-variant text-left">
+      {state === 'loading' && (
+        <p className="px-4 py-3 text-[13px] text-on-surface-variant">Checking the attendance register…</p>
+      )}
+      {state === 'error' && (
+        <p className="px-4 py-3 text-[13px] font-semibold text-on-error-container">
+          The attendance register could not be loaded.
+        </p>
+      )}
+      {state === 'ready' && !history && (
+        <p className="px-4 py-3 text-[13px] text-on-surface-variant">
+          Not found in the attendance register, so duty counts are unavailable for this account.
+        </p>
+      )}
+      {state === 'ready' && history && (
+        <>
+          <div className="px-4 py-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard Code</span>
+              <span className="font-mono text-sm font-bold text-on-surface">{history.homeGuardCode}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-semibold text-on-surface-variant">
+                Duties this month{history.divisionName ? ` · ${history.divisionName}` : ''}
+              </span>
+              <span className="text-lg font-extrabold text-primary tabular-nums">
+                {history.months[0]?.present ?? 0}
+              </span>
+            </div>
+          </div>
+          {showHistory && (
+            <ul className="px-4 py-2 flex flex-col">
+              {history.months.slice(1).map((bucket) => (
+                <li key={bucket.month} className="flex items-center justify-between py-1.5 text-[13px]">
+                  <span className="font-semibold text-on-surface-variant">{monthLabel(bucket.month)}</span>
+                  <span className="tabular-nums">
+                    <strong className="text-primary">{bucket.present}</strong>
+                    <span className="text-outline"> present</span>
+                    {bucket.absent > 0 && (
+                      <>
+                        <span className="text-outline"> · </span>
+                        <strong className="text-on-error-container">{bucket.absent}</strong>
+                        <span className="text-outline"> absent</span>
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary font-bold text-sm hover:bg-surface-container-low transition-colors cursor-pointer"
+            >
+              <Icon icon={showHistory ? 'expand_less' : 'history'} size={18} />
+              <span>{showHistory ? 'Hide history' : 'See history'}</span>
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

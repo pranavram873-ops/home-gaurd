@@ -189,6 +189,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setIsLoading(false);
 
+    // An incharge's working division is scoped to the session: signing out
+    // forgets it so the next login asks which division to view again.
+    try {
+      window.localStorage.removeItem('tnhg.selectedDivision');
+    } catch {
+      // ignore storage failures
+    }
+
     startTransition(() => {
       router.push('/login');
       router.refresh();

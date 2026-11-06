@@ -8,12 +8,7 @@ import { pushNotification } from '@/lib/services/notificationService';
 import { useAuth } from '@/lib/auth/authContext';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { Profile, TaskItem, TaskPriority, TaskStatus } from '@/types';
-import {
-  ClipboardList,
-  Plus,
-  AlertTriangle,
-  X,
-} from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 export default function TasksPage() {
   const { user } = useAuth();
@@ -100,10 +95,10 @@ export default function TasksPage() {
   }
 
   const columns: { label: string; status: TaskStatus; color: string }[] = [
-    { label: 'New Directives', status: 'new', color: 'border-slate-300 bg-slate-50' },
-    { label: 'Assigned to Guards', status: 'assigned', color: 'border-blue-300 bg-blue-50/50' },
-    { label: 'In Execution', status: 'in_progress', color: 'border-indigo-300 bg-indigo-50/50' },
-    { label: 'Completed & Verified', status: 'completed', color: 'border-emerald-300 bg-emerald-50/50' },
+    { label: 'New Directives', status: 'new', color: 'border-outline-variant bg-surface-container-low' },
+    { label: 'Assigned to Guards', status: 'assigned', color: 'border-outline-variant bg-primary-fixed/50' },
+    { label: 'In Execution', status: 'in_progress', color: 'border-outline-variant bg-primary-fixed/50' },
+    { label: 'Completed & Verified', status: 'completed', color: 'border-outline-variant bg-tertiary-fixed/50' },
   ];
 
   return (
@@ -113,10 +108,10 @@ export default function TasksPage() {
     >
       <div className="max-w-7xl mx-auto flex flex-col gap-6">
         {/* Banner with Add Directive Action */}
-        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Field Supervision Kanban Board</h2>
-            <p className="text-xs text-slate-600">
+            <h2 className="text-xl font-bold text-on-surface">Field Supervision Kanban Board</h2>
+            <p className="text-xs text-on-surface-variant">
               Assign and monitor bandobast standing orders, communications inspection, and security directives.
             </p>
           </div>
@@ -126,16 +121,16 @@ export default function TasksPage() {
               setFormError(null);
               setShowModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary text-on-primary font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Icon icon="add" size={16} />
             <span>Create Supervisory Task</span>
           </button>
         </div>
 
         {tasksQuery.error && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-error-container border border-error-container text-xs font-semibold text-on-error-container">
+            <Icon icon="warning" size={16} className="shrink-0" />
             <span>{tasksQuery.error}</span>
             <button
               onClick={() => void tasksQuery.refresh()}
@@ -147,11 +142,11 @@ export default function TasksPage() {
         )}
 
         {actionError && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-error-container border border-error-container text-xs font-semibold text-on-error-container">
+            <Icon icon="warning" size={16} className="shrink-0" />
             <span>{actionError}</span>
             <button onClick={() => setActionError(null)} className="ml-auto cursor-pointer">
-              <X className="w-4 h-4" />
+              <Icon icon="close" size={16} />
             </button>
           </div>
         )}
@@ -164,14 +159,14 @@ export default function TasksPage() {
             return (
               <div
                 key={col.status}
-                className="bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col min-h-[500px]"
+                className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-2xs flex flex-col min-h-[500px]"
               >
                 {/* Column Header */}
-                <div className={`p-3.5 border-b border-slate-200 rounded-t-xl flex items-center justify-between ${col.color}`}>
-                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                <div className={`p-3.5 border-b border-outline-variant rounded-t-xl flex items-center justify-between ${col.color}`}>
+                  <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
                     {col.label}
                   </span>
-                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-800">
+                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface">
                     {colTasks.length}
                   </span>
                 </div>
@@ -179,28 +174,28 @@ export default function TasksPage() {
                 {/* Column Cards */}
                 <div className="p-3 flex flex-col gap-3 flex-1 overflow-y-auto">
                   {tasksQuery.loading ? (
-                    <div className="text-center py-10 text-slate-400 text-xs font-medium">
+                    <div className="text-center py-10 text-outline text-xs font-medium">
                       Loading directives…
                     </div>
                   ) : colTasks.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-xs font-medium">
+                    <div className="text-center py-10 text-outline text-xs font-medium">
                       No tasks in this lane
                     </div>
                   ) : (
                     colTasks.map((t) => (
                       <div
                         key={t.id}
-                        className="p-3.5 rounded-lg border border-slate-200 bg-white shadow-2xs hover:shadow-xs transition-shadow flex flex-col gap-2"
+                        className="p-3.5 rounded-lg border border-outline-variant bg-surface-container-lowest shadow-2xs hover:shadow-xs transition-shadow flex flex-col gap-2"
                       >
                         <div className="flex items-start justify-between gap-1.5">
-                          <span className="text-xs font-bold text-slate-900 leading-snug">{t.title}</span>
+                          <span className="text-xs font-bold text-on-surface leading-snug">{t.title}</span>
                           <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                            className={`text-xs font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
                               t.priority === 'urgent'
-                                ? 'bg-rose-100 text-rose-800'
+                                ? 'bg-error-container text-on-error-container'
                                 : t.priority === 'high'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-100 text-slate-700'
+                                ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
+                                : 'bg-surface-container text-on-surface-variant'
                             }`}
                           >
                             {t.priority}
@@ -208,26 +203,26 @@ export default function TasksPage() {
                         </div>
 
                         {t.description && (
-                          <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                          <p className="text-[13px] text-on-surface-variant line-clamp-2 leading-relaxed">
                             {t.description}
                           </p>
                         )}
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                        <div className="pt-2 border-t border-outline-variant flex items-center justify-between text-[13px] text-on-surface-variant">
                           <span className="truncate max-w-[120px]">
                             {t.assignee?.full_name || 'Unassigned'}
                           </span>
-                          <span className="font-mono text-[10px]">
+                          <span className="font-mono text-xs">
                             {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No due date'}
                           </span>
                         </div>
 
                         {/* Quick Status Transition Toggle */}
-                        <div className="pt-2 border-t border-slate-100/60 flex items-center justify-between gap-1">
+                        <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between gap-1">
                           {col.status !== 'in_progress' && col.status !== 'completed' && (
                             <button
                               onClick={() => void handleStatusChange(t.id, 'in_progress')}
-                              className="text-[10px] font-semibold text-blue-800 hover:underline cursor-pointer"
+                              className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                             >
                               Move to In Progress →
                             </button>
@@ -235,13 +230,13 @@ export default function TasksPage() {
                           {col.status === 'in_progress' && (
                             <button
                               onClick={() => void handleStatusChange(t.id, 'completed')}
-                              className="text-[10px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                              className="text-xs font-semibold text-on-tertiary-container hover:underline cursor-pointer"
                             >
                               Mark Completed ✓
                             </button>
                           )}
                           {col.status === 'completed' && (
-                            <span className="text-[10px] text-emerald-700 font-bold">✓ Verified</span>
+                            <span className="text-xs text-on-tertiary-container font-bold">✓ Verified</span>
                           )}
                         </div>
                       </div>
@@ -255,65 +250,65 @@ export default function TasksPage() {
 
         {/* Create Task Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-              <div className="p-4 bg-blue-900 text-white flex items-center justify-between">
+          <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-surface-container-lowest rounded-xl max-w-lg w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+              <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-blue-200" />
+                  <Icon icon="assignment" size={20} className="text-primary" />
                   <h3 className="font-bold text-sm">Issue New Supervisory Task</h3>
                 </div>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="text-white hover:text-slate-300 cursor-pointer"
+                  className="text-on-primary hover:text-outline cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <Icon icon="close" size={20} />
                 </button>
               </div>
 
               <form onSubmit={handleCreate} className="p-5 flex flex-col gap-3 text-xs">
                 {guardsQuery.loading && (
-                  <p className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600">
+                  <p className="px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant text-on-surface-variant">
                     Loading approved guards…
                   </p>
                 )}
 
                 {!guardsQuery.loading && guards.length === 0 && (
-                  <p className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                  <p className="px-3 py-2 rounded-lg bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant">
                     There are no active guards to assign to. Approve an enrolment or add personnel first.
                   </p>
                 )}
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Task Title</label>
+                  <label className="font-bold text-on-surface-variant block mb-1">Task Title</label>
                   <input
                     type="text"
                     required
                     minLength={3}
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                     placeholder="e.g. Conduct Wireless Transceiver Battery Audit"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Instructions / Description</label>
+                  <label className="font-bold text-on-surface-variant block mb-1">Instructions / Description</label>
                   <textarea
                     rows={2}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                     placeholder="Details of duty inspection or check"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Priority</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Priority</label>
                     <select
                       value={formData.priority}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value as TaskPriority })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
                     >
                       <option value="urgent">Urgent</option>
                       <option value="high">High</option>
@@ -323,12 +318,12 @@ export default function TasksPage() {
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Assign Guard</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Assign Guard</label>
                     <select
                       required
                       value={formData.assigned_to}
                       onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
                     >
                       <option value="">Choose a guard</option>
                       {guards.map((g) => (
@@ -341,34 +336,34 @@ export default function TasksPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Due Date</label>
+                  <label className="font-bold text-on-surface-variant block mb-1">Due Date</label>
                   <input
                     type="date"
                     required
                     value={formData.due_date}
                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
                   />
                 </div>
 
                 {formError && (
-                  <p className="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
+                  <p className="px-3 py-2 rounded-lg bg-error-container border border-error-container text-on-error-container font-semibold">
                     {formError}
                   </p>
                 )}
 
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <div className="pt-3 border-t border-outline-variant flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving || !formData.assigned_to || guardsQuery.loading}
-                    className="px-4 py-2 rounded-lg bg-blue-800 text-white font-bold hover:bg-blue-900 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    className="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary cursor-pointer disabled:bg-surface-container-highest disabled:cursor-not-allowed"
                   >
                     {saving ? 'Issuing…' : 'Issue Task'}
                   </button>

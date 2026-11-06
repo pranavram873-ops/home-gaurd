@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
-import { Mail, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { Card } from '@/components/ui/primitives';
 import { createClient } from '@/lib/supabase/client';
 import { getAppUrl } from '@/lib/supabase/env';
 
@@ -49,105 +49,116 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafd] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/login" className="inline-block">
-          <div className="w-14 h-14 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
-            <Image
-              src="/images/tn-home-guards-logo.png"
-              alt="Tamil Nadu Home Guards"
-              width={56}
-              height={56}
-              className="object-contain"
-              priority
-            />
+    <div className="min-h-screen bg-surface">
+      <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
+        <div className="relative overflow-hidden bg-primary px-4 pb-8 pt-5 text-on-primary shadow-md">
+          <svg
+            viewBox="0 0 200 200"
+            aria-hidden
+            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-primary opacity-10"
+          >
+            <path d="M100 15 L170 50 L170 120 C170 160 100 190 100 190 C100 190 30 160 30 120 L30 50 Z" />
+          </svg>
+          <Link
+            href="/login"
+            aria-label="Back to sign in"
+            className="relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25"
+          >
+            <Icon icon="arrow_back" size={22} />
+          </Link>
+          <div className="relative z-10 pt-4">
+            <span className="text-label-sm uppercase tracking-wider text-secondary-fixed">Tamil Nadu Police</span>
+            <h1 className="mt-0.5 text-headline-lg text-on-primary">Password recovery</h1>
+            <p className="mt-1 max-w-sm text-body-md text-sm text-on-primary-container">
+              Enter your registered official email address to receive reset instructions.
+            </p>
           </div>
-        </Link>
-        <span className="text-[10px] font-bold text-blue-900 uppercase tracking-widest block mt-3">
-          GOVERNMENT OF TAMIL NADU
-        </span>
-        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          Password Recovery
-        </h2>
-        <p className="mt-1 text-xs text-slate-600">
-          Enter your registered email address to receive password reset instructions.
-        </p>
-      </div>
-
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 sm:rounded-xl">
-          {isSubmitted ? (
-            <div className="text-center py-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Recovery Link Dispatched</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                If an authorized personnel account matches <strong className="text-slate-900">{email}</strong>, a secure password reset link has been dispatched.
-              </p>
-              <div className="mt-6">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-800 text-white font-semibold text-xs hover:bg-blue-900"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Return to Login</span>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {errorMsg && (
-                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-                  {errorMsg}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Official Email</label>
-                <div className="mt-1 relative rounded-lg shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="officer@tnhomeguards.gov.in"
-                    className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-transparent rounded-lg shadow-xs text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Dispatching Request...</span>
-                  </>
-                ) : (
-                  <span>Send Recovery Email</span>
-                )}
-              </button>
-
-              <div className="text-center pt-2">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Login</span>
-                </Link>
-              </div>
-            </form>
-          )}
         </div>
-      </div>
+
+        <div className="relative z-20 -mt-4 px-4">
+          <Card className="p-space-md">
+            {isSubmitted ? (
+              <div className="py-4 text-center">
+                <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant">
+                  <Icon icon="check_circle" size={26} fill />
+                </span>
+                <h2 className="text-headline-sm text-on-surface">Recovery link dispatched</h2>
+                <p className="mx-auto mt-2 max-w-xs text-body-md text-sm leading-relaxed text-on-surface-variant">
+                  If an authorized personnel account matches <strong className="font-bold text-on-surface">{email}</strong>, a
+                  secure reset link has been sent.
+                </p>
+                <Link
+                  href="/login"
+                  className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-on-primary shadow-md active:scale-[0.98]"
+                >
+                  <Icon icon="arrow_back" size={20} />
+                  Return to sign in
+                </Link>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {errorMsg && (
+                  <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+                    <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
+                    <span className="min-w-0 flex-1 text-xs">{errorMsg}</span>
+                  </div>
+                )}
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label htmlFor="recovery-email" className="text-label-md text-on-surface">Official email</label>
+                    <span className="text-label-sm text-secondary">Mandatory</span>
+                  </div>
+                  <div className="flex items-center rounded-lg bg-surface-container-low shadow-sm transition-colors focus-within:bg-surface-container-lowest">
+                    <span className="flex items-center pl-3.5 pr-2 text-on-surface-variant" aria-hidden>
+                      <Icon icon="shield_person" size={20} />
+                    </span>
+                    <input
+                      id="recovery-email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="officer@tnhomeguards.gov.in"
+                      autoComplete="username"
+                      className="h-12 w-full min-w-0 bg-transparent pr-3 text-body-md text-sm text-on-surface placeholder:text-outline focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-label-lg text-base text-on-primary shadow-md transition-transform hover:bg-primary-container active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+                >
+                  {isLoading ? (
+                    <>
+                      <Icon icon="sync" size={20} className="animate-spin" />
+                      <span>Dispatching request…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send recovery email</span>
+                      <Icon icon="arrow_forward" size={20} />
+                    </>
+                  )}
+                </button>
+
+                <div className="pt-1 text-center">
+                  <Link href="/login" className="inline-flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface">
+                    <Icon icon="arrow_back" size={16} />
+                    Back to sign in
+                  </Link>
+                </div>
+              </form>
+            )}
+          </Card>
+
+          <p className="px-4 py-6 text-center text-[13px] leading-tight text-on-surface-variant">
+            Authorized personnel only · Protected under TN Police IT Protocol &amp; Official Secrets Act.
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

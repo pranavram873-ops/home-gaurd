@@ -12,10 +12,7 @@ import {
 import { pushNotification } from '@/lib/services/notificationService';
 import { writeAuditLog } from '@/lib/services/auditService';
 import { formatDate } from '@/lib/utils';
-import {
-  UserCheck, CheckCircle2, XCircle, AlertTriangle, Shield, Phone, Mail,
-  Clock, MapPin, Building2, RefreshCw, Loader2, Siren,
-} from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 export default function ApprovalsPage() {
   const { user, role, isLoading: authLoading } = useAuth();
@@ -90,8 +87,8 @@ export default function ApprovalsPage() {
   if (authLoading) {
     return (
       <DashboardLayout title="Enrolment Approvals Desk" subtitle="Tamil Nadu Home Guards • Administrative Verification">
-        <div className="flex items-center justify-center gap-2 py-20 text-slate-500 text-xs font-semibold">
-          <Loader2 className="w-4 h-4 animate-spin" />
+        <div className="flex items-center justify-center gap-2 py-20 text-on-surface-variant text-xs font-semibold">
+          <Icon icon="sync" size={16} className="animate-spin" />
           <span>Verifying your authority…</span>
         </div>
       </DashboardLayout>
@@ -101,11 +98,11 @@ export default function ApprovalsPage() {
   if (role !== 'admin') {
     return (
       <DashboardLayout title="Enrolment Approvals Desk" subtitle="Tamil Nadu Home Guards • Administrative Verification">
-        <div className="max-w-3xl mx-auto p-6 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+        <div className="max-w-3xl mx-auto p-6 rounded-xl bg-error-container border border-error-container text-on-error-container text-xs flex items-start gap-3">
+          <Icon icon="warning" size={20} className="text-on-error-container shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Administrator access required</span>
-            <p className="text-slate-700 leading-relaxed mt-0.5">
+            <p className="text-on-surface-variant leading-relaxed mt-0.5">
               Recruit verification is reserved for the State Administrator account at Command Headquarters.
             </p>
           </div>
@@ -121,11 +118,11 @@ export default function ApprovalsPage() {
     >
       <div className="max-w-5xl mx-auto flex flex-col gap-6">
         {/* Banner */}
-        <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-start gap-3">
-          <Shield className="w-5 h-5 text-blue-800 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-primary text-xs flex items-start gap-3">
+          <Icon icon="shield" size={20} className="text-primary shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Security Governance Mandate</span>
-            <p className="text-slate-700 leading-relaxed mt-0.5">
+            <p className="text-on-surface-variant leading-relaxed mt-0.5">
               Only the <strong>State Administrator</strong> at Command Headquarters approves public recruit
               applications — there is no Area Command step in this workflow. An approved applicant receives the
               verified <strong>Home Guard Volunteer</strong> cadre status and an official service badge ID.
@@ -134,107 +131,107 @@ export default function ApprovalsPage() {
         </div>
 
         {notice && (
-          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="p-4 rounded-xl bg-tertiary-fixed border border-outline-variant text-on-tertiary-fixed-variant text-xs flex items-center gap-2">
+            <Icon icon="check_circle" size={16} className="text-on-tertiary-container shrink-0" />
             <span>{notice}</span>
           </div>
         )}
 
         {errorMsg && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-xl bg-error-container border border-error-container text-on-error-container text-xs flex items-start gap-2">
+            <Icon icon="warning" size={16} className="text-on-error-container shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {/* Pending Applications List */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3">
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-outline-variant flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-blue-800" />
-              <h3 className="text-sm font-bold text-slate-900">
+              <Icon icon="how_to_reg" size={20} className="text-primary" />
+              <h3 className="text-sm font-bold text-on-surface">
                 Pending Verification Roster {loading ? '…' : `(${requests.length})`}
               </h3>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-500 hidden sm:inline">
+              <span className="text-xs text-on-surface-variant hidden sm:inline">
                 Live from the personnel database
               </span>
               <button
                 onClick={() => void load()}
                 disabled={loading}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <Icon icon="refresh" size={14} className={loading ? 'animate-spin' : ''} />
                 <span>Refresh</span>
               </button>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-outline-variant">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 py-14 text-slate-500 text-xs font-semibold">
-                <Loader2 className="w-4 h-4 animate-spin" />
+              <div className="flex items-center justify-center gap-2 py-14 text-on-surface-variant text-xs font-semibold">
+                <Icon icon="sync" size={16} className="animate-spin" />
                 <span>Loading recruit applications…</span>
               </div>
             ) : requests.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-                <span className="font-semibold text-slate-700">All recruit applications processed</span>
-                <span className="text-[11px]">No pending applicants in queue.</span>
+              <div className="py-12 text-center text-outline text-xs flex flex-col items-center gap-2">
+                <Icon icon="check_circle" size={32} className="text-on-tertiary-container" />
+                <span className="font-semibold text-on-surface-variant">All recruit applications processed</span>
+                <span className="text-[13px]">No pending applicants in queue.</span>
               </div>
             ) : (
               requests.map((request) => (
                 <div
                   key={request.id}
-                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
+                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-container-low/60 transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-900 font-extrabold flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-extrabold flex items-center justify-center shrink-0">
                       {request.full_name.charAt(0)}
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-slate-900">{request.full_name}</span>
-                        <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded uppercase">
+                        <span className="text-sm font-bold text-on-surface">{request.full_name}</span>
+                        <span className="text-xs font-mono font-bold bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.2 rounded uppercase">
                           Pending Approval
                         </span>
                         {request.rank_designation && (
-                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                          <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
                             {request.rank_designation}
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant mt-1">
                         <span className="flex items-center gap-1">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                          <Icon icon="mail" size={14} className="text-outline" />
                           {request.email}
                         </span>
                         <span className="flex items-center gap-1 font-mono">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <Icon icon="call" size={14} className="text-outline" />
                           {request.phone || 'No phone'}
                         </span>
                         <span>Blood: {request.blood_group || 'Not stated'}</span>
                         <span>App ID: {request.personnel_id || 'Not issued'}</span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant mt-1.5">
                         <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          <Icon icon="location_on" size={14} className="text-outline" />
                           {request.district_name || 'District not selected'}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                          <Icon icon="apartment" size={14} className="text-outline" />
                           {request.unit_name || 'Unit assigned after approval'}
                         </span>
                         {request.emergency_contact && (
                           <span className="flex items-center gap-1">
-                            <Siren className="w-3.5 h-3.5 text-slate-400" />
+                            <Icon icon="siren" size={14} className="text-outline" />
                             Emergency: {request.emergency_contact}
                           </span>
                         )}
                         {request.created_at && (
                           <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <Icon icon="schedule" size={14} className="text-outline" />
                             Submitted {formatDate(request.created_at)}
                           </span>
                         )}
@@ -246,20 +243,20 @@ export default function ApprovalsPage() {
                     <button
                       onClick={() => void handleDecision(request, 'reject')}
                       disabled={busyId !== null}
-                      className="px-3.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                      className="px-3.5 py-1.5 rounded-lg border border-error-container text-on-error-container hover:bg-error-container text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
                     >
-                      <XCircle className="w-3.5 h-3.5" />
+                      <Icon icon="cancel" size={14} />
                       <span>Reject</span>
                     </button>
                     <button
                       onClick={() => void handleDecision(request, 'approve')}
                       disabled={busyId !== null}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-60"
+                      className="px-4 py-1.5 rounded-lg bg-on-tertiary-container hover:bg-on-tertiary-container text-on-primary text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-60"
                     >
                       {busyId === request.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Icon icon="sync" size={14} className="animate-spin" />
                       ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <Icon icon="check_circle" size={14} />
                       )}
                       <span>Verify &amp; Approve</span>
                     </button>

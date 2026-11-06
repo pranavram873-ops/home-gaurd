@@ -3,6 +3,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { DivisionProvider } from '@/lib/attendance/divisionContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -10,14 +11,23 @@ interface DashboardLayoutProps {
   subtitle?: string;
 }
 
+/**
+ * Mobile-first frame: the bottom nav is part of the design rather than a
+ * fallback, so content reserves room for it and only steps out to the desktop
+ * rail at `lg`.
+ */
 export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Sidebar />
-      <div className="flex min-h-screen min-w-0 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] md:pl-60 md:pb-0">
-        <Header title={title} subtitle={subtitle} />
-        <main className="w-full flex-1 px-3 py-4 sm:px-5 sm:py-6">{children}</main>
+    <DivisionProvider>
+      <div className="min-h-screen bg-surface text-on-surface">
+        <Sidebar />
+        <div className="flex min-h-screen min-w-0 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pl-[264px] lg:pb-0">
+          <Header title={title} subtitle={subtitle} />
+          <main className="mx-auto w-full max-w-[640px] flex-1 px-4 py-5 sm:max-w-[1440px] sm:px-7 sm:py-8 lg:px-10">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </DivisionProvider>
   );
 }

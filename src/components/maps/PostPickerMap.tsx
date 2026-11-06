@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, GestureHandling, Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { Loader2, MapPin, Search, X } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 import { MapShell } from './MapShell';
 import { mapsMapIdProp } from '@/lib/maps/config';
 import { MIN_SEARCH_LENGTH, searchPlaces, type GeoResult } from '@/lib/maps/geocode';
@@ -272,7 +272,7 @@ function PostSearchBox({
 
   return (
     <div className="relative z-30">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+      <Icon icon="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-outline" />
       <input
         type="text"
         value={query}
@@ -287,11 +287,11 @@ function PostSearchBox({
         onKeyDown={handleKeyDown}
         aria-label="Search for a place to site the duty post"
         placeholder="Search a town, landmark or beach…"
-        className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-800/25 focus:border-blue-800"
+        className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
       />
 
       {busy ? (
-        <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-blue-800" />
+        <Icon icon="sync" size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-primary" />
       ) : query ? (
         <button
           type="button"
@@ -301,25 +301,25 @@ function PostSearchBox({
             setNotice(null);
           }}
           aria-label="Clear the search"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-outline hover:text-on-surface cursor-pointer"
         >
-          <X className="w-3.5 h-3.5" />
+          <Icon icon="close" size={14} />
         </button>
       ) : null}
 
       {open && results.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full mt-1 max-h-44 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
+        <ul className="absolute left-0 right-0 top-full mt-1 max-h-44 overflow-y-auto rounded-lg border border-outline-variant bg-surface-container-lowest shadow-lg divide-y divide-outline-variant">
           {results.map((result, index) => (
             <li key={result.id}>
               <button
                 type="button"
                 onMouseEnter={() => setActive(index)}
                 onClick={() => pick(result)}
-                className={`w-full text-left px-2.5 py-1.5 text-[11px] flex items-start gap-1.5 cursor-pointer ${
-                  index === active ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-50'
+                className={`w-full text-left px-2.5 py-1.5 text-[13px] flex items-start gap-1.5 cursor-pointer ${
+                  index === active ? 'bg-primary-fixed text-on-primary-fixed' : 'text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
-                <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-blue-800" />
+                <Icon icon="location_on" size={12} className="mt-0.5 shrink-0 text-primary" />
                 <span className="leading-snug">{result.label}</span>
               </button>
             </li>
@@ -328,7 +328,7 @@ function PostSearchBox({
       )}
 
       {notice && (
-        <p className="mt-1 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[10px] leading-snug text-amber-900">
+        <p className="mt-1 px-2.5 py-1.5 rounded-lg bg-secondary-fixed border border-transparent text-xs leading-snug text-on-secondary-fixed-variant">
           {notice}
         </p>
       )}

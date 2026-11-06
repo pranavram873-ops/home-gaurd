@@ -22,8 +22,8 @@ export async function updateSession(request: NextRequest) {
 
   const isAdminRoute = pathname.startsWith('/admin');
   const isInchargeRoute = pathname.startsWith('/incharge');
-  const isLegacyGuardRoute = pathname.startsWith('/homeguard');
-  const isProtectedRoute = isAdminRoute || isInchargeRoute || isLegacyGuardRoute;
+  const isHomeGuardRoute = pathname.startsWith('/homeguard');
+  const isProtectedRoute = isAdminRoute || isInchargeRoute || isHomeGuardRoute;
 
   const redirect = (target: string, params?: Record<string, string>) => {
     const url = request.nextUrl.clone();
@@ -39,7 +39,11 @@ export async function updateSession(request: NextRequest) {
     return response;
   };
 
-  const dashboardFor = (role: string) => (role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
+  const dashboardFor = (role: string) => role === 'admin'
+    ? '/admin/dashboard'
+    : role === 'home_guard'
+      ? '/homeguard/dashboard'
+      : '/incharge/divisions';
 
   if (pathname.startsWith('/register')) return redirect('/login');
 
@@ -136,9 +140,11 @@ export async function updateSession(request: NextRequest) {
     return redirect(dashboardFor(profile.role));
   }
 
-  if (isLegacyGuardRoute) return redirect('/incharge/attendance');
-
   if (isAdminRoute && profile.role !== 'admin') {
+    return redirect(dashboardFor(profile.role));
+  }
+
+  if (isHomeGuardRoute && profile.role !== 'home_guard') {
     return redirect(dashboardFor(profile.role));
   }
 
@@ -146,12 +152,12 @@ export async function updateSession(request: NextRequest) {
     return redirect('/admin/dashboard');
   }
 
-  if (isInchargeRoute && !['/incharge/attendance', '/incharge/reports'].includes(pathname)) {
-    return redirect('/incharge/attendance');
+  if (isInchargeRoute && profile.role === 'home_guard') {
+    return redirect('/homeguard/dashboard');
   }
 
-  if (isAdminRoute && !['/admin/dashboard', '/admin/reports'].includes(pathname)) {
-    return redirect('/admin/dashboard');
+  if (isInchargeRoute && !['/incharge/divisions', '/incharge/attendance', '/incharge/reports'].includes(pathname)) {
+    return redirect('/incharge/divisions');
   }
 
   return supabaseResponse;

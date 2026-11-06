@@ -1,0 +1,296 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "tertiary-fixed-dim": "#79db8d", "on-primary-fixed-variant": "#354862", "surface-container-high": "#e6e8ea", "background": "#f7f9fb", "on-tertiary-fixed-variant": "#005323", "surface-container": "#eceef0", "on-tertiary": "#ffffff", "error": "#ba1a1a", "on-secondary": "#ffffff", "inverse-on-surface": "#eff1f3", "on-tertiary-fixed": "#00210a", "surface-tint": "#4d5f7b", "on-surface": "#191c1e", "primary-fixed-dim": "#b4c8e8", "error-container": "#ffdad6", "surface-dim": "#d8dadc", "on-tertiary-container": "#3c9e57", "outline": "#74777e", "surface-container-lowest": "#ffffff", "surface-bright": "#f7f9fb", "secondary": "#9b4500", "on-background": "#191c1e", "on-surface-variant": "#44474d", "primary": "#001126", "on-secondary-container": "#682c00", "surface-container-highest": "#e0e3e5", "on-secondary-fixed": "#331200", "surface-container-low": "#f2f4f6", "outline-variant": "#c4c6ce", "primary-container": "#12263f", "on-error": "#ffffff", "surface-variant": "#e0e3e5", "on-primary-container": "#7b8eac", "secondary-container": "#fd8a42", "on-primary-fixed": "#061c35", "tertiary-container": "#002c0f", "primary-fixed": "#d4e3ff", "inverse-primary": "#b4c8e8", "on-error-container": "#93000a", "inverse-surface": "#2d3133", "tertiary-fixed": "#95f8a7", "secondary-fixed-dim": "#ffb68e", "on-primary": "#ffffff", "tertiary": "#001404", "surface": "#f7f9fb", "secondary-fixed": "#ffdbca", "on-secondary-fixed-variant": "#763300" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-md": "1rem", "space-xl": "2rem", "margin": "1rem", "space-lg": "1.5rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter": "1rem" }, "fontFamily": { "headline-sm": ["Inter"], "label-sm": ["Inter"], "label-lg": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"], "body-md": ["Inter"], "headline-lg": ["Inter"] }, "fontSize": { "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }], "label-lg": ["15px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.03em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "500" }], "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-primary-container/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.06)] pt-safe"><div class="h-16 px-margin flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0 text-secondary-container"><span class="material-symbols-outlined text-[22px]">local_police</span></div><div class="flex flex-col min-w-0"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-primary tracking-tight truncate">TN Home Guards</span><span class="px-1.5 py-0.5 rounded bg-secondary/30 text-secondary-fixed font-label-sm text-label-sm uppercase shrink-0">TNPG</span></div><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim"></span><span class="font-label-sm text-label-sm text-on-primary-container truncate uppercase tracking-wider">District Command HQ</span></div></div></div><div class="flex items-center gap-space-sm shrink-0"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-20 bg-surface min-h-screen"><div class="flex flex-col w-full pb-10">
+<!-- Contextual Sub-Bar / District Scope -->
+<div class="bg-primary-container px-margin py-space-sm text-on-primary">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md tracking-tight text-surface-container-lowest">Reports</span>
+<span class="font-label-sm text-label-sm text-primary-fixed uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+<span class="material-symbols-outlined text-[15px] text-secondary-container">shield</span>
+          Command &amp; Disciplinary Overview • Tiruppur District
+        </span>
+</div>
+<div class="h-8 px-2.5 rounded bg-primary flex items-center gap-1.5 text-on-primary-fixed text-label-sm font-label-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
+        LIVE LOGS
+      </div>
+</div>
+</div>
+<!-- Primary Tab Switcher -->
+<div class="bg-surface-container-low px-margin pt-space-sm">
+
+</div>
+<!-- Search & Filter Deck -->
+<div class="bg-surface-container-low px-margin pt-space-sm pb-space-md space-y-space-sm shadow-sm">
+<!-- Search Bar with dynamic focus & clear button -->
+<div class="relative flex items-center w-full">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span>
+<input class="w-full h-11 pl-10 pr-10 bg-surface-container-lowest text-on-surface rounded font-body-md text-body-md placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary shadow-sm" id="report-search" placeholder="Search guard name, HG code, or event name..." type="text" value="Pranavram">
+<button class="absolute right-3 w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors" onclick="document.getElementById('report-search').value=''; this.style.display='none'" title="Clear Search">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Date selector & Quick Division pills -->
+<div class="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-0.5">
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-primary font-label-sm text-label-sm flex items-center gap-1.5 shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
+<span class="">Oct 2024 (Current Month)</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_drop_down</span>
+</button>
+<div class="w-px h-6 bg-surface-container-highest shrink-0 mx-1"></div>
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap shrink-0 hover:bg-surface-container">
+        All Divisions
+      </button>
+<button class="h-9 px-3.5 rounded bg-primary-container text-surface-container-lowest font-label-sm text-label-sm whitespace-nowrap shrink-0 flex items-center gap-1.5 shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+        Avinashi (Active)
+      </button>
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap shrink-0 hover:bg-surface-container">
+        Dharapuram
+      </button>
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap shrink-0 hover:bg-surface-container">
+        Kangeyam
+      </button>
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap shrink-0 hover:bg-surface-container">
+        Palladam
+      </button>
+<button class="h-9 px-3 rounded bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap shrink-0 hover:bg-surface-container">
+        Udumalaipettai
+      </button>
+</div>
+</div>
+<!-- Monthly Metric Summary Tiles -->
+<div class="px-margin pt-space-md">
+
+</div>
+<!-- Section Title & Meta -->
+<div class="px-margin pt-space-md pb-space-xs flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg text-primary">Active Division Roster Dossiers</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm">3 visible</span>
+</div>
+<button class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-0.5">
+      Sort: Recent
+      <span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<!-- Dossier List -->
+<div class="px-margin space-y-space-md mt-space-xs">
+<!-- DOSSIER CARD 1: Pranavram S. (Deep View with History & Action Routing) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md p-space-md flex flex-col gap-3 relative overflow-hidden" style="display: flex;">
+<!-- Institutional Accent Stripe -->
+<div class="absolute top-0 left-0 right-0 h-1.5 bg-secondary-container"></div>
+<!-- Top Row: Guard Credentials & State Badges -->
+<div class="flex items-start justify-between gap-2 pt-1">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-primary tracking-tight truncate">Pranavram S.</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono bg-surface-container px-1.5 py-0.5 rounded">HG-AVN-0188</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant text-sm mt-0.5">Avinashi Platoon 2 • Reserve Wing</span>
+</div>
+<div class="shrink-0 flex flex-col items-end gap-1">
+<span class="px-2 py-1 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm uppercase tracking-wider flex items-center gap-1 font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            Report Filed
+          </span>
+</div>
+</div>
+<!-- Tag Pill -->
+<div class="flex items-center gap-1.5">
+<span class="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-secondary">assignment</span>
+          Written Memo • Attendance Regularity
+        </span>
+</div>
+<!-- Objective Notice / History Count Banner -->
+<div class="bg-surface-container-low rounded-lg p-2.5 flex items-start gap-2.5">
+<span class="material-symbols-outlined text-secondary-container text-[20px] shrink-0 mt-0.5">warning</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">3 reports on file for this guard</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Cumulative log across 2024 calendar deployments. Neutral administrative record.</span>
+</div>
+</div>
+<!-- Incident Metadata Table-Style Layout -->
+<div class="bg-surface-container/60 rounded-lg p-3 space-y-2 font-label-sm text-label-sm">
+<div class="grid grid-cols-2 gap-2">
+<div>
+<span class="text-on-surface-variant block uppercase tracking-wider text-[11px]">Date &amp; Time</span>
+<span class="font-label-md text-label-md text-on-surface">24 Oct 2024, 09:15 AM</span>
+</div>
+<div>
+<span class="text-on-surface-variant block uppercase tracking-wider text-[11px]">Duty Post Context</span>
+<span class="font-label-md text-label-md text-on-surface truncate block">Temple Festival Bandobast</span>
+</div>
+</div>
+<div class="pt-1.5">
+<span class="text-on-surface-variant block uppercase tracking-wider text-[11px]">Filing Incharge</span>
+<div class="flex items-center gap-1 text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[15px] text-primary">edit_note</span>
+            Area Writer S. Ramanathan <span class="font-mono text-on-surface-variant text-[12px]">(HG-AVN-0012)</span>
+</div>
+</div>
+<div class="pt-1.5">
+<span class="text-on-surface-variant block uppercase tracking-wider text-[11px]">Officer Field Observation</span>
+<p class="font-body-md text-body-md text-on-surface text-sm leading-relaxed mt-0.5 bg-surface-container-lowest p-2 rounded">
+            Reported late for 08:15 AM morning bandobast roll-call at South Gate post without prior intimation or approved duty exchange slip. Reached station at 09:45 AM.
+          </p>
+</div>
+</div>
+<!-- Service History Audit Preview (Collapsible Accordion Style) -->
+<div class="bg-surface-container-low rounded-lg p-3">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-md text-label-md text-primary flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[17px] text-on-surface-variant">history_toggle_off</span>
+            Service History Audit Trail
+          </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Archived 2024</span>
+</div>
+<div class="space-y-2">
+<!-- Item 1 -->
+<div class="flex items-start gap-2 text-label-sm font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface-variant mt-1.5 shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-on-surface font-semibold">12 Aug 2024: Uniform Turnout discrepancy</span>
+<span class="text-on-surface-variant text-[11px]">Status: Resolved on counselling with Company Commander.</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-start gap-2 text-label-sm font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface-variant mt-1.5 shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-on-surface font-semibold">03 Sep 2024: Unscheduled absence from Traffic Post #4</span>
+<span class="text-on-surface-variant text-[11px]">Status: Explanation recorded &amp; wage adjustment logged.</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-start gap-2 text-label-sm font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary mt-1.5 shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-secondary font-semibold">24 Oct 2024: Late arrival for Bandobast muster</span>
+<span class="text-on-surface-variant text-[11px]">Status: Active Action pending Command hearing.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Command Escalation Action Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="h-11 px-3 rounded bg-primary text-surface-container-lowest font-label-md text-label-md flex items-center justify-center gap-1.5 hover:bg-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-secondary-container">forward_to_inbox</span>
+          Route to DSP
+        </button>
+<button class="h-11 px-3 rounded bg-surface-container-high text-primary font-label-md text-label-md flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">call</span>
+          Call Area Incharge
+        </button>
+</div>
+</div>
+<!-- DOSSIER CARD 2: V. Karthikeyan -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md p-space-md flex flex-col gap-2.5" style="display: flex;">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-primary tracking-tight truncate">V. Karthikeyan</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono bg-surface-container px-1.5 py-0.5 rounded">HG-AVN-0188</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant text-sm mt-0.5">Avinashi Platoon 3 • Town Sector</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm uppercase tracking-wider shrink-0 font-bold">
+          Memo filed
+        </span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+          Duty Insubordination / Absence
+        </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim">verified</span>
+          1st report on this guard
+        </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface text-sm bg-surface-container-low p-2.5 rounded">
+        Guard failed to report for evening shift deployment at Vegetable Market cordon without prior leave application.
+      </p>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">badge</span>
+          Duty Writer K. Balan
+        </span>
+<button class="text-secondary font-label-md text-label-md font-bold flex items-center gap-0.5 hover:underline">
+          Open report &amp; history
+          <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- DOSSIER CARD 3: M. Muruganathan (Resolved/Closed State) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md p-space-md flex flex-col gap-2.5 opacity-95" style="display: flex;">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-primary tracking-tight truncate">M. Muruganathan</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono bg-surface-container px-1.5 py-0.5 rounded">HG-AVN-0112</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant text-sm mt-0.5">Avinashi Platoon 1 • Patrol Division</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm uppercase tracking-wider shrink-0 flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-[13px]">check_circle</span>
+          Report closed
+        </span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded bg-tertiary-container/10 text-on-tertiary-container font-label-sm text-label-sm font-semibold">
+          Medical Verified
+        </span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">• Regularized 19 Oct</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface text-sm bg-surface-container-low p-2.5 rounded">
+        Medical certificate subsequently submitted for absence during VIP route lining; regularized by Area Commandant.
+      </p>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-tertiary-container">verified_user</span>
+          Authorized by AC HQ
+        </span>
+<button class="text-on-surface-variant hover:text-primary font-label-md text-label-md font-semibold flex items-center gap-0.5">
+          Open report
+          <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footnote / Administrative Guidance Note -->
+<div class="px-margin pt-space-lg text-center">
+<div class="p-3 bg-surface-container-low rounded-lg inline-flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] text-secondary">gavel</span>
+      Official record under Tamil Nadu Home Guard Act • For Incharge Reference Only
+    </div>
+</div>
+</div>
+<script>
+  // Dynamic client interaction helper for the tabs and action routing
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('report-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase().trim();
+        const dossiers = document.querySelectorAll('.bg-surface-container-lowest.rounded-xl');
+        dossiers.forEach(card => {
+          const text = card.textContent.toLowerCase();
+          if (!val || text.includes(val)) {
+            card.style.display = 'flex';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-2px_8px_rgba(18,38,63,0.08)]" data-active-classes="text-primary-container font-bold bg-surface-container-high/60"><div class="grid grid-cols-2 h-16"><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px]" data-path="attendance" href="#"><span class="material-symbols-outlined text-[24px]">fact_check</span><span class="font-label-md text-label-md uppercase tracking-wider">Attendance</span></a><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px]" data-path="reports" href="#"><span class="material-symbols-outlined text-[24px]">assignment_late</span><span class="font-label-md text-label-md uppercase tracking-wider">Reports</span></a></div></nav>
+
+</body></html>

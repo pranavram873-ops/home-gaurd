@@ -1,85 +1,268 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, LoaderCircle } from 'lucide-react';
-import { loadAttendanceReport, type AttendanceDivision } from '@/lib/services/simpleAttendanceService';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
+import { Chip, EmptyState } from '@/components/ui/primitives';
+import { createClient } from '@/lib/supabase/client';
 
-function localDate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+type ReportStatus = 'submitted' | 'under_review' | 'resolved' | 'dismissed';
+
+interface GuardReport {
+  id: string;
+  reporter_name: string;
+  reporter_personnel_id: string | null;
+  subject_name: string;
+  subject_personnel_id: string | null;
+  category: string;
+  description: string;
+  status: ReportStatus;
+  resolution_note: string | null;
+  created_at: string;
+}
+
+const reportColumns =
+  'id,reporter_name,reporter_personnel_id,subject_name,subject_personnel_id,category,description,status,resolution_note,created_at';
+
+const categoryLabels: Record<string, string> = {
+  conduct: 'Conduct or Professionalism',
+  attendance: 'Attendance Regularity',
+  safety: 'Safety Concern',
+  other: 'Other Concern',
+};
+
+const statusMeta: Record<ReportStatus, { label: string; tone: 'live' | 'present' | 'inverse'; icon: string }> = {
+  submitted: { label: 'Report Filed', tone: 'live', icon: 'draft' },
+  under_review: { label: 'Under Review', tone: 'live', icon: 'pending' },
+  resolved: { label: 'Report Closed', tone: 'present', icon: 'check_circle' },
+  dismissed: { label: 'Closed', tone: 'inverse', icon: 'do_not_disturb_on' },
+};
+
+function formatDateTime(iso: string) {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return iso;
+  return dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function DossierCard({ report, historyCount }: { report: GuardReport; historyCount: number }) {
+  const [open, setOpen] = useState(false);
+  const status = statusMeta[report.status] ?? statusMeta.submitted;
+  return (
+    <article className="relative flex flex-col gap-3 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 shadow-card">
+      <span className="absolute inset-x-0 top-0 h-1.5 bg-secondary-container" aria-hidden />
+
+      <div className="flex items-start justify-between gap-2 pt-1">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-headline-sm tracking-tight text-primary">{report.subject_name}</h3>
+            {report.subject_personnel_id && (
+              <span className="shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-label-sm text-on-surface-variant">
+                {report.subject_personnel_id}
+              </span>
+            )}
+          </div>
+          <span className="mt-0.5 block text-body-md text-sm text-on-surface-variant">
+            Filed {formatDateTime(report.created_at)}
+          </span>
+        </div>
+        <Chip tone={status.tone} icon={status.icon}>{status.label}</Chip>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-1 text-label-sm text-on-surface">
+          <Icon icon="assignment" size={14} className="text-secondary" />
+          Written Memo • {categoryLabels[report.category] ?? 'Other Concern'}
+        </span>
+      </div>
+
+      {historyCount > 0 && (
+        <div className="flex items-start gap-2.5 rounded-lg bg-surface-container-low p-2.5">
+          <Icon icon="warning" size={20} className="mt-0.5 shrink-0 text-secondary-container" />
+          <div className="flex min-w-0 flex-col">
+            <span className="text-label-md text-on-surface">
+              {historyCount === 1 ? '1 report on file for this guard' : `${historyCount} reports on file for this guard`}
+            </span>
+            <span className="text-label-sm text-on-surface-variant">
+              Cumulative administrative log. Neutral record — not a charge or suspension.
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg bg-surface-container/60 p-3">
+        <span className="block text-[13px] uppercase tracking-wider text-on-surface-variant">Filing Incharge</span>
+        <div className="mt-0.5 flex items-center gap-1 text-label-md text-on-surface">
+          <Icon icon="edit_note" size={15} className="text-primary" />
+          <span className="truncate">{report.reporter_name || 'Unknown'}</span>
+          {report.reporter_personnel_id && (
+            <span className="font-mono text-[13px] text-on-surface-variant">({report.reporter_personnel_id})</span>
+          )}
+        </div>
+        <span className="mt-2 block text-[13px] uppercase tracking-wider text-on-surface-variant">
+          Officer Field Observation
+        </span>
+        <p className="mt-0.5 whitespace-pre-wrap rounded bg-surface-container-lowest p-2 text-body-md text-sm leading-relaxed text-on-surface">
+          {report.description}
+        </p>
+      </div>
+
+      {open && (
+        <div className="rounded-lg bg-surface-container-low p-3">
+          <span className="block text-[13px] uppercase tracking-wider text-on-surface-variant">Command Response</span>
+          {report.resolution_note ? (
+            <p className="mt-1 whitespace-pre-wrap text-body-md text-sm text-on-tertiary-container">{report.resolution_note}</p>
+          ) : (
+            <p className="mt-1 text-label-md text-on-surface-variant">No command response recorded yet.</p>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex items-center justify-between rounded bg-surface-container-high px-3 py-2.5 text-label-md text-primary transition-colors hover:bg-surface-container"
+      >
+        <span className="flex items-center gap-1.5">
+          <Icon icon="history_toggle_off" size={18} className="text-on-surface-variant" />
+          {open ? 'Hide case details' : 'Open report & history'}
+        </span>
+        <Icon icon={open ? 'expand_less' : 'chevron_right'} size={18} />
+      </button>
+    </article>
+  );
 }
 
 export function AttendanceReports() {
-  const today = localDate(new Date());
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-  const [from, setFrom] = useState(localDate(thirtyDaysAgo));
-  const [to, setTo] = useState(today);
-  const [divisions, setDivisions] = useState<AttendanceDivision[]>([]);
-  const [roster, setRoster] = useState<Array<{ id: string; division_id: string; full_name: string; home_guard_code: string }>>([]);
-  const [marks, setMarks] = useState<Array<{ id: string; guard_id: string; division_id: string; attendance_date: string; status: 'present' | 'absent' }>>([]);
+  const [reports, setReports] = useState<GuardReport[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let live = true;
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    loadAttendanceReport(from, to)
-      .then((data) => {
-        if (!live) return;
-        setDivisions(data.divisions);
-        setRoster(data.roster);
-        setMarks(data.marks);
-      })
-      .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load reports.'))
-      .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  }, [from, to]);
+    try {
+      const supabase = createClient();
+      const { data, error: queryError } = await supabase
+        .from('guard_reports')
+        .select(reportColumns)
+        .order('created_at', { ascending: false });
+      if (queryError) {
+        setError(queryError.message);
+        setReports([]);
+      } else {
+        setReports((data ?? []) as GuardReport[]);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load disciplinary records.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const present = marks.filter((mark) => mark.status === 'present').length;
-  const absent = marks.filter((mark) => mark.status === 'absent').length;
-  const totalsByGuard = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const mark of marks) if (mark.status === 'present') totals.set(mark.guard_id, (totals.get(mark.guard_id) ?? 0) + 1);
-    return totals;
-  }, [marks]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  return <div className="mx-auto max-w-5xl space-y-5">
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <p className="text-sm font-semibold text-blue-800">ATTENDANCE SUMMARY</p>
-      <h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Reports</h2>
-      <p className="mt-1 text-sm text-slate-600">See attendance by division and how many duties each Home Guard attended.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-semibold text-slate-700">From<input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="mt-1.5 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base" /></label>
-        <label className="text-sm font-semibold text-slate-700">To<input type="date" value={to} min={from} max={today} onChange={(event) => setTo(event.target.value)} className="mt-1.5 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base" /></label>
+  const historyByGuard = useMemo(() => {
+    const bySubject = new Map<string, number>();
+    for (const report of reports) {
+      if (!report.subject_name) continue;
+      const key = report.subject_personnel_id ?? report.subject_name;
+      bySubject.set(key, (bySubject.get(key) ?? 0) + 1);
+    }
+    return bySubject;
+  }, [reports]);
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return reports;
+    return reports.filter((report) =>
+      `${report.subject_name} ${report.subject_personnel_id ?? ''} ${report.reporter_name ?? ''}`.toLowerCase().includes(term),
+    );
+  }, [reports, search]);
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-0">
+      {/* Contextual sub-bar / district scope. */}
+      <section className="rounded-b-xl bg-primary-container px-4 py-3 text-on-primary">
+        <div className="flex items-center justify-between">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-headline-md tracking-tight text-surface-container-lowest">Reports</span>
+            <span className="mt-0.5 flex items-center gap-1.5 text-label-sm uppercase tracking-wider text-primary-fixed">
+              <Icon icon="shield" size={15} className="text-secondary-container" />
+              Command &amp; Disciplinary Overview
+            </span>
+          </div>
+          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded bg-primary px-2.5 text-label-sm text-on-primary-fixed">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-secondary-container" aria-hidden />
+            LIVE LOGS
+          </span>
+        </div>
+      </section>
+
+      {/* Search deck. */}
+      <section className="rounded-lg bg-surface-container-low px-4 py-3 shadow-sm">
+        <div className="relative flex items-center">
+          <Icon icon="search" size={20} className="pointer-events-none absolute left-3 text-on-surface-variant" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search guard name, HG code, or incharge..."
+            aria-label="Search disciplinary reports"
+            className="h-11 w-full rounded bg-surface-container-lowest pl-10 pr-3 text-body-md text-on-surface shadow-sm ring-primary/20 placeholder:text-outline focus:outline-none focus:ring-2"
+          />
+        </div>
+      </section>
+
+      {/* Section title + meta. */}
+      <div className="flex items-center justify-between px-1 pt-4 pb-1">
+        <div className="flex items-center gap-2">
+          <span className="text-label-lg text-primary">Disciplinary Dossiers</span>
+          <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-label-sm text-on-surface">
+            {loading ? '…' : `${visible.length} visible`}
+          </span>
+        </div>
       </div>
-    </section>
 
-    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
-    <section className="grid grid-cols-2 gap-3">
-      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-sm text-emerald-800">Present duty days</p><p className="mt-1 text-3xl font-bold text-emerald-950">{present}</p></div>
-      <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4"><p className="text-sm text-rose-800">Absent duty days</p><p className="mt-1 text-3xl font-bold text-rose-950">{absent}</p></div>
-    </section>
+      <section className="flex flex-col gap-4 py-1">
+        {error ? (
+          <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+            <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
+            <div className="min-w-0 flex-1 text-sm">
+              <p>{error}</p>
+              <button type="button" onClick={load} className="mt-1 font-bold underline">Try again</button>
+            </div>
+          </div>
+        ) : loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-on-surface-variant">
+            <Icon icon="sync" size={20} className="animate-spin" />
+            Loading disciplinary records…
+          </div>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No disciplinary reports"
+            body={search ? 'No dossiers match that search.' : 'Reports filed by incharges will appear here.'}
+          />
+        ) : (
+          visible.map((report) => (
+            <DossierCard
+              key={report.id}
+              report={report}
+              historyCount={(report.subject_personnel_id ?? report.subject_name)
+                ? Math.max(0, (historyByGuard.get(report.subject_personnel_id ?? report.subject_name) ?? 1) - 1)
+                : 0}
+            />
+          ))
+        )}
 
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-slate-200 p-4"><CalendarDays className="h-5 w-5 text-blue-800" /><h3 className="font-bold text-slate-950">Division totals</h3></div>
-      {loading ? <div className="flex items-center justify-center gap-2 p-10 text-sm text-slate-500"><LoaderCircle className="h-5 w-5 animate-spin" />Loading report…</div> : <div className="divide-y divide-slate-100">
-        {divisions.map((division) => {
-          const divisionRoster = roster.filter((guard) => guard.division_id === division.id);
-          const divisionMarks = marks.filter((mark) => mark.division_id === division.id);
-          return <div key={division.id} className="flex items-center justify-between gap-3 px-4 py-4">
-            <div className="min-w-0"><p className="font-semibold text-slate-950">{division.name}</p><p className="text-xs text-slate-500">{divisionRoster.length} Home Guards</p></div>
-            <div className="flex shrink-0 gap-3 text-right text-sm sm:gap-6"><div><p className="font-bold text-emerald-800">{divisionMarks.filter((mark) => mark.status === 'present').length}</p><p className="text-xs text-slate-500">Present</p></div><div><p className="font-bold text-rose-800">{divisionMarks.filter((mark) => mark.status === 'absent').length}</p><p className="text-xs text-slate-500">Absent</p></div></div>
-          </div>;
-        })}
-      </div>}
-    </section>
-
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 p-4"><h3 className="font-bold text-slate-950">Duties attended by Home Guard</h3><p className="mt-0.5 text-sm text-slate-500">Count of days marked Present in the selected period.</p></div>
-      {loading ? <div className="p-8 text-center text-sm text-slate-500">Loading…</div> : roster.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No Home Guards have been added yet.</p> : <ul className="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto">
-        {roster.map((guard) => <li key={guard.id} className="flex items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{guard.full_name}</p><p className="text-xs text-slate-500">{divisions.find((division) => division.id === guard.division_id)?.name} · {guard.home_guard_code}</p></div><span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-900">{totalsByGuard.get(guard.id) ?? 0} duties</span></li>)}
-      </ul>}
-    </section>
-  </div>;
+        <div className="flex items-center justify-center gap-2 py-3 text-center text-on-surface-variant/80">
+          <Icon icon="gavel" size={16} className="text-secondary" />
+          <span className="text-label-sm">Official record under Tamil Nadu Home Guard Act • For Incharge Reference Only</span>
+        </div>
+      </section>
+    </div>
+  );
 }

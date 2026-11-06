@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, ShieldX } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { Card } from '@/components/ui/primitives';
 import { createClient } from '@/lib/supabase/client';
 import { resetPasswordSchema } from '@/lib/validation';
 import { describePasswordRecoveryError } from '@/lib/auth/errors';
@@ -88,149 +88,169 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafd] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/login" className="inline-block">
-          <div className="w-14 h-14 relative mx-auto p-1 rounded-full border border-blue-200 bg-white shadow-xs">
-            <Image
-              src="/images/tn-home-guards-logo.png"
-              alt="Tamil Nadu Home Guards"
-              width={56}
-              height={56}
-              className="object-contain"
-              priority
-            />
+    <div className="min-h-screen bg-surface">
+      <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
+        <div className="relative overflow-hidden bg-primary px-4 pb-8 pt-5 text-on-primary shadow-md">
+          <svg
+            viewBox="0 0 200 200"
+            aria-hidden
+            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-primary opacity-10"
+          >
+            <path d="M100 15 L170 50 L170 120 C170 160 100 190 100 190 C100 190 30 160 30 120 L30 50 Z" />
+          </svg>
+          <Link
+            href="/login"
+            aria-label="Back to sign in"
+            className="relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25"
+          >
+            <Icon icon="arrow_back" size={22} />
+          </Link>
+          <div className="relative z-10 pt-4">
+            <span className="text-label-sm uppercase tracking-wider text-secondary-fixed">Tamil Nadu Police</span>
+            <h1 className="mt-0.5 text-headline-lg text-on-primary">Set new password</h1>
+            <p className="mt-1 max-w-sm text-body-md text-sm text-on-primary-container">
+              Establish a secure password for your Home Guard account.
+            </p>
           </div>
-        </Link>
-        <span className="text-[10px] font-bold text-blue-900 uppercase tracking-widest block mt-3">
-          GOVERNMENT OF TAMIL NADU
-        </span>
-        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          Set New Password
-        </h2>
-        <p className="mt-1 text-xs text-slate-600">
-          Establish a secure password for your Home Guard account.
-        </p>
-      </div>
+        </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 sm:rounded-xl">
-          {isSuccess ? (
-            <div className="text-center py-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Password Updated</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Your new security credential has been verified. You may now sign in.
-              </p>
-              <div className="mt-6">
+        <div className="relative z-20 -mt-4 px-4">
+          <Card className="p-space-md">
+            {isSuccess ? (
+              <div className="py-4 text-center">
+                <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant">
+                  <Icon icon="check_circle" size={26} fill />
+                </span>
+                <h2 className="text-headline-sm text-on-surface">Password updated</h2>
+                <p className="mx-auto mt-2 max-w-xs text-body-md text-sm leading-relaxed text-on-surface-variant">
+                  Your new security credential has been verified. You may now sign in.
+                </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-blue-800 text-white font-semibold text-xs hover:bg-blue-900"
+                  className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-label-lg text-on-primary shadow-md active:scale-[0.98]"
                 >
-                  Proceed to Login
+                  <span>Proceed to sign in</span>
+                  <Icon icon="arrow_forward" size={20} />
                 </Link>
               </div>
-            </div>
-          ) : linkActive === false ? (
-            <div className="text-center py-4">
-              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto mb-3">
-                <ShieldX className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Recovery Link Not Active</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                This reset link is invalid, already used, or has expired. Request a new recovery
-                email and open the link it contains.
-              </p>
-              <div className="mt-6 flex flex-col items-center gap-2">
-                <Link
-                  href="/forgot-password"
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-blue-800 text-white font-semibold text-xs hover:bg-blue-900"
-                >
-                  Request New Recovery Link
-                </Link>
-                <Link href="/login" className="text-xs font-semibold text-slate-600 hover:text-slate-900">
-                  Back to Login
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {errorMsg && (
-                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              {linkActive === null && (
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Validating your recovery link&hellip;</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">New Password</label>
-                <div className="mt-1 relative rounded-lg shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                    className="block w-full pl-9 pr-10 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+            ) : linkActive === false ? (
+              <div className="py-4 text-center">
+                <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-error-container text-error">
+                  <Icon icon="shield_lock" size={26} />
+                </span>
+                <h2 className="text-headline-sm text-on-surface">Recovery link not active</h2>
+                <p className="mx-auto mt-2 max-w-xs text-body-md text-sm leading-relaxed text-on-surface-variant">
+                  This reset link is invalid, already used, or has expired. Request a new recovery
+                  email and open the link it contains.
+                </p>
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <Link
+                    href="/forgot-password"
+                    className="inline-flex min-h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-primary px-5 text-label-lg text-on-primary shadow-md active:scale-[0.98]"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                    <Icon icon="refresh" size={20} />
+                    Request new recovery link
+                  </Link>
+                  <Link href="/login" className="text-label-md text-on-surface-variant hover:text-on-surface">
+                    Back to sign in
+                  </Link>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Confirm New Password</label>
-                <div className="mt-1 relative rounded-lg shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {errorMsg && (
+                  <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+                    <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
+                    <span className="min-w-0 flex-1 text-xs">{errorMsg}</span>
                   </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter new password"
-                    className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 text-slate-900 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading || linkActive === null}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-transparent rounded-lg shadow-xs text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-800 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Updating Security Key...</span>
-                  </>
-                ) : (
-                  <span>Update Password</span>
                 )}
-              </button>
-            </form>
-          )}
+
+                {linkActive === null && (
+                  <div className="flex items-center gap-2 rounded-lg bg-surface-container-low p-3 text-xs text-on-surface-variant">
+                    <Icon icon="sync" size={18} className="animate-spin" />
+                    <span>Validating your recovery link…</span>
+                  </div>
+                )}
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label htmlFor="new-password" className="text-label-md text-on-surface">New password</label>
+                    <span className="text-label-sm text-secondary">Min. 8 characters</span>
+                  </div>
+                  <div className="flex items-center rounded-lg bg-surface-container-low shadow-sm transition-colors focus-within:bg-surface-container-lowest">
+                    <span className="flex items-center pl-3.5 pr-2 text-on-surface-variant" aria-hidden>
+                      <Icon icon="key" size={20} />
+                    </span>
+                    <input
+                      id="new-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      autoComplete="new-password"
+                      className="h-12 w-full min-w-0 bg-transparent pr-3 text-body-md text-sm text-on-surface placeholder:text-outline focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="flex h-12 shrink-0 items-center px-2 text-on-surface-variant hover:text-on-surface"
+                    >
+                      <Icon icon={showPassword ? 'visibility_off' : 'visibility'} size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label htmlFor="confirm-password" className="text-label-md text-on-surface">Confirm new password</label>
+                    <span className="text-label-sm text-secondary">Mandatory</span>
+                  </div>
+                  <div className="flex items-center rounded-lg bg-surface-container-low shadow-sm transition-colors focus-within:bg-surface-container-lowest">
+                    <span className="flex items-center pl-3.5 pr-2 text-on-surface-variant" aria-hidden>
+                      <Icon icon="key" size={20} />
+                    </span>
+                    <input
+                      id="confirm-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      autoComplete="new-password"
+                      className="h-12 w-full min-w-0 bg-transparent pr-3 text-body-md text-sm text-on-surface placeholder:text-outline focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || linkActive === null}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-label-lg text-base text-on-primary shadow-md transition-transform hover:bg-primary-container active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+                >
+                  {isLoading ? (
+                    <>
+                      <Icon icon="sync" size={20} className="animate-spin" />
+                      <span>Updating security key…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Update password</span>
+                      <Icon icon="arrow_forward" size={20} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </Card>
+
+          <p className="px-4 py-6 text-center text-[13px] leading-tight text-on-surface-variant">
+            Authorized personnel only · Protected under TN Police IT Protocol &amp; Official Secrets Act.
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
