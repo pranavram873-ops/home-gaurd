@@ -107,6 +107,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The selected district does not exist.' }, { status: 400 });
   }
 
+  if (input.role === 'home_guard' && !input.phone) {
+    return NextResponse.json({ error: 'A 10-digit phone number is required to add a Home Guard to the event roster.' }, { status: 400 });
+  }
+
   let unitCode: string | null = null;
   if (input.unit_id) {
     const { data: unitRow, error: unitError } = await admin
@@ -163,6 +167,7 @@ export async function POST(request: NextRequest) {
     full_name: input.full_name.trim(),
     email: created.user.email || input.email,
     phone: input.phone || null,
+    personnel_id: input.personnel_id.trim().toUpperCase(),
     role: input.role,
     rank_designation: input.rank_designation.trim(),
     district_id: input.district_id,
@@ -194,6 +199,38 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       await admin.auth.admin.deleteUser(userId);
       return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+  }
+
+  // Admin personnel accounts and the incharge event roster are separate
+  // tables. Mirror each Home Guard into the division roster so they can be
+  // selected at events and included in duty counts and reports.
+  if (input.role === 'home_guard') {
+    const { data: attendanceDivision, error: attendanceDivisionError } = await admin
+      .from('attendance_divisions')
+      .select('id')
+      .eq('code', districtRow.code)
+      .maybeSingle<{ id: string }>();
+
+    if (attendanceDivisionError || !attendanceDivision) {
+      await admin.auth.admin.deleteUser(userId);
+      return NextResponse.json(
+        { error: attendanceDivisionError?.message || 'No attendance division matches the selected district.' },
+        { status: 500 },
+      );
+    }
+
+    const { error: rosterError } = await admin.from('home_guard_roster').upsert({
+      division_id: attendanceDivision.id,
+      full_name: profilePatch.full_name,
+      phone: input.phone,
+      home_guard_code: profilePatch.personnel_id,
+      is_active: true,
+    }, { onConflict: 'home_guard_code' });
+
+    if (rosterError) {
+      await admin.auth.admin.deleteUser(userId);
+      return NextResponse.json({ error: rosterError.message }, { status: 500 });
     }
   }
 

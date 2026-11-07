@@ -3,19 +3,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
-import { loadAttendanceEvents, loadAttendancePage, type AttendanceDivision, type AttendanceEventSummary } from '@/lib/services/simpleAttendanceService';
+import { loadAttendanceEvents, type AttendanceEventSummary } from '@/lib/services/simpleAttendanceService';
 
 function currentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function formatMonth(month: string) {
-  const [y, m] = month.split('-').map(Number);
-  const dt = new Date(y, (m || 1) - 1, 1);
-  if (Number.isNaN(dt.getTime())) return month;
-  return dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-}
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const date = new Date();
+  date.setDate(1);
+  date.setMonth(date.getMonth() - index);
+  const monthValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return {
+    value: monthValue,
+    label: date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+  };
+});
 
 function formatDay(date: string) {
   const [y, m, d] = date.split('-').map(Number);
@@ -35,7 +39,7 @@ function EventCard({ event }: { event: AttendanceEventSummary }) {
             <Icon icon="shield" size={15} />
             <span className="truncate">{event.divisionName} Division</span>
           </div>
-          <h2 className="mt-0.5 truncate text-headline-sm text-primary">{formatDay(event.date)} Muster</h2>
+          <h2 className="mt-0.5 truncate text-headline-sm text-primary">{event.eventName || `${formatDay(event.date)} Muster`}</h2>
           <div className="mt-0.5 flex items-center gap-1.5 text-label-sm text-on-surface-variant">
             <Icon icon="schedule" size={14} />
             <span>{formatDay(event.date)}</span>
@@ -87,7 +91,7 @@ function EventCard({ event }: { event: AttendanceEventSummary }) {
         className="mt-0.5 flex items-center justify-between rounded bg-primary px-3 py-2.5 text-label-lg text-on-primary shadow-sm transition-colors active:bg-primary-container"
       >
         <span className="flex items-center gap-2">
-          <Icon icon="visibility" size={18} className="text-secondary-container" />
+          <Icon icon="visibility" size={18} className="text-on-secondary-container" />
           <span>View attendance record</span>
         </span>
         <Icon icon="arrow_forward" size={20} />
@@ -98,27 +102,19 @@ function EventCard({ event }: { event: AttendanceEventSummary }) {
 
 export function AttendanceEvents() {
   const [month, setMonth] = useState(currentMonth);
-  const [divisionId, setDivisionId] = useState<string | null>(null);
-  const [divisions, setDivisions] = useState<AttendanceDivision[]>([]);
   const [events, setEvents] = useState<AttendanceEventSummary[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadAttendancePage('', currentMonth() + '-01')
-      .then((data) => setDivisions(data.divisions))
-      .catch(() => setDivisions([]));
-  }, []);
-
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    loadAttendanceEvents(month, divisionId)
+    loadAttendanceEvents(month, null)
       .then(setEvents)
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not load attendance events.'))
       .finally(() => setLoading(false));
-  }, [month, divisionId]);
+  }, [month]);
 
   useEffect(() => {
     load();
@@ -127,7 +123,7 @@ export function AttendanceEvents() {
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return events;
-    return events.filter((event) => `${event.divisionName} ${formatDay(event.date)}`.toLowerCase().includes(term));
+    return events.filter((event) => `${event.divisionName} ${event.eventName ?? ''} ${formatDay(event.date)}`.toLowerCase().includes(term));
   }, [events, search]);
 
   return (
@@ -136,70 +132,51 @@ export function AttendanceEvents() {
       <section className="rounded-b-xl bg-primary-container px-4 pb-4 pt-3 text-on-primary">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-secondary-container" aria-hidden />
-            <span className="text-label-sm uppercase tracking-widest text-secondary-fixed">Muster Administration</span>
+            <span className="h-2 w-2 animate-pulse rounded-full bg-on-secondary-container" aria-hidden />
+            <span className="text-label-sm uppercase tracking-widest text-on-primary-container">Muster Administration</span>
           </div>
           <span className="rounded bg-primary px-2 py-0.5 font-mono text-xs text-on-primary-container">DIST-TPR-ADM</span>
         </div>
         <h1 className="text-headline-md tracking-tight text-on-primary">Events</h1>
-        <p className="text-label-md leading-snug text-on-primary-container">Tiruppur District Daily Muster Records</p>
+        <p className="text-label-md leading-snug text-on-primary-container">All districts · event and muster records</p>
         <div className="relative mt-3">
           <Icon icon="search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container" />
           <input
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by division or date..."
+            placeholder="Search by event, division or date..."
             aria-label="Search events"
-            className="w-full rounded bg-primary py-2.5 pl-9 pr-3 text-label-lg text-on-primary shadow-inner ring-secondary-container placeholder:text-on-primary-container/70 focus:outline-none focus:ring-2"
+            className="w-full rounded bg-primary py-2.5 pl-9 pr-3 text-label-lg text-on-primary shadow-inner ring-on-primary-container/40 placeholder:text-on-primary-container/70 focus:outline-none focus:ring-2"
           />
         </div>
       </section>
 
       {/* Month control + division filter pills. */}
-      <section className="flex flex-col gap-2 rounded-lg bg-surface-container-high px-4 py-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <label className="inline-flex items-center gap-1.5 rounded bg-surface-container-lowest px-3 py-1.5 text-label-md text-primary shadow-sm">
-            <Icon icon="calendar_month" size={18} className="text-secondary" />
-            <span>{formatMonth(month)}</span>
-            <input
-              type="month"
+      <section className="flex flex-col gap-2 rounded-[20px] border border-[#e7edf4] bg-[#f8fbfd] px-4 py-2.5 shadow-[0_10px_20px_rgba(17,38,67,0.04)]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-[#dfe7ef] bg-white px-3 py-2.5 text-primary shadow-sm sm:w-auto">
+            <Icon icon="calendar_month" size={18} className="shrink-0 text-[#24598a]" />
+            <select
               value={month}
               onChange={(event) => event.target.value && setMonth(event.target.value)}
               aria-label="Choose a month"
-              className="absolute h-0 w-0 opacity-0"
-            />
+              className="w-full min-w-0 bg-transparent pr-6 text-sm font-semibold text-[#102a43] outline-none sm:text-label-md"
+            >
+              {MONTH_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
-          <div className="flex items-center gap-1.5 rounded bg-surface-container-lowest px-2.5 py-1 text-label-sm text-on-surface-variant shadow-sm">
-            <Icon icon="folder_special" size={15} className="text-on-tertiary-container" />
-            <span className="font-mono font-bold text-on-surface">{events.length}</span>
-            <span>Total Events Logged</span>
+          <div className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-[#e0e8ee] bg-white px-2.5 py-2 text-[11px] text-[#526372] shadow-sm sm:w-auto sm:justify-start sm:text-label-sm">
+            <Icon icon="folder_special" size={15} className="shrink-0 text-[#1d7a5a]" />
+            <span className="font-mono font-bold text-[#102a43]">{events.length}</span>
+            <span className="whitespace-nowrap">Total records</span>
           </div>
         </div>
-        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto py-0.5">
-          <button
-            type="button"
-            onClick={() => setDivisionId(null)}
-            className={`flex shrink-0 items-center gap-1.5 rounded px-3 py-1.5 text-label-md shadow-sm ${
-              divisionId === null ? 'bg-primary-container text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:text-primary'
-            }`}
-          >
-            {divisionId === null && <span className="h-1.5 w-1.5 rounded-full bg-secondary-container" aria-hidden />}
-            All Divisions
-          </button>
-          {divisions.map((division) => (
-            <button
-              key={division.id}
-              type="button"
-              onClick={() => setDivisionId(division.id)}
-              className={`shrink-0 rounded px-3 py-1.5 text-label-md shadow-sm ${
-                divisionId === division.id ? 'bg-primary-container text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:text-primary'
-              }`}
-            >
-              {division.name}
-            </button>
-          ))}
-        </div>
+
       </section>
 
       <section className="flex flex-col gap-3.5 py-1">

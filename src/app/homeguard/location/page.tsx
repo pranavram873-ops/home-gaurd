@@ -164,7 +164,7 @@ export default function HomeGuardLocationPage() {
     >
       <div className="max-w-4xl mx-auto flex flex-col gap-6">
         {/* Geofence Notice Banner */}
-        <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-primary text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-on-primary-fixed text-xs flex items-start gap-3">
           <Icon icon="verified_user" size={20} className="text-primary shrink-0 mt-0.5" />
           <div className="flex flex-col gap-0.5">
             <span className="font-bold">Official Biometric & Geofence Policy</span>
@@ -347,7 +347,7 @@ export default function HomeGuardLocationPage() {
                   <span className="text-xs text-outline font-bold uppercase block">Perimeter Compliance</span>
                   <div className="mt-0.5">
                     {isWithin ? (
-                      <span className="inline-flex items-center gap-1 font-bold text-on-tertiary-container bg-tertiary-fixed px-2 py-0.5 rounded text-xs">
+                      <span className="inline-flex items-center gap-1 font-bold text-on-tertiary-fixed-variant bg-tertiary-fixed px-2 py-0.5 rounded text-xs">
                         <Icon icon="check_circle" size={14} /> Inside Allowed Zone
                       </span>
                     ) : (
@@ -415,7 +415,7 @@ export default function HomeGuardLocationPage() {
                 <button
                   onClick={() => void handleAttendance('check_out')}
                   disabled={isSubmitting || !coords}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container text-on-primary font-bold text-xs shadow-sm disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container text-on-surface font-bold text-xs shadow-sm disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <Icon icon="sync" size={16} className="animate-spin" />

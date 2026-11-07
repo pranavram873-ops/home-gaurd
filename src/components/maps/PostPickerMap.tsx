@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Circle, GestureHandling, Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Icon } from '@/components/ui/Icon';
 import { MapShell } from './MapShell';
-import { mapsMapIdProp } from '@/lib/maps/config';
+import { mapsMapIdProp, mapsStylesProp } from '@/lib/maps/config';
 import { MIN_SEARCH_LENGTH, searchPlaces, type GeoResult } from '@/lib/maps/geocode';
 import type { MapPoint } from './GeofenceMap';
 
@@ -93,6 +93,7 @@ export function PostPickerMap({
           defaultCenter={position}
           zoom={16}
           mapId={mapsMapIdProp()}
+          styles={mapsStylesProp()}
           gestureHandling={GestureHandling.COOPERATIVE}
           mapTypeControl
           // Pin dragging is done in plan view; a tilted map offsets the pointer

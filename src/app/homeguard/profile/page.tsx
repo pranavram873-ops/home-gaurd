@@ -109,7 +109,7 @@ export default function HomeGuardProfilePage() {
           </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-primary bg-primary-fixed px-2 py-0.5 rounded border border-outline-variant">
+              <span className="font-mono text-xs font-bold text-on-primary-fixed bg-primary-fixed px-2 py-0.5 rounded border border-outline-variant">
                 {dossier?.personnel_id || 'Badge pending'}
               </span>
               <span className="text-xs font-bold text-on-tertiary-fixed-variant bg-tertiary-fixed px-1.5 py-0.5 rounded uppercase">

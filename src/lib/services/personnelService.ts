@@ -106,6 +106,7 @@ export async function updateOwnProfile(
 export interface StaffAccountInput {
   full_name: string;
   email: string;
+  personnel_id: string;
   phone?: string | null;
   role: UserRole;
   rank_designation: string;

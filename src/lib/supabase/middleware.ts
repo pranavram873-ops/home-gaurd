@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
   };
 
   const dashboardFor = (role: string) => role === 'admin'
-    ? '/admin/dashboard'
+    ? '/admin/divisions'
     : role === 'home_guard'
       ? '/homeguard/dashboard'
       : '/incharge/divisions';
@@ -149,7 +149,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isInchargeRoute && profile.role === 'admin') {
-    return redirect('/admin/dashboard');
+    return redirect('/admin/divisions');
   }
 
   if (isInchargeRoute && profile.role === 'home_guard') {

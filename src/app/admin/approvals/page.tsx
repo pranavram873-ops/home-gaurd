@@ -118,7 +118,7 @@ export default function ApprovalsPage() {
     >
       <div className="max-w-5xl mx-auto flex flex-col gap-6">
         {/* Banner */}
-        <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-primary text-xs flex items-start gap-3">
+        <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-on-primary-fixed text-xs flex items-start gap-3">
           <Icon icon="shield" size={20} className="text-primary shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Security Governance Mandate</span>

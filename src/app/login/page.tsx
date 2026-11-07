@@ -8,6 +8,7 @@ import { LOGIN_ROUTE_ERRORS } from '@/lib/auth/errors';
 import { loginSchema } from '@/lib/validation';
 import { Icon } from '@/components/ui/Icon';
 import { Card } from '@/components/ui/primitives';
+import { useDivision } from '@/lib/attendance/divisionContext';
 
 /**
  * Field shell from the mockups: the icon leads, the input fills, and the whole
@@ -52,6 +53,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const { setDivisionId } = useDivision();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -91,15 +93,15 @@ function LoginForm() {
     try {
       const res = await login(email, password);
       if (res.success && res.role) {
-        // Honour the page middleware remembered, but only for in-app paths whose
-        // prefix matches the signed-in role (no open redirects).
-        const requested = searchParams.get('redirect') || '';
-        const fallback = res.role === 'admin' ? '/admin/dashboard' : res.role === 'home_guard' ? '/homeguard/dashboard' : '/incharge/divisions';
-        const allowed =
-          ((requested.startsWith('/admin') || requested.startsWith('/incharge')) && res.role === 'admin') ||
-          (requested.startsWith('/homeguard') && res.role === 'home_guard') ||
-          (requested.startsWith('/incharge') && res.role === 'incharge');
-        router.push(allowed ? requested : fallback);
+        // Start each admin/incharge session at the district chooser so their
+        // workspace and personnel list begin in the division they selected.
+        setDivisionId('');
+        const fallback = res.role === 'admin'
+          ? '/admin/divisions'
+          : res.role === 'home_guard'
+            ? '/homeguard/dashboard'
+            : '/incharge/divisions';
+        router.push(fallback);
         router.refresh();
       } else {
         setErrorMsg(res.error || 'Authentication failed. Please verify your credentials.');
@@ -209,37 +211,27 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface">
       <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
         {/* Ambient command banner. */}
-        <div className="relative overflow-hidden bg-primary px-4 pb-8 pt-6 text-on-primary shadow-md">
+        <div className="relative overflow-hidden bg-[linear-gradient(125deg,#102a43_0%,#24598a_72%,#19736a_120%)] px-4 pb-8 pt-6 text-on-surface shadow-md">
           <svg
             viewBox="0 0 200 200"
             aria-hidden
-            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-primary opacity-10"
+            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-surface opacity-10"
           >
             <path d="M100 15 L170 50 L170 120 C170 160 100 190 100 190 C100 190 30 160 30 120 L30 50 Z" />
           </svg>
 
-          <div className="relative z-10 mb-1 flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest/15 p-2 shadow-inner backdrop-blur-sm">
-              <Icon icon="security" size={32} fill className="text-secondary-container" />
+          <div className="relative z-10 mb-1 flex items-center gap-4">
+            <span className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-white/30">
+              <img src="/images/tn-home-guards-logo.png" alt="Tamil Nadu Home Guards emblem" className="h-full w-full object-contain" />
             </span>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-label-sm uppercase tracking-wider text-secondary-fixed">Tamil Nadu Police</span>
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-tertiary-container px-1.5 py-0.5 text-[13px] font-bold text-tertiary-fixed">
-                  <Icon icon="verified" size={12} fill />
-                  VERIFIED PORTAL
-                </span>
-              </div>
-              <p className="truncate text-headline-sm tracking-tight text-on-primary">TN Home Guards Roster Portal</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-fixed/60">Tamil Nadu</p>
+              <p className="text-xl font-extrabold leading-tight tracking-tight text-on-surface">Home Guards</p>
+              <span className="mt-2 block h-1 w-12 rounded-full bg-secondary-fixed" aria-hidden />
             </div>
           </div>
-
           <div className="relative z-10 flex items-center justify-between gap-2 pt-1">
-            <p className="text-label-md text-primary-fixed-dim">Government of Tamil Nadu</p>
-            <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-highest/20 px-2 py-0.5 text-xs font-medium text-primary-fixed">
-              <span className="h-2 w-2 rounded-full bg-tertiary-fixed animate-pulse" aria-hidden />
-              Muster live
-            </span>
+            <p className="text-label-md text-primary-fixed/60">Government of Tamil Nadu</p>
           </div>
         </div>
 
@@ -255,12 +247,9 @@ export default function LoginPage() {
                 <span className="block text-label-sm uppercase text-on-surface-variant">Sign-in node</span>
                 <p className="truncate text-label-lg text-on-surface">Secure Command Network</p>
               </div>
-              <span className="shrink-0 rounded-md bg-surface-container-low px-2 py-1 text-xs font-bold text-on-tertiary-container">
-                VERIFIED
-              </span>
+              <span className="shrink-0 rounded-md bg-surface-container-low px-2 py-1 text-xs font-bold text-on-tertiary-container">VERIFIED</span>
             </div>
           </Card>
-
           <Card className="p-space-md">
             <div className="mb-4 flex items-start justify-between gap-2">
               <div>
@@ -275,16 +264,6 @@ export default function LoginPage() {
               <LoginForm />
             </Suspense>
           </Card>
-
-          <div className="px-4 pt-2 text-center">
-            <div className="mb-1 inline-flex items-center gap-1.5 text-on-surface-variant opacity-80">
-              <Icon icon="lock" size={14} />
-              <span className="text-label-sm uppercase tracking-wider">Restricted intranet access</span>
-            </div>
-            <p className="text-[13px] leading-tight text-on-surface-variant">
-              Authorized personnel only · Protected under TN Police IT Protocol &amp; Official Secrets Act.
-            </p>
-          </div>
         </div>
       </main>
     </div>

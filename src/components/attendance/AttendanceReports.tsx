@@ -189,15 +189,11 @@ export function AttendanceReports() {
         <div className="flex items-center justify-between">
           <div className="flex min-w-0 flex-col">
             <span className="text-headline-md tracking-tight text-surface-container-lowest">Reports</span>
-            <span className="mt-0.5 flex items-center gap-1.5 text-label-sm uppercase tracking-wider text-primary-fixed">
-              <Icon icon="shield" size={15} className="text-secondary-container" />
+            <span className="mt-0.5 flex items-center gap-1.5 text-label-sm uppercase tracking-wider text-on-primary-container">
+              <Icon icon="shield" size={15} className="text-on-secondary-container" />
               Command &amp; Disciplinary Overview
             </span>
           </div>
-          <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded bg-primary px-2.5 text-label-sm text-on-primary-fixed">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-secondary-container" aria-hidden />
-            LIVE LOGS
-          </span>
         </div>
       </section>
 

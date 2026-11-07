@@ -18,7 +18,7 @@ export function Card({
 }) {
   return (
     <Tag
-      className={`rounded-xl border border-outline-variant/40 bg-surface-container-lowest shadow-card ${className}`}
+      className={`rounded-2xl border border-outline-variant/50 bg-surface-container-lowest shadow-card transition-shadow ${className}`}
     >
       {children}
     </Tag>
@@ -91,7 +91,7 @@ export function SegmentedFilter<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={`flex gap-1 rounded-lg bg-surface-container p-1 ${className}`}>
+    <div role="radiogroup" aria-label={label} className={`flex gap-1 rounded-xl border border-outline-variant/50 bg-surface-container-low p-1 ${className}`}>
       {options.map((option) => {
         const selected = option.value === value;
         return (

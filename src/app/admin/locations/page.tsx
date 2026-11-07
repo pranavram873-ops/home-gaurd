@@ -140,7 +140,7 @@ export default function LocationsPage() {
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-primary-fixed text-primary border border-outline-variant">
+              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-primary-fixed text-on-primary-fixed border border-outline-variant">
                 GPS Geofence Perimeter
               </span>
               <span className="text-xs font-mono font-bold text-on-surface-variant">HAVERSINE ENGINE</span>
@@ -176,7 +176,7 @@ export default function LocationsPage() {
                   Post Geofence Perimeter: {selectedLoc?.name}
                 </span>
               </div>
-              <span className="text-xs font-mono font-bold text-on-tertiary-container bg-tertiary-fixed px-2 py-0.5 rounded border border-outline-variant">
+              <span className="text-xs font-mono font-bold text-on-tertiary-fixed-variant bg-tertiary-fixed px-2 py-0.5 rounded border border-outline-variant">
                 {selectedLoc ? `Radius: ${selectedLoc.radius_meters}m` : 'No post selected'}
               </span>
             </div>
@@ -275,7 +275,7 @@ export default function LocationsPage() {
                     >
                       <div className="flex items-start justify-between">
                         <span className="text-xs font-bold text-on-surface">{loc.name}</span>
-                        <span className="text-xs font-mono font-bold text-primary bg-primary-fixed px-1.5 py-0.2 rounded">
+                        <span className="text-xs font-mono font-bold text-on-primary-fixed bg-primary-fixed px-1.5 py-0.2 rounded">
                           {loc.radius_meters}m
                         </span>
                       </div>

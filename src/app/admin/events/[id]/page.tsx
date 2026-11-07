@@ -9,7 +9,9 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   loadAttendancePage,
   parseAttendanceEventId,
+  saveDailyMark,
   type DailyMark,
+  type MusterEvent,
   type RosterGuard,
 } from '@/lib/services/simpleAttendanceService';
 
@@ -32,11 +34,23 @@ function initials(name: string) {
 
 type Filter = 'all' | 'present' | 'absent';
 
-function GuardRow({ guard, mark }: { guard: RosterGuard; mark?: DailyMark }) {
+function GuardRow({
+  guard,
+  mark,
+  onImageClick,
+  onMarkStatus,
+  isSaving,
+}: {
+  guard: RosterGuard;
+  mark?: DailyMark;
+  onImageClick?: (url: string, title: string) => void;
+  onMarkStatus?: (guard: RosterGuard, status: 'present' | 'absent') => void;
+  isSaving?: boolean;
+}) {
   const present = mark?.status === 'present';
   const absent = mark?.status === 'absent';
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3.5 shadow-card">
+    <li className="flex flex-col gap-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3.5 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <span
@@ -70,6 +84,55 @@ function GuardRow({ guard, mark }: { guard: RosterGuard; mark?: DailyMark }) {
           </span>
         )}
       </div>
+
+      <div className="grid w-full grid-cols-2 gap-2 mt-1">
+        <button
+          type="button"
+          disabled={isSaving}
+          aria-pressed={present}
+          onClick={() => onMarkStatus?.(guard, 'present')}
+          className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
+            present
+              ? 'bg-on-tertiary-container text-on-tertiary shadow-sm'
+              : 'bg-surface-container-high text-on-surface hover:bg-on-tertiary-container hover:text-on-tertiary'
+          }`}
+        >
+          {isSaving && !present ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="check" size={16} />}
+          <span>Present</span>
+        </button>
+        <button
+          type="button"
+          disabled={isSaving}
+          aria-pressed={absent}
+          onClick={() => onMarkStatus?.(guard, 'absent')}
+          className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
+            absent
+              ? 'bg-error text-on-error shadow-sm'
+              : 'bg-surface-container-high text-on-surface hover:bg-error hover:text-on-error'
+          }`}
+        >
+          {isSaving && !absent ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="close" size={16} />}
+          <span>Absent</span>
+        </button>
+      </div>
+
+      {mark?.photo_url && (
+        <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2 border border-outline-variant/40">
+          <img
+            src={mark.photo_url}
+            alt={`${guard.full_name} attendance evidence`}
+            className="h-12 w-16 object-cover rounded-md cursor-pointer hover:scale-105 transition-transform"
+            onClick={() => onImageClick?.(mark.photo_url!, `${guard.full_name} (${guard.home_guard_code}) - Photo Evidence`)}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-primary flex items-center gap-1">
+              <Icon icon="verified" size={14} className="text-tertiary shrink-0" />
+              Guard Photo Evidence Attached
+            </p>
+            <p className="text-[11px] text-on-surface-variant truncate">Click thumbnail to inspect full photo</p>
+          </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -82,10 +145,13 @@ export default function AdminEventDetailsPage() {
   const [roster, setRoster] = useState<RosterGuard[]>([]);
   const [marks, setMarks] = useState<DailyMark[]>([]);
   const [divisionName, setDivisionName] = useState('');
+  const [musterEvent, setMusterEvent] = useState<MusterEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!parsed) {
@@ -101,12 +167,40 @@ export default function AdminEventDetailsPage() {
         if (!live) return;
         setRoster(data.roster);
         setMarks(data.marks);
+        setMusterEvent(data.musterEvent);
         setDivisionName(data.divisions.find((division) => division.id === parsed.divisionId)?.name ?? 'Division');
       })
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load this record.'))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [parsed]);
+
+  async function changeStatus(guard: RosterGuard, status: 'present' | 'absent') {
+    if (!parsed) return;
+    setSavingId(guard.id);
+    try {
+      await saveDailyMark(guard.id, parsed.divisionId, parsed.date, status);
+      setMarks((current) => {
+        const prior = current.find((m) => m.guard_id === guard.id);
+        if (prior) return current.map((m) => (m.guard_id === guard.id ? { ...m, status } : m));
+        return [
+          ...current,
+          {
+            id: `${guard.id}-${parsed.date}`,
+            guard_id: guard.id,
+            division_id: parsed.divisionId,
+            attendance_date: parsed.date,
+            status,
+            marked_at: new Date().toISOString(),
+          },
+        ];
+      });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not save attendance mark.');
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   const markByGuard = useMemo(() => new Map(marks.map((mark) => [mark.guard_id, mark])), [marks]);
   const presentCount = marks.filter((mark) => mark.status === 'present').length;
@@ -131,9 +225,9 @@ export default function AdminEventDetailsPage() {
       <div className="mx-auto max-w-2xl pb-10">
       {/* Return bar */}
       <div className="flex items-center justify-between rounded bg-surface-container-low px-4 py-2 shadow-sm">
-        <Link href="/admin/dashboard" className="flex items-center gap-1 text-label-md text-primary active:opacity-75">
+        <Link href="/admin/dashboard" className="flex items-center gap-1 text-label-md font-bold text-primary active:opacity-75">
           <Icon icon="arrow_back" size={18} />
-          Events
+          Back to Events List
         </Link>
         <div className="flex items-center gap-1.5 rounded-full bg-surface-container px-2 py-1">
           <Icon icon="fingerprint" size={14} className="text-on-surface-variant" />
@@ -151,8 +245,8 @@ export default function AdminEventDetailsPage() {
           {/* Header */}
           <section className="px-1 pt-4">
             <div className="mb-1 flex items-start justify-between gap-2">
-              <h2 className="text-headline-md leading-snug tracking-tight text-primary">
-                {divisionName || 'Muster'} {parsed ? formatDay(parsed.date) : ''}
+              <h2 className="text-headline-md leading-snug tracking-tight text-primary font-bold">
+                {musterEvent?.event_name || `${divisionName || 'Muster'} ${parsed ? formatDay(parsed.date) : ''}`}
               </h2>
               <span
                 className={`inline-flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-label-sm font-bold tracking-wide ${
@@ -172,6 +266,12 @@ export default function AdminEventDetailsPage() {
                 <div className="flex items-center gap-1.5">
                   <Icon icon="schedule" size={16} className="text-secondary" />
                   <span>{formatDay(parsed.date)}</span>
+                </div>
+              )}
+              {musterEvent?.address && (
+                <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                  <Icon icon="location_on" size={16} className="text-primary shrink-0" />
+                  <span>{musterEvent.address}</span>
                 </div>
               )}
             </div>
@@ -211,21 +311,42 @@ export default function AdminEventDetailsPage() {
                 </div>
               </Card>
             </div>
-            <Card className="mt-2 p-3">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-label-sm font-bold uppercase tracking-wider text-on-surface-variant">Parade Quorum Ratio</span>
-                <span className="text-label-sm font-bold text-primary">{presentCount} / {sanctionedCount} Deployed</span>
+          </section>
+
+          {/* Evidence Photos Section */}
+          <section className="px-1 py-2">
+            <Card className="p-3.5">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5 text-label-sm font-bold uppercase tracking-wider text-primary">
+                  <Icon icon="add_a_photo" size={18} />
+                  <span>Event Photo Evidence ({(musterEvent?.evidence_photos || []).length} Attached)</span>
+                </div>
               </div>
-              <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-error-container">
-                <span className="h-full bg-tertiary-fixed-dim" style={{ width: `${presentPct}%` }} />
-              </div>
+              {(musterEvent?.evidence_photos || []).length > 0 ? (
+                <div className="flex flex-wrap gap-2.5 mt-2">
+                  {musterEvent!.evidence_photos!.map((photoUrl, idx) => (
+                    <div key={idx} className="h-20 w-24 rounded-lg overflow-hidden border border-outline-variant bg-surface-container shadow-xs">
+                      <img
+                        src={photoUrl}
+                        alt={`Event evidence ${idx + 1}`}
+                        className="h-full w-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                        onClick={() => setPreviewImage({ url: photoUrl, title: `Event Evidence Photo #${idx + 1}` })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-on-surface-variant italic py-1">
+                  No event evidence photos attached yet for this muster.
+                </p>
+              )}
             </Card>
           </section>
 
           {/* Roster */}
           <section className="px-1 py-2">
             <div className="mb-1 flex items-baseline justify-between">
-              <h3 className="text-headline-sm text-primary">Rostered Personnel</h3>
+              <h3 className="text-headline-sm font-bold text-primary">Rostered Personnel</h3>
               <span className="text-label-sm font-bold uppercase text-on-surface-variant">Total {sanctionedCount}</span>
             </div>
             <SegmentedFilter<Filter>
@@ -260,25 +381,42 @@ export default function AdminEventDetailsPage() {
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {visible.map((guard) => (
-                  <GuardRow key={guard.id} guard={guard} mark={markByGuard.get(guard.id)} />
+                  <GuardRow
+                    key={guard.id}
+                    guard={guard}
+                    mark={markByGuard.get(guard.id)}
+                    isSaving={savingId === guard.id}
+                    onMarkStatus={(g, status) => void changeStatus(g, status)}
+                    onImageClick={(url, title) => setPreviewImage({ url, title })}
+                  />
                 ))}
               </ul>
             )}
           </section>
-
-          {/* Official footer seal */}
-          <footer className="px-1 pt-2">
-            <div className="flex items-start gap-2.5 rounded-xl bg-surface-container-low p-3.5">
-              <Icon icon="verified" size={20} className="mt-0.5 shrink-0 text-primary" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-label-sm font-bold uppercase tracking-wide text-primary">Official Command Record</span>
-                <p className="text-[13px] leading-relaxed text-on-surface-variant">
-                  Tamil Nadu Police Act • Tamper-proof muster logged with Tiruppur District HG Headquarters.
-                </p>
-              </div>
-            </div>
-          </footer>
         </>
+      )}
+
+      {/* Lightbox Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-3xl w-full flex flex-col items-center">
+            <div className="w-full flex items-center justify-between text-white mb-2 px-1">
+              <span className="font-bold text-sm truncate">{previewImage.title}</span>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-white cursor-pointer"
+                aria-label="Close photo preview"
+              >
+                <Icon icon="close" size={24} />
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.title}
+              className="max-h-[80vh] w-auto max-w-full rounded-lg object-contain shadow-2xl"
+            />
+          </div>
+        </div>
       )}
     </div>
     </DashboardLayout>

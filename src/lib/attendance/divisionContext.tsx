@@ -35,7 +35,8 @@ export function DivisionProvider({ children }: { children: React.ReactNode }) {
   const setDivisionId = useCallback((id: string) => {
     setDivisionIdState(id);
     try {
-      window.localStorage.setItem(STORAGE_KEY, id);
+      if (id) window.localStorage.setItem(STORAGE_KEY, id);
+      else window.localStorage.removeItem(STORAGE_KEY);
     } catch {
       // ignore
     }

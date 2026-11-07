@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { Circle, GestureHandling, Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps';
 import { MapShell } from './MapShell';
-import { mapsMapIdProp } from '@/lib/maps/config';
+import { mapsMapIdProp, mapsStylesProp } from '@/lib/maps/config';
 
 export interface MapPoint {
   lat: number;
@@ -56,6 +56,7 @@ export function GeofenceMap({
         center={center}
         zoom={15}
         mapId={mapsMapIdProp()}
+        styles={mapsStylesProp()}
         gestureHandling={GestureHandling.COOPERATIVE}
         mapTypeControl
         // A perimeter is a circle: rotating the view cannot reveal anything a
@@ -95,7 +96,7 @@ export function GeofenceMap({
             <Polyline
               path={[center, position]}
               clickable={false}
-              strokeColor="#0f172a"
+              strokeColor="#7ea6ff"
               strokeOpacity={0.45}
               strokeWeight={2}
             />

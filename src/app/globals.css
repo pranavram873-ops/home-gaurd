@@ -8,66 +8,66 @@
  * touching layout.
  */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand */
-  --color-primary: #001126;
+  /* Tamil Nadu Home Guards crest palette: royal blue, leaf green, and red. */
+  --color-primary: #102a43;
   --color-on-primary: #ffffff;
-  --color-primary-container: #12263f;
-  --color-on-primary-container: #7b8eac;
-  --color-primary-fixed: #d4e3ff;
-  --color-primary-fixed-dim: #b4c8e8;
-  --color-on-primary-fixed: #061c35;
-  --color-on-primary-fixed-variant: #354862;
-  --color-surface-tint: #4d5f7b;
+  --color-primary-container: #24598a;
+  --color-on-primary-container: #eff6ff;
+  --color-primary-fixed: #eaf2f8;
+  --color-primary-fixed-dim: #cbddec;
+  --color-on-primary-fixed: #102a43;
+  --color-on-primary-fixed-variant: #394c88;
+  --color-surface-tint: #24598a;
 
-  /* Secondary - the amber accent used for codes, alerts-in-waiting and live dots */
-  --color-secondary: #9b4500;
+  /* Red from the crest ribbon; kept as a restrained accent. */
+  --color-secondary: #a63d40;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #fd8a42;
-  --color-on-secondary-container: #682c00;
-  --color-secondary-fixed: #ffdbca;
-  --color-secondary-fixed-dim: #ffb68e;
-  --color-on-secondary-fixed: #331200;
-  --color-on-secondary-fixed-variant: #763300;
+  --color-secondary-container: #f7e4e5;
+  --color-on-secondary-container: #72262a;
+  --color-secondary-fixed: #fff0f1;
+  --color-secondary-fixed-dim: #f1b9be;
+  --color-on-secondary-fixed: #39090e;
+  --color-on-secondary-fixed-variant: #801c27;
 
-  /* Tertiary - present / verified / in-sync */
-  --color-tertiary: #001404;
+  /* Green from the crest wreath for present and verified states. */
+  --color-tertiary: #19736a;
   --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #002c0f;
-  --color-on-tertiary-container: #3c9e57;
-  --color-tertiary-fixed: #95f8a7;
-  --color-tertiary-fixed-dim: #79db8d;
+  --color-tertiary-container: #d6eee9;
+  --color-on-tertiary-container: #175b54;
+  --color-tertiary-fixed: #e3f4ef;
+  --color-tertiary-fixed-dim: #b7ddd5;
   --color-on-tertiary-fixed: #00210a;
-  --color-on-tertiary-fixed-variant: #005323;
+  --color-on-tertiary-fixed-variant: #235c2c;
 
-  /* Surfaces - five steps of elevation-by-tone instead of drop shadows */
-  --color-background: #f7f9fb;
-  --color-on-background: #191c1e;
-  --color-surface: #f7f9fb;
-  --color-on-surface: #191c1e;
-  --color-surface-bright: #f7f9fb;
-  --color-surface-dim: #d8dadc;
-  --color-surface-variant: #e0e3e5;
+  /* Airy light surfaces let the crest colours stay clear and legible. */
+  --color-background: #f4f7fa;
+  --color-on-background: #1b2530;
+  --color-surface: #f4f7fa;
+  --color-on-surface: #1b2530;
+  --color-surface-bright: #ffffff;
+  --color-surface-dim: #dce4ea;
+  --color-surface-variant: #e7edf2;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f2f4f6;
-  --color-surface-container: #eceef0;
-  --color-surface-container-high: #e6e8ea;
-  --color-surface-container-highest: #e0e3e5;
+  --color-surface-container-low: #edf3f7;
+  --color-surface-container: #e7eef4;
+  --color-surface-container-high: #dce6ee;
+  --color-surface-container-highest: #cedae4;
 
   /* Text and dividing lines */
-  --color-on-surface-variant: #44474d;
-  --color-outline: #74777e;
-  --color-outline-variant: #c4c6ce;
+  --color-on-surface-variant: #526372;
+  --color-outline: #728797;
+  --color-outline-variant: #cfdae2;
   --color-inverse-surface: #2d3133;
   --color-inverse-on-surface: #eff1f3;
-  --color-inverse-primary: #b4c8e8;
+  --color-inverse-primary: #c7d2ff;
 
   /* Error */
-  --color-error: #ba1a1a;
+  --color-error: #b4233a;
   --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
+  --color-error-container: #fde7e9;
+  --color-on-error-container: #791b26;
 
   /* Type ramp (mockup sizes) */
   --text-label-sm: 0.75rem;
@@ -109,30 +109,29 @@
   --spacing-margin: 1rem;
   --spacing-gutter: 1rem;
 
-  /* The one card shadow in the system; elevation is otherwise carried by tone */
-  --shadow-card: 0 2px 7px rgb(20 38 57 / 5%);
-  --shadow-float: 0 -2px 10px rgb(0 17 38 / 6%);
+  --shadow-card: 0 12px 32px rgb(16 42 67 / 7%), 0 2px 8px rgb(16 42 67 / 4%);
+  --shadow-float: 0 -4px 18px rgb(20 42 58 / 9%);
 }
 
 @layer base {
   :root {
-    --background: #f7f9fb;
-    --foreground: #191c1e;
+    --background: #f4f7fa;
+    --foreground: #1b2530;
     --surface: #ffffff;
-    --surface-low: #f1f5f9;
+    --surface-low: #edf3f7;
     --surface-card: #ffffff;
-    --border: #e2e8f0;
+    --border: #cfdae2;
 
     /* Kept for call-sites that still reference the named brand ramp. */
-    --tnhg-navy: #12263f;
-    --tnhg-royal: #1e3a5f;
-    --tnhg-blue-light: #edf2f8;
-    --tnhg-gold: #b45309;
-    --tnhg-green: #15803d;
-    --tnhg-green-light: #dcfce7;
-    --tnhg-red: #b8191d;
-    --tnhg-red-light: #fff0ef;
-    --tnhg-slate: #475569;
+    --tnhg-navy: #102a43;
+    --tnhg-royal: #24598a;
+    --tnhg-blue-light: #e7ecff;
+    --tnhg-gold: #bd2735;
+    --tnhg-green: #187b2b;
+    --tnhg-green-light: #dcf6df;
+    --tnhg-red: #bd2735;
+    --tnhg-red-light: #ffe8e9;
+    --tnhg-slate: #53616b;
   }
 
   body {
@@ -140,6 +139,7 @@
     color: var(--color-on-surface);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   html {
@@ -160,6 +160,14 @@
   ::selection {
     background: var(--color-primary-fixed);
     color: var(--color-on-primary-fixed);
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.025em;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
   }
 
 }

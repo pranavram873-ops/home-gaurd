@@ -1,12 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Manrope } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth/authContext';
+import { DivisionProvider } from '@/lib/attendance/divisionContext';
 
-const inter = Inter({
+/*
+ * Manrope has clean, open forms for operational dashboards and remains highly
+ * legible in dense tables, forms and status indicators.
+ */
+const manrope = Manrope({
   subsets: ['latin'],
+  variable: '--font-manrope',
   display: 'swap',
-  variable: '--font-inter',
 });
 
 export const metadata: Metadata = {
@@ -22,7 +27,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#12263f',
+  themeColor: '#102a43',
 };
 
 export default function RootLayout({
@@ -31,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={manrope.variable}>
       <head>
         {/*
           Material Symbols is an icon font: a glyph is picked by typing its
@@ -46,7 +51,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-surface font-sans text-on-surface antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <DivisionProvider>{children}</DivisionProvider>
+        </AuthProvider>
       </body>
     </html>
   );

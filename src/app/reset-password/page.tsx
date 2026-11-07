@@ -90,11 +90,11 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-surface">
       <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
-        <div className="relative overflow-hidden bg-primary px-4 pb-8 pt-5 text-on-primary shadow-md">
+        <div className="relative overflow-hidden bg-[linear-gradient(120deg,#1c2a63_0%,#111a45_55%,#0a0f24_100%)] px-4 pb-8 pt-5 text-on-surface shadow-md">
           <svg
             viewBox="0 0 200 200"
             aria-hidden
-            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-primary opacity-10"
+            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-surface opacity-10"
           >
             <path d="M100 15 L170 50 L170 120 C170 160 100 190 100 190 C100 190 30 160 30 120 L30 50 Z" />
           </svg>
@@ -107,8 +107,8 @@ export default function ResetPasswordPage() {
           </Link>
           <div className="relative z-10 pt-4">
             <span className="text-label-sm uppercase tracking-wider text-secondary-fixed">Tamil Nadu Police</span>
-            <h1 className="mt-0.5 text-headline-lg text-on-primary">Set new password</h1>
-            <p className="mt-1 max-w-sm text-body-md text-sm text-on-primary-container">
+            <h1 className="mt-0.5 text-headline-lg text-on-surface">Set new password</h1>
+            <p className="mt-1 max-w-sm text-body-md text-sm text-primary-fixed/70">
               Establish a secure password for your Home Guard account.
             </p>
           </div>

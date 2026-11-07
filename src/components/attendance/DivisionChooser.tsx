@@ -9,6 +9,14 @@ import { loadDivisionSummaries, type DivisionSummary } from '@/lib/services/simp
 
 // Presentation strings for the five Tiruppur sub-divisions seeded by
 // 20261024000001. Cards fall back to the database name when a code is new.
+const DISTRICT_NAMES: Record<string, string> = {
+  AVN: 'Avinashi',
+  DHP: 'Dharapuram',
+  KGM: 'Kangeyam',
+  PLM: 'Palladam',
+  UDP: 'Udumalaipettai',
+};
+
 const TAMIL_NAMES: Record<string, string> = {
   AVN: 'அவிநாசி',
   DHP: 'தாராபுரம்',
@@ -17,81 +25,104 @@ const TAMIL_NAMES: Record<string, string> = {
   UDP: 'உடுமலைப்பேட்டை',
 };
 
+function getShortDistrictCode(division: DivisionSummary) {
+  if (division.code) return division.code.toUpperCase().slice(0, 3);
+  const fallback = DISTRICT_NAMES[division.name?.toUpperCase().slice(0, 3)] ?? division.name ?? 'D';
+  return fallback.slice(0, 3).toUpperCase();
+}
+
 function todayLocal() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function DivisionCard({ division, onSelect }: { division: DivisionSummary; onSelect: (id: string) => void }) {
+function DivisionCard({
+  division,
+  selected,
+  onSelect,
+}: {
+  division: DivisionSummary;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
   const marked = division.presentCount + division.absentCount;
-  // A division without a roster cannot be "up to date"; it needs guards first.
   const upToDate = division.guardCount > 0 && marked >= division.guardCount;
+  const districtName = DISTRICT_NAMES[division.code] ?? division.name;
+  const districtCode = division.code || getShortDistrictCode(division);
+  const badge = upToDate ? 'Updated' : division.guardCount ? 'Pending' : 'No roster';
 
   return (
     <button
       type="button"
       onClick={() => onSelect(division.id)}
-      className="group relative flex w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 text-left shadow-card transition-transform duration-100 active:scale-[0.99]"
+      aria-pressed={selected}
+      className={`group relative flex w-full flex-col items-center overflow-visible rounded-[28px] border-0 bg-transparent p-0 text-center shadow-none transition-all duration-150 active:scale-[0.99] md:items-stretch md:gap-3 md:overflow-hidden md:border md:bg-white md:p-3.5 md:text-left md:shadow-[0_18px_40px_rgba(17,38,67,0.08)] md:hover:-translate-y-0.5 md:hover:shadow-[0_22px_46px_rgba(17,38,67,0.12)] ${selected ? 'md:border-[#24598a] md:ring-2 md:ring-[#24598a] md:ring-offset-2' : ''}`}
     >
-      {/* Accent strip flags the division whose muster is still open. */}
-      {!upToDate && <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-secondary" />}
-      <div className="flex items-start justify-between gap-2 pl-1">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container-high text-primary-container">
-            <Icon icon="domain" size={22} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-headline-sm text-on-surface">{division.name}</span>
-              <span className="truncate text-label-md font-normal text-on-surface-variant">
-                {TAMIL_NAMES[division.code] ?? division.code}
-              </span>
-            </div>
-            <span className="text-label-sm text-on-surface-variant">{division.guardCount} Home Guards</span>
-          </div>
-        </div>
-        {upToDate ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-container-highest px-2.5 py-1 font-medium text-label-sm text-on-surface-variant">
-            <Icon icon="check_circle" size={14} fill className="text-on-tertiary-container" />
-            Up to date
-          </span>
-        ) : (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-secondary-fixed px-2.5 py-1 font-bold text-label-sm text-on-secondary-fixed-variant">
-            <span aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-secondary" />
-            {division.guardCount ? 'Muster open' : 'Roster empty'}
+      <div className={`relative flex aspect-square w-full items-center justify-center rounded-[28px] bg-[#3977a7] text-[clamp(4.5rem,19vw,7rem)] font-semibold text-white shadow-[0_12px_24px_rgba(32,77,116,0.16)] transition ${selected ? 'ring-[3px] ring-[#24598a] ring-offset-[5px]' : ''} md:hidden`}>
+        {districtName.charAt(0).toUpperCase()}
+        {selected && (
+          <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#9d3440] shadow-md">
+            <Icon icon="check" size={22} fill />
           </span>
         )}
       </div>
-      {division.bandobast ? (
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-surface-container-low px-3 py-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Icon icon="campaign" size={16} className="shrink-0 text-secondary" />
-            <span className="truncate text-label-sm text-on-surface-variant">
-              Active Bandobast: <span className="font-semibold text-on-surface">{division.bandobast.title}</span>
+      <span className="mt-3 max-w-full truncate px-1 text-lg font-bold text-[#18334f] md:hidden">{districtName}</span>
+
+      <div className="hidden w-full flex-col gap-3 md:flex">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#102a43] to-[#24598a] text-xl font-bold text-white shadow-inner shadow-black/10">
+              {districtCode.slice(0, 2)}
             </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b7d8d]">District</p>
+              <h3 className="mt-1 truncate text-xl font-bold text-[#102a43]">{districtName}</h3>
+              <p className="text-sm text-[#526372]">{TAMIL_NAMES[division.code] ?? districtCode}</p>
+            </div>
           </div>
-          <span className="flex shrink-0 items-center gap-1 font-bold text-label-md text-secondary">
-            Open
-            <Icon icon="arrow_forward" size={16} />
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${selected ? 'bg-[#e7f0ff] text-[#24598a]' : upToDate ? 'bg-[#eaf7f2] text-[#1d7a5a]' : 'bg-[#fff2e8] text-[#b76114]'}`}>
+            {selected && <Icon icon="check_circle" size={14} fill />}
+            {selected ? 'Selected' : badge}
           </span>
         </div>
-      ) : (
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-surface-container-low px-3 py-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Icon icon="local_police" size={16} className="shrink-0 text-surface-tint" />
-            <span className="truncate text-label-sm text-on-surface-variant">No Bandobast recorded for today</span>
+
+        <div className="rounded-2xl bg-[#f3f7fb] p-3">
+          <div className="flex items-center justify-between gap-2 text-sm text-[#526372]">
+            <span>{division.guardCount} Home Guards</span>
+            <span className="font-semibold text-[#102a43]">{marked}/{division.guardCount || 0} marked</span>
           </div>
-          <Icon icon="chevron_right" size={20} className="shrink-0 text-outline transition-transform group-active:translate-x-0.5" />
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dfe9f3]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#2d7ec6] to-[#1f9d6f]"
+              style={{ width: `${division.guardCount ? (marked / division.guardCount) * 100 : 0}%` }}
+            />
+          </div>
         </div>
-      )}
+
+        {division.bandobast ? (
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-[#fff7ea] px-3 py-2 text-left">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9a5a13]">Bandobast</p>
+              <p className="truncate text-sm font-semibold text-[#2b2f36]">{division.bandobast.title}</p>
+            </div>
+            <span className="text-sm font-bold text-[#9a5a13]">Open</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-[#f4f7fa] px-3 py-2 text-[#526372]">
+            <span className="text-sm">No duty assigned today</span>
+            <Icon icon="arrow_forward" size={18} className="text-[#102a43]" />
+          </div>
+        )}
+      </div>
     </button>
   );
 }
 
 export function DivisionChooser() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { divisionId, setDivisionId, resolved } = useDivision();
+  const [selectedId, setSelectedId] = useState(divisionId);
   const [divisions, setDivisions] = useState<DivisionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -105,71 +136,71 @@ export function DivisionChooser() {
       .finally(() => setLoading(false));
   }, []);
 
-  // With a division already stored this screen is a pass-through: returning to
-  // Attendance lands on that division's muster instead of re-asking. It only
-  // lists the choices while none exists (a fresh login after sign-out, or the
-  // first time an incharge opens the workspace).
   useEffect(() => {
     if (!resolved) return;
-    if (divisionId) {
-      router.replace('/incharge/attendance');
-      return;
-    }
     load();
-  }, [resolved, divisionId, router, load]);
+  }, [resolved, load]);
+
+  useEffect(() => setSelectedId(divisionId), [divisionId]);
 
   function select(id: string) {
-    setDivisionId(id);
-    router.push('/incharge/attendance');
+    setSelectedId(id);
+  }
+
+  function continueToWorkspace() {
+    if (!selectedId) return;
+    setDivisionId(selectedId);
+    router.push(role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
   }
 
   const totalGuards = divisions.reduce((sum, division) => sum + division.guardCount, 0);
+  const selectedDivision = divisions.find((division) => division.id === selectedId);
 
   return (
-    <div className="mx-auto max-w-[640px] space-y-4">
-      {/* The greeting banner is this screen's header, so the page skips the
-          command bar chrome entirely. */}
-      <section className="rounded-b-xl bg-primary-container px-1 pb-5 pt-4 text-on-primary shadow-sm">
-        <div className="flex items-center gap-1.5 self-start rounded-full bg-primary/40 px-2.5 py-1">
-          <Icon icon="shield" size={16} fill className="text-secondary-container" />
-          <span className="text-label-sm uppercase tracking-wider text-secondary-container">TN Home Guards • Tiruppur</span>
-        </div>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-label-sm font-medium tracking-wide text-primary-fixed-dim">வணக்கம் / Welcome</p>
-            <h1 className="mt-0.5 text-headline-sm text-on-primary">
-              Incharge {user?.full_name || '—'}
-            </h1>
-            {user?.personnel_id && (
-              <p className="mt-1 text-label-sm text-outline-variant">ID: {user.personnel_id} • District HQ Command</p>
-            )}
+    <div className="mx-auto max-w-[720px] space-y-4">
+      <section className="hidden rounded-[32px] bg-gradient-to-br from-[#102a43] via-[#183d63] to-[#24598a] px-4 pb-5 pt-4 text-white shadow-[0_18px_40px_rgba(18,40,63,0.18)] sm:px-5 md:block">
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sky-100">
+            <Icon icon="shield" size={14} fill className="text-[#dfeeff]" />
+            TN Home Guards • Tiruppur
           </div>
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-secondary-fixed shadow-inner">
-            <Icon icon="badge" size={26} />
-          </span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg text-sky-100">
+            <Icon icon="badge" size={22} />
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-100/80">வணக்கம் / Welcome</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-[2rem]">{role === 'admin' ? 'Administrator' : 'Incharge'} {user?.full_name || '—'}</h1>
+          </div>
+          <div className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-sky-100/90">
+            {user?.personnel_id ? `ID ${user.personnel_id}` : 'District HQ'}
+          </div>
         </div>
       </section>
 
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <span aria-hidden className="h-4 w-1.5 rounded-full bg-secondary-container" />
-          <h2 className="text-headline-md text-on-surface">Which division do you want to view?</h2>
+      <div className="border-0 bg-transparent px-1 py-1 text-center md:rounded-[28px] md:border md:border-[#e8edf3] md:bg-white/90 md:px-4 md:py-4 md:text-left md:shadow-[0_12px_32px_rgba(16,42,67,0.05)] md:backdrop-blur-sm">
+        <div className="flex items-center justify-center gap-2.5 md:justify-start">
+          <span className="hidden h-2.5 w-2.5 rounded-full bg-[#cc5641] md:block" aria-hidden />
+          <h2 className="text-[2rem] font-bold leading-tight tracking-tight text-[#18334f] md:text-xl md:text-[#102a43] lg:text-[1.65rem]">Select your division</h2>
         </div>
-        <p className="text-body-md text-on-surface-variant">
-          Select a division to take new duty attendance or inspect roster muster records.
+        <p className="mt-2 text-base text-[#6b7280] md:text-sm md:text-[#526372] lg:text-base">
+          Choose a division to review muster records
         </p>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-3.5 py-2.5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Icon icon="domain" size={18} className="text-surface-tint" />
-          <span className="font-semibold text-label-md text-on-surface">
-            {loading ? 'Loading divisions…' : `${divisions.length} Active Sub-Divisions`}
+      <div className="hidden rounded-[22px] border border-[#e6edf4] bg-[#f7fafc] px-3 py-2.5 shadow-[0_10px_20px_rgba(17,38,67,0.04)] md:block">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-2 text-[#102a43]">
+            <Icon icon="domain" size={18} className="text-[#24598a]" />
+            <span className="font-semibold">
+              {loading ? 'Loading districts…' : `${divisions.length} available districts`}
+            </span>
+          </div>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#526372]">
+            {totalGuards} guards
           </span>
-        </div>
-        <div className="flex items-center gap-1.5 text-on-surface-variant">
-          <Icon icon="groups" size={16} fill className="text-tertiary-fixed-dim" />
-          <span className="font-bold text-label-md text-on-surface">{totalGuards} Total Personnel</span>
         </div>
       </div>
 
@@ -184,23 +215,41 @@ export function DivisionChooser() {
           </div>
         </div>
       ) : !resolved || loading ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-10 text-sm text-on-surface-variant shadow-card">
+        <div className="flex items-center justify-center gap-2 rounded-[28px] border border-[#e6edf4] bg-white p-10 text-sm text-[#526372] shadow-[0_12px_26px_rgba(16,42,67,0.06)]">
           <Icon icon="sync" size={20} className="animate-spin" />
-          Loading divisions…
+          Loading districts…
         </div>
       ) : divisions.length === 0 ? (
-        <div className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-10 text-center shadow-card">
-          <Icon icon="domain" size={32} className="mx-auto text-outline" />
-          <h4 className="mt-3 text-headline-sm text-on-surface">No divisions configured</h4>
-          <p className="mt-1 text-body-md text-sm text-on-surface-variant">Ask Command HQ to set up the attendance divisions.</p>
+        <div className="rounded-[28px] border border-[#e6edf4] bg-white p-10 text-center shadow-[0_12px_26px_rgba(16,42,67,0.06)]">
+          <Icon icon="domain" size={32} className="mx-auto text-[#728797]" />
+          <h4 className="mt-3 text-xl font-bold text-[#102a43]">No districts configured</h4>
+          <p className="mt-1 text-sm text-[#526372]">Ask Command HQ to set up the attendance districts.</p>
         </div>
       ) : (
-        <div role="list" className="flex flex-col gap-3">
+        <div role="list" className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-4">
           {divisions.map((division) => (
-            <DivisionCard key={division.id} division={division} onSelect={select} />
+            <div key={division.id}>
+              <DivisionCard division={division} selected={division.id === selectedId} onSelect={select} />
+            </div>
           ))}
         </div>
       )}
+
+      {divisions.length > 0 && !loading && !error && (
+        <button
+          type="button"
+          onClick={continueToWorkspace}
+          disabled={!selectedDivision}
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#24598a] px-4 text-base font-bold text-white shadow-[0_12px_26px_rgba(36,89,138,0.24)] transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span>Continue{selectedDivision ? ` with ${DISTRICT_NAMES[selectedDivision.code] ?? selectedDivision.name}` : ''}</span>
+          <Icon icon="arrow_forward" size={20} />
+        </button>
+      )}
+      <div className="flex items-center justify-center gap-2 py-5 text-center text-[#667085] md:hidden">
+        <Icon icon="verified_user" size={18} className="text-[#9d3440]" />
+        <span className="text-sm">Authorized for Official Review • TN Police Dept</span>
+      </div>
     </div>
   );
 }

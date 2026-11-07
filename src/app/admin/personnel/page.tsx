@@ -3,25 +3,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
-  createStaffAccount,
   listPersonnel,
-  type StaffAccountResult,
 } from '@/lib/services/personnelService';
-import { listDistricts, listUnits } from '@/lib/services/referenceService';
-import { loadGuardDutyHistory, type GuardDutyHistory } from '@/lib/services/simpleAttendanceService';
+import { listDistricts } from '@/lib/services/referenceService';
+import { addRosterGuard, listDivisionRoster, loadGuardDutyHistory, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
-import { District, Profile, Unit, UserRole } from '@/types';
+import { District, Profile } from '@/types';
 import { Icon } from '@/components/ui/Icon';
+import { createClient } from '@/lib/supabase/client';
+import { useDivision } from '@/lib/attendance/divisionContext';
 
 const blankRecruit = {
   full_name: '',
-  email: '',
   phone: '',
-  role: 'home_guard' as UserRole,
-  rank_designation: 'Home Guard Volunteer',
+  personnel_id: '',
   district_id: '',
-  unit_id: '',
-  blood_group: '',
 };
 
 const PERSONNEL_DISTRICT_NAMES = [
@@ -37,10 +33,15 @@ function normalizeDistrictName(name: string) {
 }
 
 export default function PersonnelDirectoryPage() {
+  const { divisionId, setDivisionId, resolved: divisionResolved } = useDivision();
   const [search, setSearch] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('all');
+  const [districtFilter, setDistrictFilter] = useState('scope-error');
+  const [divisionFilterReady, setDivisionFilterReady] = useState(false);
+  const [districtScopeError, setDistrictScopeError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [memoCounts, setMemoCounts] = useState<Record<string, number>>({});
   const [showAddModal, setShowAddModal] = useState(false);
+  const [rosterSyncError, setRosterSyncError] = useState<string | null>(null);
 
   // The roster comes from `profiles`. RLS is what decides scope: an
   // administrator sees the statewide cadre, and anyone else would get only
@@ -51,16 +52,38 @@ export default function PersonnelDirectoryPage() {
   // result: sending it to Postgres would fire a request on every keystroke for
   // no benefit on a list already in hand.
   const rosterQuery = useLiveQuery<Profile[]>(
-    () =>
-      listPersonnel({
-        districtId: districtFilter === 'all' ? null : districtFilter,
-        unitId: null,
-        role: 'all',
-        status: 'all',
-      }),
-    districtFilter,
+    () => divisionFilterReady && !districtScopeError
+      ? listPersonnel({
+          districtId: districtFilter,
+          unitId: null,
+          role: 'all',
+          status: 'all',
+        })
+      : Promise.resolve({ data: [], error: null }),
+    `${districtFilter}:${divisionFilterReady}:${districtScopeError ?? ''}`,
   );
-  const personnel = useMemo(() => rosterQuery.data ?? [], [rosterQuery.data]);
+  const attendanceRosterQuery = useLiveQuery<RosterGuard[]>(
+    () => divisionId ? listDivisionRoster(divisionId) : Promise.resolve([]),
+    divisionId,
+  );
+  useEffect(() => {
+    let live = true;
+    const supabase = createClient();
+    const loadMemoCounts = async () => {
+      const { data, error } = await supabase.from('guard_reports').select('subject_id');
+      if (!live || error) return;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) counts[row.subject_id] = (counts[row.subject_id] ?? 0) + 1;
+      setMemoCounts(counts);
+    };
+    void loadMemoCounts();
+    const channel = supabase.channel('personnel-memo-counts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guard_reports' }, (payload) => {
+        const subjectId = (payload.new as { subject_id: string }).subject_id;
+        setMemoCounts((current) => ({ ...current, [subjectId]: (current[subjectId] ?? 0) + 1 }));
+      }).subscribe();
+    return () => { live = false; void supabase.removeChannel(channel); };
+  }, []);
 
   const districtsQuery = useLiveQuery<District[]>(() => listDistricts());
   const districts = useMemo(() => {
@@ -75,31 +98,131 @@ export default function PersonnelDirectoryPage() {
       }))
       .sort((a, b) => PERSONNEL_DISTRICT_NAMES.indexOf(a.name) - PERSONNEL_DISTRICT_NAMES.indexOf(b.name));
   }, [districtsQuery.data]);
-  const unitsQuery = useLiveQuery<Unit[]>(() => listUnits());
-  const units = useMemo(() => unitsQuery.data ?? [], [unitsQuery.data]);
+  const selectedDistrict = districts.find((district) => district.id === districtFilter);
+  const personnel = useMemo(() => {
+    const profiles = rosterQuery.data ?? [];
+    const knownCodes = new Set(profiles.map((profile) => profile.personnel_id?.toUpperCase()).filter(Boolean));
+    const attendanceOnly = (attendanceRosterQuery.data ?? [])
+      .filter((guard) => !knownCodes.has(guard.home_guard_code.toUpperCase()))
+      .map((guard) => ({
+        id: `attendance-${guard.id}`,
+        full_name: guard.full_name,
+        email: '',
+        phone: guard.phone,
+        personnel_id: guard.home_guard_code,
+        role: 'home_guard' as const,
+        district_id: selectedDistrict?.id ?? null,
+        unit_id: null,
+        account_status: 'active' as const,
+        rank_designation: 'Home Guard Volunteer',
+        created_at: '',
+        updated_at: '',
+        district: selectedDistrict ?? null,
+        unit: null,
+      } satisfies Profile));
+    return [...profiles, ...attendanceOnly];
+  }, [rosterQuery.data, attendanceRosterQuery.data, selectedDistrict]);
 
+  // Older admin-created records were saved only in `profiles`. Bring those
+  // active guards into the attendance roster when this admin directory loads.
+  useEffect(() => {
+    if (!divisionId || !selectedDistrict || rosterQuery.loading || rosterQuery.error) return;
+    const legacyGuards = (rosterQuery.data ?? []).filter((profile) =>
+      profile.role === 'home_guard'
+      && profile.account_status === 'active'
+      && Boolean(profile.personnel_id)
+      && Boolean(profile.phone && /^[0-9]{10}$/.test(profile.phone)),
+    );
+    if (!legacyGuards.length) return;
+    const supabase = createClient();
+    void supabase.from('home_guard_roster').upsert(
+      legacyGuards.map((profile) => ({
+        division_id: divisionId,
+        full_name: profile.full_name,
+        phone: profile.phone!,
+        home_guard_code: profile.personnel_id!,
+        is_active: true,
+      })),
+      { onConflict: 'home_guard_code' },
+    ).then(({ error }) => {
+      if (error) {
+        setRosterSyncError(`Existing Home Guards could not be added to the event roster: ${error.message}`);
+      } else {
+        setRosterSyncError(null);
+        void attendanceRosterQuery.refresh();
+      }
+    });
+  }, [divisionId, selectedDistrict, rosterQuery.data, rosterQuery.loading, rosterQuery.error]);
+
+  useEffect(() => {
+    let live = true;
+    if (!divisionResolved || !divisionId) return;
+    setDivisionFilterReady(false);
+    setDistrictScopeError(null);
+    const supabase = createClient();
+    Promise.all([
+      supabase.from('attendance_divisions').select('code, name').eq('id', divisionId).maybeSingle(),
+      supabase.from('districts').select('id, code, name'),
+    ]).then(([divisionResult, districtResult]) => {
+      if (!live) return;
+      if (divisionResult.error || districtResult.error || !divisionResult.data) {
+        setDistrictFilter('scope-error');
+        setDistrictScopeError('Could not match the selected division to its personnel district.');
+        setDivisionFilterReady(true);
+        return;
+      }
+      const division = divisionResult.data;
+      const matchingDistrict = (districtResult.data ?? []).find((district) =>
+        district.code?.toUpperCase() === division.code.toUpperCase()
+        || normalizeDistrictName(district.name) === normalizeDistrictName(division.name),
+      );
+      if (!matchingDistrict) {
+        setDistrictFilter('scope-error');
+        setDistrictScopeError('No personnel district matches the selected division.');
+      } else {
+        setDistrictFilter(matchingDistrict.id);
+      }
+      setDivisionFilterReady(true);
+    }).catch(() => {
+      if (!live) return;
+      setDistrictFilter('scope-error');
+      setDistrictScopeError('Could not match the selected division to its personnel district.');
+      setDivisionFilterReady(true);
+    });
+    return () => { live = false; };
+  }, [divisionId, divisionResolved]);
   // New personnel form state
   const [newGuard, setNewGuard] = useState({ ...blankRecruit });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // The temporary password exists only in this response and this component. It
-  // is never written to the database, so closing the panel is the only way it
-  // can be lost - which is the intended behaviour.
-  const [created, setCreated] = useState<StaffAccountResult | null>(null);
+  const [created, setCreated] = useState(false);
 
   useEffect(() => {
     if (districts.length === 0) return;
     setNewGuard((prev) =>
-      prev.district_id && districts.some((d) => d.id === prev.district_id)
+      !selectedDistrict || prev.district_id === selectedDistrict.id
         ? prev
-        : { ...prev, district_id: districts[0].id, unit_id: '' },
+        : { ...prev, district_id: selectedDistrict.id },
     );
-  }, [districts]);
+  }, [districts, selectedDistrict]);
 
-  const unitOptions = useMemo(
-    () => units.filter((u) => !newGuard.district_id || u.district_id === newGuard.district_id),
-    [units, newGuard.district_id],
-  );
+  async function handleDistrictChange(districtId: string) {
+    setDistrictScopeError(null);
+    setDistrictFilter(districtId);
+    const district = districts.find((item) => item.id === districtId);
+    if (!district) return;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('attendance_divisions')
+      .select('id')
+      .eq('code', district.code)
+      .maybeSingle();
+    if (error || !data) {
+      setDistrictScopeError('Could not switch the selected division. Please reload and try again.');
+      return;
+    }
+    setDivisionId(data.id);
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -115,90 +238,54 @@ export default function PersonnelDirectoryPage() {
   }, [personnel, search]);
 
   function resetForm() {
-    setNewGuard({ ...blankRecruit, district_id: newGuard.district_id });
+    setNewGuard({ ...blankRecruit, district_id: selectedDistrict?.id ?? '' });
     setFormError(null);
     setCreated(null);
   }
 
   async function handleCreateGuard(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
-    setFormError(null);
-
-    const { data, error } = await createStaffAccount({
-      full_name: newGuard.full_name,
-      email: newGuard.email,
-      phone: newGuard.phone || null,
-      role: newGuard.role,
-      rank_designation: newGuard.rank_designation,
-      district_id: newGuard.district_id,
-      unit_id: newGuard.unit_id || null,
-      blood_group: newGuard.blood_group || null,
-    });
-
-    setSaving(false);
-
-    if (error || !data) {
-      setFormError(error || 'The staff account could not be created.');
+    if (!divisionId || !selectedDistrict) {
+      setFormError('Select a division before adding a Home Guard.');
       return;
     }
+    setSaving(true);
+    setFormError(null);
+    try {
+      await addRosterGuard({
+        full_name: newGuard.full_name,
+        phone: newGuard.phone,
+        home_guard_code: newGuard.personnel_id,
+        division_id: divisionId,
+      });
+      setCreated(true);
+      void attendanceRosterQuery.refresh();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'The Home Guard could not be added.');
+    } finally {
+      setSaving(false);
+    }
 
-    setCreated(data);
-    void rosterQuery.refresh();
   }
-
-  const exportCSV = () => {
-    const headers = ['Personnel ID', 'Full Name', 'Email', 'Phone', 'Role', 'Status', 'Rank'];
-    const rows = filtered.map((p) => [
-      p.personnel_id || '',
-      `"${p.full_name}"`,
-      p.email,
-      p.phone || '',
-      p.role,
-      p.account_status,
-      `"${p.rank_designation || ''}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `TN_Home_Guards_Roster_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   return (
     <DashboardLayout
       title="Personnel Directory & Roster"
-      subtitle="Tamil Nadu Home Guards • State Metropolitan Command"
+      subtitle={selectedDistrict ? `Tamil Nadu Home Guards • ${selectedDistrict.name}` : 'Tamil Nadu Home Guards • Selected district'}
     >
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+        {rosterSyncError && (
+          <div role="alert" className="rounded-lg bg-error-container p-4 text-sm text-on-error-container">
+            {rosterSyncError}
+          </div>
+        )}
         {/* Banner with Action Buttons */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-primary-fixed text-primary border border-outline-variant">
-                Muster Command
-              </span>
-              <span className="text-xs font-mono font-bold text-on-surface-variant">STATEWIDE CADRE</span>
-            </div>
-            <h2 className="text-xl font-bold text-on-surface mt-1">Tamil Nadu Home Guards Directory</h2>
-            <p className="text-xs text-on-surface-variant">
-              Active field officers, platoon assignments, service numbers, and muster status.
-            </p>
+            <h2 className="text-xl font-bold text-on-surface">Tamil Nadu Home Guards Directory</h2>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={exportCSV}
-              disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low text-on-surface-variant font-semibold text-xs shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Icon icon="download" size={16} />
-              <span>Export Roster CSV</span>
-            </button>
-
             <button
               onClick={() => {
                 resetForm();
@@ -230,11 +317,11 @@ export default function PersonnelDirectoryPage() {
             <Icon icon="location_on" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
             <select
               value={districtFilter}
-              onChange={(e) => setDistrictFilter(e.target.value)}
+              onChange={(e) => void handleDistrictChange(e.target.value)}
               aria-label="Filter by district"
               className="h-11 w-full pl-9 pr-8 text-sm border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-on-surface bg-surface-container-lowest appearance-none cursor-pointer"
             >
-              <option value="all">All Districts (Statewide)</option>
+              {districtScopeError && <option value="scope-error">Selected district unavailable</option>}
               {districts.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -252,7 +339,7 @@ export default function PersonnelDirectoryPage() {
             <span className="text-xs font-bold text-on-surface">
               <strong className="text-primary">{filtered.length}</strong>{' '}
               {filtered.length === 1 ? 'person found' : 'people found'}
-              {search.trim() || districtFilter !== 'all' ? ' in this view' : ' in the directory'}
+              {search.trim() || districtFilter !== 'scope-error' ? ' in this view' : ' in the directory'}
             </span>
             {!rosterQuery.loading && !rosterQuery.error && personnel.length > 0 && (
               <button
@@ -264,7 +351,11 @@ export default function PersonnelDirectoryPage() {
             )}
           </div>
 
-          {rosterQuery.loading ? (
+          {districtScopeError ? (
+            <div role="alert" className="m-4 rounded-lg bg-error-container p-4 text-sm text-on-error-container">
+              {districtScopeError}
+            </div>
+          ) : rosterQuery.loading || !divisionFilterReady ? (
             <p className="py-10 text-center text-on-surface-variant text-sm">
               Loading the cadre roster…
             </p>
@@ -295,7 +386,7 @@ export default function PersonnelDirectoryPage() {
                     className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     aria-label={`Open profile for ${p.full_name}`}
                   >
-                    <span className="w-24 shrink-0 rounded-md bg-primary-fixed px-2 py-1 text-center font-mono text-[13px] font-bold text-primary">
+                    <span className="w-24 shrink-0 rounded-md bg-primary-fixed px-2 py-1 text-center font-mono text-[13px] font-bold text-on-primary-fixed">
                       {p.personnel_id || '—'}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-bold text-on-surface">
@@ -310,7 +401,7 @@ export default function PersonnelDirectoryPage() {
         </div>
       </div>
 
-      {/* Profile modal: identity only - service number and name. */}
+      {/* Profile modal: identity and assigned division. */}
       {selectedProfile && (
         <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest rounded-xl max-w-sm w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
@@ -338,6 +429,10 @@ export default function PersonnelDirectoryPage() {
                 </span>
                 <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Name</span>
                 <span className="text-lg font-bold text-on-surface">{selectedProfile.full_name}</span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Division</span>
+                <span className="text-lg font-bold text-primary">
+                  {selectedProfile.district?.name || 'Not assigned'}
+                </span>
                 <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Mobile Number</span>
                 <span className="text-lg font-semibold text-on-surface">
                   {selectedProfile.phone || 'Not provided'}
@@ -345,6 +440,14 @@ export default function PersonnelDirectoryPage() {
               </div>
 
               <DutyHistorySection phone={selectedProfile.phone} />
+
+              <div className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-4 py-3 text-left">
+                <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Memos on file</p>
+                <p className="mt-1 flex items-center gap-2 text-lg font-extrabold text-primary">
+                  {memoCounts[selectedProfile.id] ?? 0}
+                  <span className="text-sm font-medium text-on-surface-variant">{(memoCounts[selectedProfile.id] ?? 0) === 1 ? 'memo' : 'memos'}</span>
+                </p>
+              </div>
 
               <button
                 onClick={() => setSelectedProfile(null)}
@@ -365,7 +468,7 @@ export default function PersonnelDirectoryPage() {
               <div className="flex items-center gap-2">
                 <Icon icon="person_add" size={20} className="text-primary" />
                 <h3 className="font-bold text-sm">
-                  {created ? 'Account Created' : 'Enrol New Home Guard Personnel'}
+                  {created ? 'Home Guard Added' : 'Add Home Guard'}
                 </h3>
               </div>
               <button
@@ -381,46 +484,13 @@ export default function PersonnelDirectoryPage() {
                 <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-tertiary-fixed border border-outline-variant">
                   <Icon icon="check_circle" size={16} className="text-on-tertiary-container shrink-0 mt-0.5" />
                   <p className="text-on-tertiary-fixed-variant font-semibold">
-                    {newGuard.full_name} can sign in now. Their service badge is issued by the database and
-                    appears on the roster.
+                    {newGuard.full_name} was added to the {selectedDistrict?.name ?? 'selected'} division.
                   </p>
                 </div>
 
-                <div className="border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
-                  <div>
-                    <span className="text-outline font-bold block">Sign-in email</span>
-                    <span className="font-mono font-semibold text-on-surface block mt-0.5 break-all">
-                      {created.email}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-outline font-bold block">Temporary password</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-mono font-bold text-on-surface bg-surface-container px-2 py-1 rounded border border-outline-variant break-all">
-                        {created.temporaryPassword}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void navigator.clipboard?.writeText(created.temporaryPassword)}
-                        className="p-1.5 rounded-lg text-primary hover:bg-primary-fixed border border-outline-variant cursor-pointer shrink-0"
-                        title="Copy password"
-                      >
-                        <Icon icon="content_copy" size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="px-3 py-2 rounded-lg bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant font-semibold">
-                  This password is shown once and is not stored by the portal. Hand it to the officer
-                  directly and have them set their own before the first muster.
+                <p className="rounded-lg bg-surface-container p-3 text-on-surface-variant">
+                  This Home Guard is now available in the incharge event roster.
                 </p>
-
-                {created.auditWarning && (
-                  <p className="px-3 py-2 rounded-lg bg-error-container border border-error-container text-on-error-container">
-                    The account works, but its audit entry failed to save: {created.auditWarning}
-                  </p>
-                )}
 
                 <div className="pt-3 border-t border-outline-variant flex justify-end gap-2">
                   <button
@@ -441,15 +511,8 @@ export default function PersonnelDirectoryPage() {
               </div>
             ) : (
               <form onSubmit={handleCreateGuard} className="p-5 flex flex-col gap-3 text-xs">
-                {districts.length === 0 && !districtsQuery.loading && (
-                  <p className="px-3 py-2 rounded-lg bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant">
-                    No districts are seeded in the database yet, so a person cannot be filed anywhere.
-                    Run the reference-data migration before adding personnel.
-                  </p>
-                )}
-
                 <div>
-                  <label className="font-bold text-on-surface-variant block mb-1">Full Legal Name</label>
+                  <label className="font-bold text-on-surface-variant block mb-1">Name</label>
                   <input
                     type="text"
                     required
@@ -457,115 +520,43 @@ export default function PersonnelDirectoryPage() {
                     value={newGuard.full_name}
                     onChange={(e) => setNewGuard({ ...newGuard, full_name: e.target.value })}
                     className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
-                    placeholder="e.g. S. Kannan"
+                    placeholder="Enter full name"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Email</label>
-                    <input
-                      type="email"
-                      required
-                      value={newGuard.email}
-                      onChange={(e) => setNewGuard({ ...newGuard, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
-                      placeholder="kannan@tnhomeguards.gov.in"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Mobile Number</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Number</label>
                     <input
                       type="tel"
                       required
                       pattern="[0-9]{10}"
                       maxLength={10}
                       value={newGuard.phone}
-                      onChange={(e) => setNewGuard({ ...newGuard, phone: e.target.value })}
+                      onChange={(e) => setNewGuard({ ...newGuard, phone: e.target.value.replace(/\D/g, '') })}
                       className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
-                      placeholder="9840001122"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Rank / Designation</label>
-                    <input
-                      type="text"
-                      required
-                      minLength={2}
-                      value={newGuard.rank_designation}
-                      onChange={(e) => setNewGuard({ ...newGuard, rank_designation: e.target.value })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
+                      placeholder="10 digit mobile number"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Role</label>
-                    <select
-                      value={newGuard.role}
-                      onChange={(e) => setNewGuard({ ...newGuard, role: e.target.value as UserRole })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
-                    >
-                      <option value="home_guard">Home Guard Volunteer</option>
-                      <option value="admin">Administrator</option>
-                    </select>
+                    <label className="font-bold text-on-surface-variant block mb-1">Home Guard Code</label>
+                    <input type="text" required maxLength={40} value={newGuard.personnel_id}
+                      onChange={(e) => setNewGuard({ ...newGuard, personnel_id: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface uppercase" placeholder="e.g. TN-HG-12345" />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">District Command</label>
+                    <label className="font-bold text-on-surface-variant block mb-1">Division</label>
                     <select
                       required
-                      value={newGuard.district_id}
-                      onChange={(e) => setNewGuard({ ...newGuard, district_id: e.target.value, unit_id: '' })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest"
+                      value={districtFilter}
+                      onChange={(event) => void handleDistrictChange(event.target.value)}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface"
                     >
-                      <option value="">Select district</option>
-                      {districts.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({d.code})
-                        </option>
+                      {!selectedDistrict && <option value="">Select division</option>}
+                      {districts.map((district) => (
+                        <option key={district.id} value={district.id}>{district.name}</option>
                       ))}
                     </select>
-                  </div>
-                  <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Unit / Battalion</label>
-                    <select
-                      value={newGuard.unit_id}
-                      disabled={!newGuard.district_id}
-                      onChange={(e) => setNewGuard({ ...newGuard, unit_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface bg-surface-container-lowest disabled:bg-surface-container disabled:text-outline"
-                    >
-                      <option value="">
-                        {newGuard.district_id ? 'Statewide (no unit)' : 'Select district first'}
-                      </option>
-                      {unitOptions.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-on-surface-variant block mb-1">Blood Group</label>
-                    <input
-                      type="text"
-                      value={newGuard.blood_group}
-                      onChange={(e) => setNewGuard({ ...newGuard, blood_group: e.target.value })}
-                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
-                      placeholder="Optional, e.g. O+"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <p className="text-[13px] text-on-surface-variant leading-snug">
-                      The login is created active, since an administrator is attesting to this person
-                      in person. Self-enrolled applicants still go through the approvals desk.
-                    </p>
                   </div>
                 </div>
 
@@ -585,10 +576,10 @@ export default function PersonnelDirectoryPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving || !newGuard.district_id || districtsQuery.loading}
+                    disabled={saving || !selectedDistrict || districtsQuery.loading}
                     className="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary cursor-pointer disabled:bg-surface-container-highest disabled:cursor-not-allowed"
                   >
-                    {saving ? 'Creating Login…' : 'Create Personnel Login'}
+                    {saving ? 'Adding Home Guard…' : 'Add Home Guard'}
                   </button>
                 </div>
               </form>

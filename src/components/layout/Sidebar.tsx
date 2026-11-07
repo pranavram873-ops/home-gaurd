@@ -24,6 +24,7 @@ export function Sidebar() {
         // Personnel" on mobile where there is no rail.
         { label: 'Events', href: '/admin/dashboard', icon: 'event_note' },
         { label: 'Personnel', href: '/admin/personnel', icon: 'groups' },
+        { label: 'Reports', href: '/admin/reports', icon: 'assignment_late' },
       ]
     : role === 'home_guard'
       ? [
@@ -33,24 +34,28 @@ export function Sidebar() {
           { label: 'Attendance', href: '/homeguard/attendance', icon: 'fact_check' },
         ]
       : [
-          // The tab covers both the chooser landing screen and the muster.
+          // Return to the current district workspace; Change district opens the chooser.
           {
             label: 'Attendance',
-            href: '/incharge/divisions',
+            href: '/incharge/attendance',
             icon: 'fact_check',
             matches: ['/incharge/divisions', '/incharge/attendance'],
           },
           { label: 'Reports', href: '/incharge/reports', icon: 'assignment_late' },
         ];
   const secondary: Item[] = admin
-    ? []
+    ? [
+        { label: 'Change district', href: '/admin/divisions', icon: 'domain' },
+      ]
     : role === 'home_guard'
       ? [
           { label: 'GPS check-in', href: '/homeguard/location', icon: 'location_on' },
           { label: 'My reports', href: '/homeguard/reports', icon: 'description' },
           { label: 'My profile', href: '/homeguard/profile', icon: 'badge' },
         ]
-      : [];
+      : [
+          { label: 'Change district', href: '/incharge/divisions', icon: 'domain' },
+        ];
 
   const active = (item: Item) =>
     (item.matches ?? [item.href]).some((href) => pathname === href || pathname.startsWith(`${href}/`));
@@ -63,7 +68,7 @@ export function Sidebar() {
         href={item.href}
         aria-current={selected ? 'page' : undefined}
         className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-label-md transition-colors ${
-          selected ? 'bg-primary-container font-semibold text-on-primary' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+          selected ? 'bg-primary-container font-bold text-on-primary shadow-sm shadow-primary/10' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
         }`}
       >
         <Icon icon={item.icon} size={20} fill={selected} />
@@ -79,12 +84,13 @@ export function Sidebar() {
         key={`tab-${item.label}-${item.href}`}
         href={item.href}
         aria-current={selected ? 'page' : undefined}
-        className={`flex min-h-[44px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${
+        aria-label={item.label}
+        title={item.label}
+        className={`flex min-h-[44px] w-full min-w-0 flex-col items-center justify-center gap-0.5 py-1 transition-colors ${
           selected ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
         }`}
       >
         <Icon icon={item.icon} size={24} fill={selected} />
-        <span className={`text-label-md uppercase tracking-wider ${selected ? 'font-bold' : ''}`}>{item.label}</span>
         {/* The mockups mark the live tab with a bar rather than a filled pill. */}
         <span className={`h-1 w-5 rounded-full ${selected ? 'bg-primary' : 'bg-transparent'}`} aria-hidden />
       </Link>
@@ -95,7 +101,7 @@ export function Sidebar() {
     <>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col border-r border-outline-variant/60 bg-surface-container-lowest lg:flex">
         <div className="flex items-center gap-2.5 border-b border-surface-container px-5 py-5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-secondary-container">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-secondary-container ring-1 ring-primary/10">
             <Icon icon="local_police" size={22} />
           </span>
           <div className="min-w-0">
@@ -141,20 +147,20 @@ export function Sidebar() {
 
       <nav
         aria-label="Main navigation"
-        style={{ gridTemplateColumns: `repeat(${Math.min(primary.length + 1, 5)}, minmax(0, 1fr))` }}
-        className="fixed inset-x-0 bottom-0 z-50 grid h-16 border-t border-outline-variant/60 bg-surface-container-lowest/95 pb-safe shadow-[0_-2px_10px_rgba(18,38,63,.08)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 grid h-16 grid-flow-col auto-cols-fr justify-items-stretch border-t border-outline-variant/60 bg-surface-container-lowest/95 pb-safe shadow-[0_-4px_18px_rgba(20,42,58,.09)] backdrop-blur-xl lg:hidden"
       >
         {primary.slice(0, 4).map(tabLink)}
         <button
           type="button"
           aria-expanded={moreOpen}
+          aria-label={moreOpen ? 'Close menu' : 'More'}
+          title="More"
           onClick={() => setMoreOpen((value) => !value)}
-          className={`flex min-h-[44px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${
+          className={`flex min-h-[44px] w-full min-w-0 flex-col items-center justify-center gap-0.5 py-1 transition-colors ${
             moreOpen ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
           }`}
         >
           <Icon icon={moreOpen ? 'close' : 'menu'} size={24} />
-          <span className="text-label-md uppercase tracking-wider">More</span>
           <span className="h-1 w-5 rounded-full bg-transparent" aria-hidden />
         </button>
       </nav>
@@ -182,27 +188,19 @@ export function Sidebar() {
                 <Icon icon="close" size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[...primary, ...secondary.filter((item) => !primary.some((main) => main.href === item.href))].map((item) => {
-                const selected = active(item);
-                return (
-                  <Link
-                    key={`more-${item.href}-${item.label}`}
-                    href={item.href}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex min-h-[68px] items-center gap-3 rounded-xl border p-3 text-label-lg ${
-                      selected ? 'border-primary-container bg-primary-container text-on-primary' : 'border-outline-variant bg-surface-container-lowest text-on-surface'
-                    }`}
-                  >
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${selected ? 'bg-primary/40' : 'bg-surface-container text-primary-container'}`}>
-                      <Icon icon={item.icon} size={20} />
-                    </span>
-                    <span className="min-w-0 truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-container-low p-3">
+            {(admin || role === 'incharge') && (
+              <Link
+                href={admin ? '/admin/divisions' : '/incharge/divisions'}
+                onClick={() => setMoreOpen(false)}
+                className="mb-4 flex min-h-[64px] items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-label-lg text-on-surface transition-colors hover:bg-surface-container-low"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-fixed text-primary">
+                  <Icon icon="domain" size={20} />
+                </span>
+                <span>Change district</span>
+              </Link>
+            )}
+            <div className="flex items-center justify-between border-t border-outline-variant/60 pt-4">
               <div className="min-w-0">
                 <p className="truncate text-label-lg text-on-surface">{user?.full_name || 'Signed in'}</p>
                 <p className="text-body-md text-xs text-on-surface-variant">{admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}</p>

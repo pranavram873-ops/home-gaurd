@@ -269,7 +269,7 @@ export default function AssignmentsPage() {
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
                             asg.status === 'in_progress'
-                              ? 'bg-primary-fixed text-primary animate-pulse'
+                              ? 'bg-primary-fixed text-on-primary-fixed animate-pulse'
                               : asg.status === 'completed'
                               ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
                               : asg.status === 'cancelled'

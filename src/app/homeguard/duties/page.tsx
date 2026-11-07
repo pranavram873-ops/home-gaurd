@@ -16,7 +16,7 @@ function clock(value: string | null | undefined): string {
 
 const STATUS_STYLE: Record<string, string> = {
   scheduled: 'bg-surface-container text-on-surface-variant',
-  in_progress: 'bg-primary-fixed text-primary',
+  in_progress: 'bg-primary-fixed text-on-primary-fixed',
   completed: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
   cancelled: 'bg-surface-container text-outline line-through',
   absent: 'bg-error-container text-on-error-container',
@@ -97,7 +97,7 @@ export default function HomeGuardDutiesPage() {
               >
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-primary bg-primary-fixed px-2 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold text-on-primary-fixed bg-primary-fixed px-2 py-0.5 rounded">
                       {duty.duty_date.slice(0, 10)}
                     </span>
                     <span

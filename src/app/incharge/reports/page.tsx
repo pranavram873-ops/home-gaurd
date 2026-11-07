@@ -1,8 +1,12 @@
 'use client';
 
-import { AttendanceReports } from '@/components/attendance/AttendanceReports';
+import { InchargePersonnelReports } from '@/components/reports/InchargePersonnelReports';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 export default function InchargeReportsPage() {
-  return <DashboardLayout title="Reports" subtitle="Disciplinary dossiers on file"><AttendanceReports /></DashboardLayout>;
+  return (
+    <DashboardLayout title="Reports" subtitle="Disciplinary dossiers on file">
+      <InchargePersonnelReports />
+    </DashboardLayout>
+  );
 }

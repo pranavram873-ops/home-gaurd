@@ -20,13 +20,14 @@ const TABLES = [
   'districts', 'units', 'profiles', 'duty_locations', 'duty_assignments',
   'attendance_events', 'tasks', 'task_status_history', 'events',
   'event_assignments', 'notifications', 'audit_logs', 'app_settings',
-  'guard_reports',
+  'attendance_divisions', 'home_guard_roster', 'daily_attendance',
+  'muster_events', 'personnel_reports', 'guard_reports',
 ];
 
 // Tables that revoke anonymous access deliberately. Postgres answers the
 // keyless probe with "permission denied", which proves the table exists *and*
 // is locked down — a pass, not a problem.
-const ANON_DENIED = new Set(['guard_reports']);
+const ANON_DENIED = new Set(['muster_events', 'personnel_reports', 'guard_reports']);
 
 // Functions the API must expose. Two failure modes look identical through REST
 // but mean opposite things, so each entry declares what a correct answer is:

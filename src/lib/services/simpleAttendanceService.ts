@@ -35,12 +35,34 @@ export interface DailyMark {
   division_id: string;
   attendance_date: string;
   status: 'present' | 'absent';
+  photo_url?: string | null;
   marked_at: string;
+}
+
+export interface MusterEvent {
+  id: string;
+  division_id: string;
+  event_date: string;
+  event_name: string;
+  address?: string | null;
+  evidence_photos?: string[] | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export async function loadAttendancePage(divisionId: string, date: string) {
   const supabase = createClient();
-  const [divisions, roster, marks] = await Promise.all([
+  let musterEventQuery = divisionId
+    ? supabase
+        .from('muster_events')
+        .select('id, division_id, event_date, event_name, address, evidence_photos, created_by, created_at, updated_at')
+        .eq('division_id', divisionId)
+        .eq('event_date', date)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
+  let [divisions, roster, marks, musterEvent] = await Promise.all([
     supabase.from('attendance_divisions').select('id, code, name').order('name'),
     divisionId
       ? supabase
@@ -53,18 +75,95 @@ export async function loadAttendancePage(divisionId: string, date: string) {
     divisionId
       ? supabase
           .from('daily_attendance')
-          .select('id, guard_id, division_id, attendance_date, status, marked_at')
+          .select('id, guard_id, division_id, attendance_date, status, photo_url, marked_at')
           .eq('division_id', divisionId)
           .eq('attendance_date', date)
       : Promise.resolve({ data: [], error: null }),
+    musterEventQuery,
   ]);
-  const error = divisions.error || roster.error || marks.error;
+
+  if (marks.error && marks.error.message.includes('photo_url')) {
+    const fallbackMarks = await supabase
+      .from('daily_attendance')
+      .select('id, guard_id, division_id, attendance_date, status, marked_at')
+      .eq('division_id', divisionId)
+      .eq('attendance_date', date);
+    marks = fallbackMarks as typeof marks;
+  }
+
+  if (musterEvent.error && (musterEvent.error.message.includes('address') || musterEvent.error.message.includes('evidence_photos'))) {
+    const fallbackMuster = await supabase
+      .from('muster_events')
+      .select('id, division_id, event_date, event_name, created_by, created_at, updated_at')
+      .eq('division_id', divisionId)
+      .eq('event_date', date)
+      .maybeSingle();
+    musterEvent = fallbackMuster as typeof musterEvent;
+  }
+
+  const error = divisions.error || roster.error || marks.error || musterEvent.error;
   if (error) throw new Error(error.message);
   return {
     divisions: (divisions.data ?? []) as AttendanceDivision[],
     roster: (roster.data ?? []) as RosterGuard[],
     marks: (marks.data ?? []) as DailyMark[],
+    musterEvent: (musterEvent.data ?? null) as MusterEvent | null,
   };
+}
+
+export async function listDivisionRoster(divisionId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('home_guard_roster')
+    .select('id, division_id, full_name, phone, home_guard_code, is_active')
+    .eq('division_id', divisionId)
+    .eq('is_active', true)
+    .order('full_name');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as RosterGuard[];
+}
+
+export async function saveMusterEvent(
+  divisionId: string,
+  date: string,
+  eventName: string,
+  address?: string,
+): Promise<MusterEvent> {
+  const supabase = createClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw new Error('Please sign in again to create this event.');
+
+  const payload: Record<string, unknown> = {
+    division_id: divisionId,
+    event_date: date,
+    event_name: eventName.trim(),
+    created_by: authData.user.id,
+    updated_at: new Date().toISOString(),
+  };
+  if (address !== undefined && address.trim()) {
+    payload.address = address.trim();
+  }
+
+  const { data, error } = await supabase
+    .from('muster_events')
+    .upsert(payload, { onConflict: 'division_id,event_date' })
+    .select('id, division_id, event_date, event_name, address, created_by, created_at, updated_at')
+    .single();
+
+  if (error) {
+    if (error.message.includes('address')) {
+      delete payload.address;
+      const fallback = await supabase
+        .from('muster_events')
+        .upsert(payload, { onConflict: 'division_id,event_date' })
+        .select('id, division_id, event_date, event_name, created_by, created_at, updated_at')
+        .single();
+      if (fallback.error) throw new Error(fallback.error.message);
+      return fallback.data as MusterEvent;
+    }
+    throw new Error(error.message);
+  }
+  return data as MusterEvent;
 }
 
 /**
@@ -147,8 +246,8 @@ export async function loadBandobastForDate(date: string): Promise<BandobastEvent
 }
 
 /**
- * A division-day muster summary for the admin events list. One row per
- * (division, date) that has attendance activity in the month.
+ * A division-day muster summary for the admin events list. A row appears when
+ * that division/date has a named event or attendance activity in the month.
  */
 export interface AttendanceEventSummary {
   /** Composite key `${divisionId}.${date}` used to route to the detail screen. */
@@ -156,6 +255,7 @@ export interface AttendanceEventSummary {
   divisionId: string;
   divisionName: string;
   date: string;
+  eventName: string | null;
   presentCount: number;
   absentCount: number;
   sanctionedCount: number;
@@ -192,7 +292,7 @@ export async function loadAttendanceEvents(
   const lastDay = new Date(y, m, 0).getDate();
   const to = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-  const [divisions, roster, marks] = await Promise.all([
+  const [divisions, roster, marks, musterEvents] = await Promise.all([
     supabase.from('attendance_divisions').select('id, code, name').order('name'),
     supabase.from('home_guard_roster').select('id, division_id').eq('is_active', true),
     supabase
@@ -201,8 +301,14 @@ export async function loadAttendanceEvents(
       .gte('attendance_date', from)
       .lte('attendance_date', to)
       .order('attendance_date', { ascending: false }),
+    supabase
+      .from('muster_events')
+      .select('division_id, event_date, event_name')
+      .gte('event_date', from)
+      .lte('event_date', to)
+      .order('event_date', { ascending: false }),
   ]);
-  const error = divisions.error || roster.error || marks.error;
+  const error = divisions.error || roster.error || marks.error || musterEvents.error;
   if (error) throw new Error(error.message);
 
   const nameById = new Map<string, string>();
@@ -215,13 +321,21 @@ export async function loadAttendanceEvents(
   }
 
   const today = todayISO();
-  const buckets = new Map<string, { present: number; absent: number }>();
+  const buckets = new Map<string, { present: number; absent: number; eventName: string | null }>();
   for (const mark of (marks.data ?? []) as Array<{ division_id: string; attendance_date: string; status: string }>) {
     if (divisionId && mark.division_id !== divisionId) continue;
     const key = attendanceEventId(mark.division_id, mark.attendance_date);
-    const bucket = buckets.get(key) ?? { present: 0, absent: 0 };
+    const bucket = buckets.get(key) ?? { present: 0, absent: 0, eventName: null };
     if (mark.status === 'present') bucket.present += 1;
     else bucket.absent += 1;
+    buckets.set(key, bucket);
+  }
+
+  for (const event of (musterEvents.data ?? []) as Array<{ division_id: string; event_date: string; event_name: string }>) {
+    if (divisionId && event.division_id !== divisionId) continue;
+    const key = attendanceEventId(event.division_id, event.event_date);
+    const bucket = buckets.get(key) ?? { present: 0, absent: 0, eventName: null };
+    bucket.eventName = event.event_name;
     buckets.set(key, bucket);
   }
 
@@ -235,6 +349,7 @@ export async function loadAttendanceEvents(
       divisionId: parsed.divisionId,
       divisionName: nameById.get(parsed.divisionId) ?? 'Unknown division',
       date: parsed.date,
+      eventName: bucket.eventName,
       presentCount: bucket.present,
       absentCount: bucket.absent,
       sanctionedCount: sanctionedByDivision.get(parsed.divisionId) ?? markedCount,
@@ -402,3 +517,180 @@ export async function loadAttendanceReport(from: string, to: string) {
     marks,
   };
 }
+
+export async function filePersonnelReport(input: {
+  guardId: string;
+  divisionId: string;
+  category: string;
+  description: string;
+}) {
+  const supabase = createClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw new Error('Please sign in again to file a report.');
+
+  const { error } = await supabase.from('personnel_reports').insert({
+    filed_by: authData.user.id,
+    guard_id: input.guardId,
+    division_id: input.divisionId,
+    category: input.category,
+    description: input.description.trim(),
+  });
+
+  if (error) throw new Error(error.message);
+}
+
+export async function loadGuardMemoCount(guardId: string, phone?: string): Promise<number> {
+  const supabase = createClient();
+  let count = 0;
+  try {
+    const { data: pReports, error: pErr } = await supabase
+      .from('personnel_reports')
+      .select('id')
+      .eq('guard_id', guardId);
+    if (!pErr && pReports) count += pReports.length;
+
+    if (phone) {
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .like('phone', `%${digits.slice(-10)}%`);
+        if (profiles && profiles.length > 0) {
+          const { data: gReports } = await supabase
+            .from('guard_reports')
+            .select('id')
+            .eq('subject_id', profiles[0].id);
+          if (gReports) count += gReports.length;
+        }
+      }
+    }
+  } catch {
+    // Ignore error
+  }
+  return count;
+}
+
+export async function addMusterEventEvidencePhoto(
+  divisionId: string,
+  date: string,
+  photoUrl: string,
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from('muster_events')
+    .select('evidence_photos')
+    .eq('division_id', divisionId)
+    .eq('event_date', date)
+    .maybeSingle();
+
+  const currentPhotos = ((existing?.evidence_photos as string[] | null) ?? []);
+  const updatedPhotos = [...currentPhotos, photoUrl];
+
+  const { error } = await supabase
+    .from('muster_events')
+    .update({ evidence_photos: updatedPhotos, updated_at: new Date().toISOString() })
+    .eq('division_id', divisionId)
+    .eq('event_date', date);
+
+  if (error) throw new Error(describeEvidencePhotoError(error));
+  return updatedPhotos;
+}
+
+export async function removeMusterEventEvidencePhoto(
+  divisionId: string,
+  date: string,
+  index: number,
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from('muster_events')
+    .select('evidence_photos')
+    .eq('division_id', divisionId)
+    .eq('event_date', date)
+    .maybeSingle();
+
+  const currentPhotos = ((existing?.evidence_photos as string[] | null) ?? []);
+  const updatedPhotos = currentPhotos.filter((_, i) => i !== index);
+
+  const { error } = await supabase
+    .from('muster_events')
+    .update({ evidence_photos: updatedPhotos, updated_at: new Date().toISOString() })
+    .eq('division_id', divisionId)
+    .eq('event_date', date);
+
+  if (error) throw new Error(describeEvidencePhotoError(error));
+  return updatedPhotos;
+}
+
+function describeEvidencePhotoError(error: { code?: string; message: string }) {
+  if (error.code === 'PGRST204' || error.message.toLowerCase().includes('evidence_photos')) {
+    return 'Event photo storage is not enabled in Supabase yet. Apply 20261108000001_add_evidence_photos.sql, then retry.';
+  }
+  return error.message;
+}
+
+export async function saveGuardPhotoEvidence(
+  guardId: string,
+  divisionId: string,
+  date: string,
+  photoUrl: string,
+) {
+  const supabase = createClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw new Error('Please sign in again to save photo evidence.');
+
+  const { error } = await supabase.from('daily_attendance').upsert(
+    {
+      guard_id: guardId,
+      division_id: divisionId,
+      attendance_date: date,
+      status: 'present',
+      photo_url: photoUrl,
+      marked_by: authData.user.id,
+      marked_at: new Date().toISOString(),
+    },
+    { onConflict: 'guard_id,attendance_date' },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Failed to process image file.'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+

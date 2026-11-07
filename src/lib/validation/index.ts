@@ -111,6 +111,7 @@ export type EventInput = z.infer<typeof eventSchema>;
 export const staffAccountSchema = z.object({
   full_name: z.string().min(3, 'Full name must be at least 3 characters'),
   email: z.string().email('Please enter a valid official email address'),
+  personnel_id: z.string().min(2, 'Home Guard code is required').max(40),
   phone: z
     .string()
     .regex(/^[0-9]{10}$/, 'Mobile number must be a valid 10-digit number')

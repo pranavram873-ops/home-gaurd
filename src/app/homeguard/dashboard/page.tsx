@@ -46,7 +46,7 @@ export default function HomeGuardDashboardPage() {
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold font-mono text-primary bg-primary-fixed px-2 py-0.5 rounded border border-outline-variant">
+                <span className="text-xs font-bold font-mono text-on-primary-fixed bg-primary-fixed px-2 py-0.5 rounded border border-outline-variant">
                   {user?.personnel_id || 'Badge pending'}
                 </span>
                 <span className="text-xs font-bold text-on-tertiary-fixed-variant bg-tertiary-fixed px-1.5 py-0.5 rounded uppercase">
@@ -84,10 +84,10 @@ export default function HomeGuardDashboardPage() {
         <div className="bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-xs overflow-hidden">
           <div className="p-4 bg-gradient-to-r from-primary to-primary-container text-on-primary flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon icon="fact_check" size={20} className="text-secondary-container" />
+              <Icon icon="fact_check" size={20} className="text-on-secondary-container" />
               <h3 className="text-sm font-bold tracking-tight">Current Duty Assignment</h3>
             </div>
-            <span className="text-[13px] font-mono px-2 py-0.5 rounded bg-primary text-primary-fixed font-bold uppercase">
+            <span className="text-[13px] font-mono px-2 py-0.5 rounded bg-primary text-on-primary font-bold uppercase">
               {statsQuery.loading ? 'LOADING' : todayAssignment?.status ? todayAssignment.status.replace('_', ' ') : 'NO DUTY'}
             </span>
           </div>
@@ -219,7 +219,7 @@ export default function HomeGuardDashboardPage() {
                         className={`text-xs font-bold px-2 py-0.5 rounded uppercase shrink-0 ${
                           t.status === 'completed'
                             ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
-                            : 'bg-primary-fixed text-primary'
+                            : 'bg-primary-fixed text-on-primary-fixed'
                         }`}
                       >
                         {t.status.replace('_', ' ')}

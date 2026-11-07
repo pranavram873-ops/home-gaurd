@@ -285,7 +285,7 @@ export function ComplaintCenter() {
         </div>
 
         {success && (
-          <div role="status" className="flex items-center justify-between gap-3 rounded-xl bg-tertiary-container p-3.5 text-on-tertiary shadow-md">
+          <div role="status" className="flex items-center justify-between gap-3 rounded-xl bg-tertiary-container p-3.5 text-on-tertiary-container shadow-md">
             <div className="flex min-w-0 items-center gap-2.5">
               <Icon icon="check_circle" size={24} className="shrink-0 text-tertiary-fixed" />
               <div className="flex min-w-0 flex-col">
@@ -363,7 +363,7 @@ export function ComplaintCenter() {
             )}
 
             {!loading && reportableGuards.length === 0 && (
-              <p className="text-label-sm text-on-secondary-container">There are no other active Home Guards available to report yet.</p>
+              <p className="text-label-sm text-on-surface-variant">There are no other active Home Guards available to report yet.</p>
             )}
 
             {selectedGuard && (

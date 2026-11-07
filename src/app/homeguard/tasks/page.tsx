@@ -114,7 +114,7 @@ export default function HomeGuardTasksPage() {
                       className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${
                         t.status === 'completed'
                           ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
-                          : 'bg-primary-fixed text-primary'
+                          : 'bg-primary-fixed text-on-primary-fixed'
                       }`}
                     >
                       {t.status.replace('_', ' ')}
