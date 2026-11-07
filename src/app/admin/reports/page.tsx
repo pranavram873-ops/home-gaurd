@@ -7,8 +7,9 @@ import { AdminPersonnelReports } from '@/components/reports/AdminPersonnelReport
 export default function AdminReportsPage() {
   return (
     <DashboardLayout title="Reports" subtitle="Memos and statewide operational reporting">
-      <AdminPersonnelReports />
-      <AttendanceReports />
+      <AttendanceReports>
+        <AdminPersonnelReports />
+      </AttendanceReports>
     </DashboardLayout>
   );
 }

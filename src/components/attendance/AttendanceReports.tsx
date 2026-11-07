@@ -132,7 +132,7 @@ function DossierCard({ report, historyCount }: { report: GuardReport; historyCou
   );
 }
 
-export function AttendanceReports() {
+export function AttendanceReports({ children }: { children?: React.ReactNode }) {
   const [reports, setReports] = useState<GuardReport[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -212,15 +212,7 @@ export function AttendanceReports() {
         </div>
       </section>
 
-      {/* Section title + meta. */}
-      <div className="flex items-center justify-between px-1 pt-4 pb-1">
-        <div className="flex items-center gap-2">
-          <span className="text-label-lg text-primary">Disciplinary Dossiers</span>
-          <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-label-sm text-on-surface">
-            {loading ? '…' : `${visible.length} visible`}
-          </span>
-        </div>
-      </div>
+      {children}
 
       <section className="flex flex-col gap-4 py-1">
         {error ? (
