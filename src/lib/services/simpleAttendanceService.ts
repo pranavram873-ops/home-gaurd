@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { describeQueryError, describeThrownError, type ListResult } from './queryError';
 
 export interface AttendanceDivision {
   id: string;
@@ -111,16 +112,20 @@ export async function loadAttendancePage(divisionId: string, date: string) {
   };
 }
 
-export async function listDivisionRoster(divisionId: string) {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('home_guard_roster')
-    .select('id, division_id, full_name, phone, home_guard_code, is_active')
-    .eq('division_id', divisionId)
-    .eq('is_active', true)
-    .order('full_name');
-  if (error) throw new Error(error.message);
-  return (data ?? []) as RosterGuard[];
+export async function listDivisionRoster(divisionId: string): Promise<ListResult<RosterGuard>> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('home_guard_roster')
+      .select('id, division_id, full_name, phone, home_guard_code, is_active')
+      .eq('division_id', divisionId)
+      .eq('is_active', true)
+      .order('full_name');
+    if (error) return { data: [], error: describeQueryError(error) };
+    return { data: (data ?? []) as RosterGuard[], error: null };
+  } catch (error) {
+    return { data: [], error: describeThrownError(error, 'Could not load the division roster.') };
+  }
 }
 
 export async function saveMusterEvent(

@@ -63,7 +63,7 @@ export default function PersonnelDirectoryPage() {
     `${districtFilter}:${divisionFilterReady}:${districtScopeError ?? ''}`,
   );
   const attendanceRosterQuery = useLiveQuery<RosterGuard[]>(
-    () => divisionId ? listDivisionRoster(divisionId) : Promise.resolve([]),
+    () => divisionId ? listDivisionRoster(divisionId) : Promise.resolve({ data: [], error: null }),
     divisionId,
   );
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function PersonnelDirectoryPage() {
   function resetForm() {
     setNewGuard({ ...blankRecruit, district_id: selectedDistrict?.id ?? '' });
     setFormError(null);
-    setCreated(null);
+    setCreated(false);
   }
 
   async function handleCreateGuard(e: React.FormEvent) {

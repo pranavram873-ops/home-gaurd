@@ -140,7 +140,7 @@ function GuardRow({
 export default function AdminEventDetailsPage() {
   const params = useParams<{ id: string }>();
   const rawId = Array.isArray(params?.id) ? params.id[0] : params?.id ?? '';
-  const parsed = parseAttendanceEventId(rawId);
+  const parsed = useMemo(() => parseAttendanceEventId(rawId), [rawId]);
 
   const [roster, setRoster] = useState<RosterGuard[]>([]);
   const [marks, setMarks] = useState<DailyMark[]>([]);
