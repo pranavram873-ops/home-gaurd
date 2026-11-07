@@ -93,13 +93,31 @@ export async function loadAttendancePage(divisionId: string, date: string) {
   }
 
   if (musterEvent.error && (musterEvent.error.message.includes('address') || musterEvent.error.message.includes('evidence_photos'))) {
-    const fallbackMuster = await supabase
-      .from('muster_events')
-      .select('id, division_id, event_date, event_name, created_by, created_at, updated_at')
-      .eq('division_id', divisionId)
-      .eq('event_date', date)
-      .maybeSingle();
-    musterEvent = fallbackMuster as typeof musterEvent;
+    const optionalColumns = ['address', 'evidence_photos'];
+    let selectedOptionalColumns = [...optionalColumns];
+    let fallbackMuster;
+
+    for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
+      const columns = [
+        'id', 'division_id', 'event_date', 'event_name',
+        ...selectedOptionalColumns,
+        'created_by', 'created_at', 'updated_at',
+      ].join(', ');
+      fallbackMuster = await supabase
+        .from('muster_events')
+        .select(columns)
+        .eq('division_id', divisionId)
+        .eq('event_date', date)
+        .maybeSingle();
+
+      if (!fallbackMuster.error) break;
+      const message = fallbackMuster.error.message.toLowerCase();
+      const unavailableColumns = selectedOptionalColumns.filter((column) => message.includes(column));
+      if (unavailableColumns.length === 0) break;
+      selectedOptionalColumns = selectedOptionalColumns.filter((column) => !unavailableColumns.includes(column));
+    }
+
+    if (fallbackMuster) musterEvent = fallbackMuster as typeof musterEvent;
   }
 
   const error = divisions.error || roster.error || marks.error || musterEvent.error;

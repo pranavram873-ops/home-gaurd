@@ -302,7 +302,7 @@ export default function AdminEventDetailsPage() {
               </Card>
               <Card className="flex flex-col justify-between p-3">
                 <div className="mb-1 flex items-center justify-between text-on-surface-variant">
-                  <span className="text-label-sm font-bold uppercase">Sanctioned</span>
+                  <span className="text-label-sm font-bold uppercase">Total Guards</span>
                   <Icon icon="groups" size={18} />
                 </div>
                 <div>
