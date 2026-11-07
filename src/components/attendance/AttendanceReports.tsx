@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Chip, EmptyState } from '@/components/ui/primitives';
+import { Chip } from '@/components/ui/primitives';
 import { createClient } from '@/lib/supabase/client';
 
 type ReportStatus = 'submitted' | 'under_review' | 'resolved' | 'dismissed';
@@ -236,13 +236,7 @@ export function AttendanceReports() {
             <Icon icon="sync" size={20} className="animate-spin" />
             Loading disciplinary records…
           </div>
-        ) : visible.length === 0 ? (
-          <EmptyState
-            icon="inbox"
-            title="No disciplinary reports"
-            body={search ? 'No dossiers match that search.' : 'Reports filed by incharges will appear here.'}
-          />
-        ) : (
+        ) : visible.length === 0 ? null : (
           visible.map((report) => (
             <DossierCard
               key={report.id}
