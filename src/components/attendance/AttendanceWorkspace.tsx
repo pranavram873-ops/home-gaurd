@@ -207,9 +207,6 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
     let live = true;
     setLoading(true);
     setError('');
-    setMusterEvent(null);
-    setEventName('');
-    setEventAddress('');
     loadAttendancePage(divisionId, date)
       .then((data) => {
         if (!live) return;
@@ -217,9 +214,6 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         if (!divisionId && data.divisions[0]) setDivisionId(data.divisions[0].id);
         setRoster(data.roster);
         setMarks(data.marks);
-        setMusterEvent(data.musterEvent);
-        setEventName(data.musterEvent?.event_name ?? '');
-        setEventAddress(data.musterEvent?.address ?? '');
 
         // Restore guard photos from database marks
         const photosFromDb: Record<string, { name: string; dataUrl: string }> = {};
@@ -234,6 +228,13 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [divisionId, date, setDivisionId]);
+
+  useEffect(() => {
+    setMusterEvent(null);
+    setEventName('');
+    setEventAddress('');
+    setShowEventForm(false);
+  }, [divisionId]);
 
   useEffect(() => {
     let live = true;
@@ -501,7 +502,14 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
             <input
               type="date"
               value={date}
-              onChange={(event) => event.target.value && setDate(event.target.value)}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                setMusterEvent(null);
+                setShowEventForm(false);
+                setEventName('');
+                setEventAddress('');
+                setDate(event.target.value);
+              }}
               className="absolute h-0 w-0 opacity-0"
               aria-label="Event date"
             />
@@ -733,28 +741,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
             )}
           </div>
         </Card>
-      ) : (
-        <Card className="flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary">
-              <Icon icon="event" size={22} />
-            </span>
-            <div>
-              <h2 className="text-headline-sm font-bold text-on-surface">Create a new district event</h2>
-              <p className="text-sm text-on-surface-variant">{formatDay(date)} · Enter name, date & address to manage personnel.</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => { setError(''); setShowEventForm(true); }}
-            disabled={loading || !divisionId}
-            className="flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-label-md font-bold text-on-primary hover:bg-primary/90 disabled:opacity-60 sm:w-auto cursor-pointer"
-          >
-            <Icon icon="add" size={18} />
-            Create Event
-          </button>
-        </Card>
-      )}
+      ) : null}
 
       {notice && (
         <div role="status" className="flex items-start gap-2.5 rounded-lg bg-tertiary-fixed p-3 text-on-tertiary-fixed-variant">
@@ -951,11 +938,22 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         <Card className="overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-outline-variant/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
             <div><h2 className="text-headline-sm font-bold text-on-surface">Events this month</h2><p className="text-sm text-on-surface-variant">Events for {selectedDivision?.name ?? 'this district'}.</p></div>
-            <label className="flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-label-md text-on-surface">
-              <Icon icon="calendar_month" size={18} className="text-primary" />
-              <span className="sr-only">Choose event month</span>
-              <input type="month" value={eventMonth} max={todayLocal().slice(0, 7)} onChange={(event) => event.target.value && setEventMonth(event.target.value)} className="min-w-0 bg-transparent text-sm outline-none" aria-label="Choose event month" />
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-label-md text-on-surface">
+                <Icon icon="calendar_month" size={18} className="text-primary" />
+                <span className="sr-only">Choose event month</span>
+                <input type="month" value={eventMonth} max={todayLocal().slice(0, 7)} onChange={(event) => event.target.value && setEventMonth(event.target.value)} className="min-w-0 bg-transparent text-sm outline-none" aria-label="Choose event month" />
+              </label>
+              <button
+                type="button"
+                onClick={() => { setError(''); setShowEventForm(true); }}
+                disabled={loading || !divisionId}
+                className="flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-label-md font-bold text-on-primary hover:bg-primary/90 disabled:opacity-60"
+              >
+                <Icon icon="add" size={17} />
+                <span>Create event</span>
+              </button>
+            </div>
           </div>
           <div className="space-y-2 p-3 sm:p-4">
             {eventsError ? <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{eventsError}</p> : eventsLoading ? <p className="py-6 text-center text-sm text-on-surface-variant">Loading events…</p> : monthEvents.length ? monthEvents.map((event) => (

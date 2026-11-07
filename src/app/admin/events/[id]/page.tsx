@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { Card, EmptyState, SegmentedFilter } from '@/components/ui/primitives';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import {
   loadAttendancePage,
   parseAttendanceEventId,
@@ -62,7 +63,9 @@ function GuardRow({
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h4 className="truncate text-[16px] font-semibold text-primary">{guard.full_name}</h4>
+              <HomeGuardProfileLink code={guard.home_guard_code} name={guard.full_name} className="truncate text-left text-[16px] font-semibold text-primary hover:underline">
+                {guard.full_name}
+              </HomeGuardProfileLink>
               <span className="shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-[13px] text-on-surface">{guard.home_guard_code}</span>
             </div>
             <span className="text-label-sm text-on-surface-variant">{guard.phone}</span>

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import { loadAttendanceEvents, type AttendanceEventSummary } from '@/lib/services/simpleAttendanceService';
+import { useDivision } from '@/lib/attendance/divisionContext';
 
 function currentMonth() {
   const now = new Date();
@@ -101,6 +102,7 @@ function EventCard({ event }: { event: AttendanceEventSummary }) {
 }
 
 export function AttendanceEvents() {
+  const { divisionId } = useDivision();
   const [month, setMonth] = useState(currentMonth);
   const [events, setEvents] = useState<AttendanceEventSummary[]>([]);
   const [search, setSearch] = useState('');
@@ -110,11 +112,11 @@ export function AttendanceEvents() {
   const load = useCallback(() => {
     setLoading(true);
     setError('');
-    loadAttendanceEvents(month, null)
+    loadAttendanceEvents(month, divisionId || null)
       .then(setEvents)
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not load attendance events.'))
       .finally(() => setLoading(false));
-  }, [month]);
+  }, [month, divisionId]);
 
   useEffect(() => {
     load();
@@ -138,7 +140,9 @@ export function AttendanceEvents() {
           <span className="rounded bg-primary px-2 py-0.5 font-mono text-xs text-on-primary-container">DIST-TPR-ADM</span>
         </div>
         <h1 className="text-headline-md tracking-tight text-on-primary">Events</h1>
-        <p className="text-label-md leading-snug text-on-primary-container">All districts · event and muster records</p>
+        <p className="text-label-md leading-snug text-on-primary-container">
+          {divisionId ? 'Selected district · event and muster records' : 'All districts · event and muster records'}
+        </p>
         <div className="relative mt-3">
           <Icon icon="search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container" />
           <input

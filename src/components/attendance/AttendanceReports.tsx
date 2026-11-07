@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { Chip } from '@/components/ui/primitives';
 import { createClient } from '@/lib/supabase/client';
+import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 
 type ReportStatus = 'submitted' | 'under_review' | 'resolved' | 'dismissed';
 
@@ -53,7 +54,13 @@ function DossierCard({ report, historyCount }: { report: GuardReport; historyCou
       <div className="flex items-start justify-between gap-2 pt-1">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-headline-sm tracking-tight text-primary">{report.subject_name}</h3>
+            <HomeGuardProfileLink
+              code={report.subject_personnel_id}
+              name={report.subject_name}
+              className="truncate text-left text-headline-sm font-bold tracking-tight text-primary hover:underline"
+            >
+              {report.subject_name}
+            </HomeGuardProfileLink>
             {report.subject_personnel_id && (
               <span className="shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-label-sm text-on-surface-variant">
                 {report.subject_personnel_id}
