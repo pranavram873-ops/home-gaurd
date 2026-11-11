@@ -24,9 +24,21 @@ ALTER TABLE public.personnel_reports ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.personnel_reports FROM anon, authenticated;
 GRANT SELECT, INSERT ON public.personnel_reports TO authenticated;
 
-CREATE POLICY "Incharges see their own personnel reports and admins see all"
+CREATE POLICY "Incharges see division personnel reports and admins see all"
   ON public.personnel_reports FOR SELECT TO authenticated
-  USING (filed_by = (SELECT auth.uid()) OR (SELECT public.is_admin()));
+  USING (
+    (SELECT public.is_admin())
+    OR filed_by = (SELECT auth.uid())
+    OR (
+      (SELECT public.can_use_attendance_register())
+      AND EXISTS (
+        SELECT 1
+        FROM public.home_guard_roster roster
+        WHERE roster.id = personnel_reports.guard_id
+          AND roster.division_id = personnel_reports.division_id
+      )
+    )
+  );
 
 CREATE POLICY "Active incharges can file roster personnel reports"
   ON public.personnel_reports FOR INSERT TO authenticated

@@ -99,13 +99,13 @@ function HomeGuardProfileDialog({ profile, onClose }: { profile: GuardProfile; o
   }, [profile]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="home-guard-profile-title" className="w-full max-w-sm overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
-        <header className="flex items-center justify-between bg-primary p-4 text-on-primary">
+    <div className="overlay-enter fixed inset-0 z-[70] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="home-guard-profile-title" className="overlay-panel flex max-h-[92dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between bg-primary p-4 text-on-primary">
           <div className="flex items-center gap-2"><Icon icon="badge" size={20} /><h2 id="home-guard-profile-title" className="font-bold">Home Guard Profile</h2></div>
           <button type="button" onClick={onClose} aria-label="Close profile" className="rounded p-1 hover:bg-white/10"><Icon icon="close" size={20} /></button>
         </header>
-        <div className="flex flex-col items-center gap-4 p-5 text-center">
+        <div className="flex flex-col items-center gap-4 overflow-y-auto p-5 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-extrabold text-on-primary">{profile.full_name.charAt(0)}</div>
           <div className="flex flex-col gap-1">
             <h3 className="text-lg font-bold text-on-surface">{profile.full_name}</h3>

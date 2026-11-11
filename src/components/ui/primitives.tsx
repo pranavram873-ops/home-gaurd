@@ -1,5 +1,8 @@
+'use client';
+
 import React from 'react';
 import { Icon } from './Icon';
+import { usePresence } from '@/lib/hooks/usePresence';
 
 /**
  * The pieces the Stitch screens repeat. They live here rather than in each page
@@ -18,7 +21,7 @@ export function Card({
 }) {
   return (
     <Tag
-      className={`rounded-2xl border border-outline-variant/50 bg-surface-container-lowest shadow-card transition-shadow ${className}`}
+      className={`rounded-2xl border border-outline-variant/50 bg-surface-container-lowest shadow-card transition-all duration-200 ${className}`}
     >
       {children}
     </Tag>
@@ -52,9 +55,9 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-label-sm uppercase tracking-wider ${CHIP_TONES[tone]}${className ? ` ${className}` : ''}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-label-sm uppercase tracking-wider transition-colors duration-200 ${CHIP_TONES[tone]}${className ? ` ${className}` : ''}`}
     >
-      {pulse && <span className="h-2 w-2 shrink-0 rounded-full bg-current" aria-hidden />}
+      {pulse && <span className={`${tone === 'live' || tone === 'absent' ? 'beacon-pulse-red' : 'beacon-pulse'} h-2 w-2 shrink-0 rounded-full bg-current`} aria-hidden />}
       {icon && <Icon icon={icon} size={14} />}
       {children}
     </span>
@@ -63,7 +66,7 @@ export function Chip({
 
 /** Two-tone dot used against the muster progress bar and in the tally row. */
 export function Dot({ className = '' }: { className?: string }) {
-  return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${className}`} />;
+  return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full transition-transform duration-200 ${className}`} />;
 }
 
 export interface SegmentOption<T extends string> {
@@ -101,13 +104,13 @@ export function SegmentedFilter<T extends string>({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(option.value)}
-            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-label-lg transition-colors ${
-              selected ? 'bg-primary-container text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-label-lg transition-all duration-200 active:scale-[0.98] ${
+              selected ? 'bg-primary-container text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/60'
             }`}
           >
             <span>{option.label}</span>
             {option.count !== undefined && (
-              <span className={selected ? 'text-on-primary-container' : 'text-outline'}>({option.count})</span>
+              <span className={`transition-colors duration-200 ${selected ? 'text-on-primary-container' : 'text-outline'}`}>({option.count})</span>
             )}
           </button>
         );
@@ -128,8 +131,8 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container text-outline">
+    <div className="empty-enter flex flex-col items-center px-6 py-14 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container text-outline shadow-xs transition-transform duration-300 hover:scale-105">
         <Icon icon={icon} size={26} />
       </span>
       <h4 className="mt-3 text-headline-sm text-on-surface">{title}</h4>
@@ -158,32 +161,39 @@ export function BottomSheet({
   children: React.ReactNode;
   wide?: boolean;
 }) {
-  // Escape closes the sheet; the backdrop is a real button so the dismiss is
-  // reachable by keyboard rather than only by a stray pointer.
+  const { mounted, visible } = usePresence(open, 320);
+
   React.useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previous;
+    };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <button
         type="button"
         aria-label="Close"
+        data-open={visible}
         onClick={onClose}
-        className="absolute inset-0 bg-primary/40 backdrop-blur-[2px]"
+        className="sheet-scrim"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest p-5 shadow-2xl sm:rounded-xl`}
+        data-open={visible}
+        className={`sheet-panel w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest p-5 shadow-2xl sm:rounded-xl`}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-outline-variant sm:hidden" aria-hidden />
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -216,10 +226,10 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-base text-on-primary shadow-md transition-transform active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 ${className}`}
+      className={`group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-base text-on-primary shadow-md transition-all duration-200 hover:bg-primary-container hover:shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 ${className}`}
     >
-      {children}
-      {icon && <Icon icon={icon} size={20} />}
+      <span>{children}</span>
+      {icon && <Icon icon={icon} size={20} className="transition-transform duration-200 group-hover:translate-x-0.5" />}
     </button>
   );
 }

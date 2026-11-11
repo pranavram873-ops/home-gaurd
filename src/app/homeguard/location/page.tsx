@@ -279,7 +279,7 @@ export default function HomeGuardLocationPage() {
                 <button
                   onClick={acquireLocation}
                   disabled={isLocating}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low text-xs font-semibold text-on-surface-variant transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low text-xs font-semibold text-on-surface-variant transition-all duration-200 active:scale-95 cursor-pointer"
                 >
                   <Icon icon="refresh" size={14} className={isLocating ? 'animate-spin' : ''} />
                   <span>Refresh Coordinates</span>
@@ -402,7 +402,7 @@ export default function HomeGuardLocationPage() {
                 <button
                   onClick={() => void handleAttendance('check_in')}
                   disabled={isSubmitting || !coords}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-on-tertiary-container hover:bg-on-tertiary-container text-on-primary font-bold text-xs shadow-sm disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-on-tertiary-container hover:bg-on-tertiary-container text-on-primary font-bold text-xs shadow-sm hover:shadow-md disabled:opacity-50 transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <Icon icon="sync" size={16} className="animate-spin" />
@@ -415,7 +415,7 @@ export default function HomeGuardLocationPage() {
                 <button
                   onClick={() => void handleAttendance('check_out')}
                   disabled={isSubmitting || !coords}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container text-on-surface font-bold text-xs shadow-sm disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs shadow-sm hover:shadow-md disabled:opacity-50 transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <Icon icon="sync" size={16} className="animate-spin" />

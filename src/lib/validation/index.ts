@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid official email address'),
+  username: z.string().trim().min(1, 'Please enter your username'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   rememberMe: z.boolean().optional(),
 });
@@ -28,22 +28,6 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
-
-export const forgotPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-});
-
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
-
-export const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Password must be at least 8 characters long'),
-  confirm_password: z.string(),
-}).refine((data) => data.password === data.confirm_password, {
-  message: 'Passwords do not match',
-  path: ['confirm_password'],
-});
-
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const checkInSchema = z.object({
   duty_assignment_id: z.string().optional().nullable(),

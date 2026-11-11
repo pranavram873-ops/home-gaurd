@@ -12,5 +12,7 @@ export function createClient() {
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseKey);
+  return createBrowserClient(supabaseUrl, supabaseKey, {
+    cookieOptions: { maxAge: 30 * 24 * 60 * 60 },
+  });
 }

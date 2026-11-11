@@ -11,8 +11,8 @@ export const runtime = 'nodejs';
  * A temporary password the operator reads aloud once. Sixteen characters from an
  * alphabet with no look-alikes, built from `randomInt` so it is not derived from
  * anything the client sent. The application never stores it: it exists only in
- * this response body, and the new officer is expected to change it through the
- * forgot-password flow on first use.
+ * this response body, and the administrator must hand it to the new officer
+ * through an approved secure channel.
  */
 function generateTemporaryPassword(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
   }
 
   const input = validation.data;
+  const personnelCode = input.personnel_id.trim().toUpperCase();
 
   // 1. Who is asking, and are they an active administrator? Both answers come
   //    from the database, not from a cookie or a client-side role.
@@ -107,6 +108,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The selected district does not exist.' }, { status: 400 });
   }
 
+  // A previous direct deletion in Supabase may have removed the Auth user but
+  // left a profile with the same personnel code. Reuse that identity by
+  // restoring the Auth user with the same UUID, which also preserves related
+  // records and avoids duplicate personnel codes.
+  const { data: existingProfile, error: existingProfileError } = await admin
+    .from('profiles')
+    .select('id, email, personnel_id')
+    .ilike('personnel_id', personnelCode)
+    .maybeSingle<{ id: string; email: string | null; personnel_id: string | null }>();
+
+  if (existingProfileError) {
+    return NextResponse.json({ error: existingProfileError.message }, { status: 500 });
+  }
+
   if (input.role === 'home_guard' && !input.phone) {
     return NextResponse.json({ error: 'A 10-digit phone number is required to add a Home Guard to the event roster.' }, { status: 400 });
   }
@@ -133,19 +148,48 @@ export async function POST(request: NextRequest) {
   // 3. The login itself. `email_confirm: true` because nobody is going to click a
   //    link in an official address the department handed us; the officer is told
   //    the temporary password directly.
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email.toLowerCase().trim(),
-    password: temporaryPassword,
-    email_confirm: true,
-    user_metadata: {
+  const email = input.email.toLowerCase().trim();
+  let userId: string;
+  let createError: { message: string } | null = null;
+  if (existingProfile) {
+    const { data: oldAuth, error: oldAuthError } = await admin.auth.admin.getUserById(existingProfile.id);
+    if (!oldAuthError && oldAuth.user) {
+      return NextResponse.json({ error: 'That personnel username already has an Auth account. Sign in or contact Command HQ for account support.' }, { status: 409 });
+    }
+    if (existingProfile.email && existingProfile.email.toLowerCase() !== email) {
+      return NextResponse.json({ error: 'A profile with this username already exists. Use its existing email address to restore the account.' }, { status: 409 });
+    }
+    const { data: restored, error } = await admin.auth.admin.createUser({
+      id: existingProfile.id,
+      email,
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: {
       full_name: input.full_name.trim(),
       phone: input.phone || undefined,
       district_code: districtRow.code,
       unit_code: unitCode || undefined,
-    },
-  });
+      },
+    });
+    userId = restored.user?.id ?? existingProfile.id;
+    createError = error;
+  } else {
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email,
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: input.full_name.trim(),
+        phone: input.phone || undefined,
+        district_code: districtRow.code,
+        unit_code: unitCode || undefined,
+      },
+    });
+    userId = created.user?.id ?? '';
+    createError = error;
+  }
 
-  if (createError || !created.user) {
+  if (createError || !userId) {
     const message = createError?.message || 'The login could not be created.';
     // Supabase answers a taken email with an ambiguous 422 to avoid user
     // enumeration. An administrator adding staff needs to know which one it is.
@@ -156,7 +200,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const userId = created.user.id;
 
   // 4. `handle_new_user` has already inserted a pending `home_guard` row.
   //    Promote it to the rank and status the operator chose. The service badge
@@ -165,9 +208,9 @@ export async function POST(request: NextRequest) {
   //    inside the database.
   const profilePatch = {
     full_name: input.full_name.trim(),
-    email: created.user.email || input.email,
+    email,
     phone: input.phone || null,
-    personnel_id: input.personnel_id.trim().toUpperCase(),
+    personnel_id: personnelCode,
     role: input.role,
     rank_designation: input.rank_designation.trim(),
     district_id: input.district_id,
@@ -192,7 +235,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  if (!updatedRow) {
+  if (!updatedRow && !existingProfile) {
     // The trigger did not run, or its insert failed. Write the row directly so
     // this route works whether or not the signup hook is installed.
     const { error: insertError } = await admin.from('profiles').insert({ id: userId, ...profilePatch });

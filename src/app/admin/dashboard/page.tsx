@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 export default function AdminDashboardPage() {
   return (
-    <DashboardLayout title="Events" subtitle="Events and muster records from every district">
+    <DashboardLayout title="Events" subtitle="Create events and manage attendance in your selected division">
       <AttendanceEvents />
     </DashboardLayout>
   );

@@ -37,7 +37,7 @@ export default function HomeGuardDashboardPage() {
       title="Home Guard Duty Portal"
       subtitle="Tamil Nadu Home Guards • Personnel Operations Desk"
     >
-      <div className="flex flex-col gap-6 max-w-5xl mx-auto">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
         {/* Guard Identification Banner */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
@@ -64,7 +64,7 @@ export default function HomeGuardDashboardPage() {
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed-variant border border-outline-variant text-xs font-semibold">
-              <Icon icon="radio" size={14} className="text-on-tertiary-container animate-pulse" />
+              <span className="beacon-pulse h-2 w-2 rounded-full bg-on-tertiary-container" aria-hidden />
               <span>Geofenced Muster Enabled</span>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function HomeGuardDashboardPage() {
         )}
 
         {/* Today's Duty Assignment Card - Primary Focal Point */}
-        <div className="bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-xs overflow-hidden">
+        <div className="card-hover-lift bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-xs overflow-hidden transition-all duration-300 hover:shadow-md">
           <div className="p-4 bg-gradient-to-r from-primary to-primary-container text-on-primary flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Icon icon="fact_check" size={20} className="text-on-secondary-container" />
@@ -169,9 +169,9 @@ export default function HomeGuardDashboardPage() {
 
                   <Link
                     href="/homeguard/location"
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-base text-on-primary shadow-md transition-transform hover:bg-primary-container active:scale-[0.98]"
+                    className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-base text-on-primary shadow-md transition-all duration-200 hover:bg-primary-container hover:shadow-lg active:scale-[0.98]"
                   >
-                    <Icon icon="location_on" size={20} />
+                    <Icon icon="location_on" size={20} className="transition-transform duration-200 group-hover:scale-110" />
                     <span>Check In with GPS Now</span>
                   </Link>
                 </div>
@@ -199,7 +199,7 @@ export default function HomeGuardDashboardPage() {
                 </Link>
               </div>
 
-              <div className="flex flex-col gap-2.5">
+              <div className="stagger-in flex flex-col gap-2.5">
                 {statsQuery.loading ? (
                   <p className="text-xs text-on-surface-variant text-center py-4 flex items-center justify-center gap-2">
                     <Icon icon="sync" size={14} className="animate-spin" /> Loading your directives...
@@ -210,13 +210,13 @@ export default function HomeGuardDashboardPage() {
                   </p>
                 ) : (
                   myTasks.slice(0, 3).map((t) => (
-                    <div key={t.id} className="p-3 rounded-lg border border-outline-variant bg-surface-container-low flex items-start justify-between gap-2">
+                    <div key={t.id} className="card-hover-lift p-3 rounded-lg border border-outline-variant bg-surface-container-low flex items-start justify-between gap-2 transition-all duration-200 hover:bg-surface-container/70">
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs font-bold text-on-surface leading-snug">{t.title}</span>
                         <span className="text-[13px] text-on-surface-variant mt-0.5">Priority: {t.priority}</span>
                       </div>
                       <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded uppercase shrink-0 ${
+                        className={`text-xs font-bold px-2 py-0.5 rounded uppercase shrink-0 transition-colors duration-200 ${
                           t.status === 'completed'
                             ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
                             : 'bg-primary-fixed text-on-primary-fixed'
@@ -254,7 +254,7 @@ export default function HomeGuardDashboardPage() {
                 </Link>
               </div>
 
-              <div className="flex flex-col gap-2.5">
+              <div className="stagger-in flex flex-col gap-2.5">
                 {statsQuery.loading ? (
                   <p className="text-xs text-on-surface-variant text-center py-4 flex items-center justify-center gap-2">
                     <Icon icon="sync" size={14} className="animate-spin" /> Reading your muster register...
@@ -265,7 +265,7 @@ export default function HomeGuardDashboardPage() {
                   </p>
                 ) : (
                   myAttendance.slice(0, 3).map((a) => (
-                    <div key={a.id} className="p-3 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-between">
+                    <div key={a.id} className="card-hover-lift p-3 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-between transition-all duration-200 hover:bg-surface-container/70">
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-on-surface">{a.location?.name || 'Post no longer on file'}</span>
                         <span className="text-[13px] text-on-surface-variant">
@@ -274,7 +274,7 @@ export default function HomeGuardDashboardPage() {
                       </div>
                       <div className="text-right">
                         <span
-                          className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${
+                          className={`text-xs font-bold px-2 py-0.5 rounded uppercase transition-colors duration-200 ${
                             a.event_type === 'check_in' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface-variant'
                           }`}
                         >

@@ -1,16 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { Manrope } from 'next/font/google';
+import { IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth/authContext';
 import { DivisionProvider } from '@/lib/attendance/divisionContext';
 
 /*
- * Manrope has clean, open forms for operational dashboards and remains highly
- * legible in dense tables, forms and status indicators.
+ * IBM Plex Sans has a calm, workmanlike voice that stays clear in dense
+ * personnel tables and operational forms.
  */
-const manrope = Manrope({
+const plexSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  variable: '--font-manrope',
+  variable: '--font-plex-sans',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
@@ -36,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className={plexSans.variable}>
       <head>
         {/*
           Material Symbols is an icon font: a glyph is picked by typing its

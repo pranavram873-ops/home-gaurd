@@ -52,8 +52,6 @@ home-guard-supervision/
 │   │   ├── page.tsx                      # Redirects to /login; there is no public landing page
 │   │   ├── login/page.tsx                # Supabase password sign-in with show/hide password
 │   │   ├── register/page.tsx             # Volunteer enrolment (enforces 'pending' status)
-│   │   ├── forgot-password/page.tsx      # Password recovery dispatch
-│   │   ├── reset-password/page.tsx       # Secure password reset
 │   │   ├── admin/
 │   │   │   ├── dashboard/page.tsx        # State Headquarters command overview
 │   │   │   ├── personnel/page.tsx        # Statewide personnel roster, filters & CSV export
@@ -197,7 +195,7 @@ secret key:
 5. An `audit_logs` row (`CREATE_STAFF_ACCOUNT`) names the acting administrator and
    the new officer, and the response returns a generated temporary password
    **once** for the operator to hand over. It is not stored anywhere; the officer
-   is expected to set their own through the forgot-password flow.
+   must be handed to the new officer through an approved secure channel.
 
 The `assign_personnel_badge` trigger issues the service badge number as the row
 becomes active, whether the account was approved at the approvals desk or created
@@ -248,12 +246,12 @@ To provision the initial State Administrator without exposing credentials:
    for the password without echoing it, so the password is not part of the
    command or shell history:
    ```bash
-   node scripts/bootstrap-admin.mjs <admin-email> "<full-name>"
+   node scripts/bootstrap-admin.mjs <admin-email> <admin-username> "<full-name>"
    ```
 
    **Example:**
    ```bash
-   node scripts/bootstrap-admin.mjs admin@your-organization.example "Your Name"
+   node scripts/bootstrap-admin.mjs admin@your-organization.example COMMAND01 "Your Name"
    ```
 
 3. The script:
@@ -304,8 +302,7 @@ To provision the initial State Administrator without exposing credentials:
 2. **Authentication → URL Configuration**:
    - **Site URL**: `http://localhost:3000` locally, the Vercel domain in
      production (this is also `NEXT_PUBLIC_APP_URL`).
-   - **Redirect URLs**: add `<site URL>/login?notice=email_confirmed` and
-     `<site URL>/reset-password`.
+   - **Redirect URLs**: add `<site URL>/login?notice=email_confirmed`.
 3. Create the first administrator (section 5). Public enrolment can never
    produce an administrator: the role is fixed inside the database trigger.
 

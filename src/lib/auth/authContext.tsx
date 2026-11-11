@@ -11,12 +11,14 @@ interface AuthContextType {
   user: Profile | null;
   role: UserRole | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>;
   logout: () => Promise<void>;
   refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const REMEMBERED_SESSION_KEY = 'tnhg.auth.rememberedUntil';
+const REMEMBERED_SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 // RLS policy "Users can view own profile" allows reading this row.
 // The district and unit are embedded by their foreign-key constraint names: an
@@ -57,16 +59,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let expiryTimer: number | undefined;
+
+    const scheduleSessionExpiry = (expiresAt: number) => {
+      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+      const delay = Math.max(0, Math.min(expiresAt - Date.now(), 2_147_000_000));
+      expiryTimer = window.setTimeout(() => {
+        if (Date.now() < expiresAt) {
+          scheduleSessionExpiry(expiresAt);
+          return;
+        }
+        window.localStorage.removeItem(REMEMBERED_SESSION_KEY);
+        sessionRef.current = null;
+        void createClient().auth.signOut();
+      }, delay);
+    };
 
     async function applySession(session: Session | null, version: number) {
       if (!active) return;
       if (version !== sessionVersionRef.current) return;
 
       if (!session?.user) {
+        if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+        window.localStorage.removeItem(REMEMBERED_SESSION_KEY);
         setUser(null);
         setIsLoading(false);
         return;
       }
+
+      const savedExpiry = Number(window.localStorage.getItem(REMEMBERED_SESSION_KEY));
+      const expiresAt = Number.isFinite(savedExpiry) && savedExpiry > 0
+        ? savedExpiry
+        : Date.now() + REMEMBERED_SESSION_DURATION_MS;
+      if (expiresAt <= Date.now()) {
+        window.localStorage.removeItem(REMEMBERED_SESSION_KEY);
+        sessionRef.current = null;
+        setUser(null);
+        setIsLoading(false);
+        void createClient().auth.signOut();
+        return;
+      }
+      window.localStorage.setItem(REMEMBERED_SESSION_KEY, String(expiresAt));
+      scheduleSessionExpiry(expiresAt);
 
       const profile = await loadProfile(session.user.id);
       if (!active || version !== sessionVersionRef.current) return;
@@ -115,11 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
+      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
       unsubscribe?.();
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     setIsLoading(true);
 
     if (!password) {
@@ -129,14 +164,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const supabase = createClient();
+      const resolution = await fetch('/api/auth/resolve-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      const resolutionBody = await resolution.json().catch(() => null) as { email?: string } | null;
+
+      if (!resolution.ok || !resolutionBody?.email) {
+        return { success: false, error: 'Invalid username or password.' };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: resolutionBody.email,
         password,
       });
 
       if (error) {
         return { success: false, error: describeSignInError(error) };
       }
+
+      window.localStorage.setItem(
+        REMEMBERED_SESSION_KEY,
+        String(Date.now() + REMEMBERED_SESSION_DURATION_MS),
+      );
 
       const profile = data.session ? await loadProfile(data.session.user.id) : null;
 
@@ -185,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore — session cookies are cleared below regardless
     }
+    window.localStorage.removeItem(REMEMBERED_SESSION_KEY);
     sessionRef.current = null;
     setUser(null);
     setIsLoading(false);

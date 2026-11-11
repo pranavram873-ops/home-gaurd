@@ -6,9 +6,12 @@ import { Card, Chip, EmptyState } from '@/components/ui/primitives';
 import { useAuth } from '@/lib/auth/authContext';
 import { createClient } from '@/lib/supabase/client';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
+import { compressImage } from '@/lib/services/simpleAttendanceService';
+import { useDivision } from '@/lib/attendance/divisionContext';
+import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
 
 type GuardOption = { id: string; full_name: string; home_guard_code: string; division_id: string; division_name: string };
-type FiledReport = { id: string; guard_name: string; home_guard_code: string; division_name: string; category: string; description: string; status: string; created_at: string };
+type FiledReport = { id: string; division_id: string; guard_name: string; home_guard_code: string; division_name: string; category: string; description: string; status: string; created_at: string; evidence_photo: string | null };
 const categoryOptions = [
   { value: 'conduct', label: 'Conduct or behaviour' },
   { value: 'attendance', label: 'Attendance or duty' },
@@ -18,12 +21,15 @@ const categoryOptions = [
 
 export function InchargePersonnelReports() {
   const { user } = useAuth();
+  const { divisionId, resolved: divisionResolved } = useDivision();
   const [guards, setGuards] = useState<GuardOption[]>([]);
   const [reports, setReports] = useState<FiledReport[]>([]);
   const [query, setQuery] = useState('');
   const [selectedGuard, setSelectedGuard] = useState<GuardOption | null>(null);
   const [category, setCategory] = useState('conduct');
   const [description, setDescription] = useState('');
+  const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -31,13 +37,20 @@ export function InchargePersonnelReports() {
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user || !divisionResolved) return;
+    if (!divisionId) {
+      setReports([]);
+      setGuards([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
+    setReports([]);
     const supabase = createClient();
     const [rosterResult, reportResult] = await Promise.all([
-      supabase.from('home_guard_roster').select('id,full_name,home_guard_code,division_id,attendance_divisions(name)').eq('is_active', true).order('full_name'),
-      supabase.from('personnel_reports').select('id,guard_name,home_guard_code,division_name,category,description,status,created_at').eq('filed_by', user.id).order('created_at', { ascending: false }),
+      supabase.from('home_guard_roster').select('id,full_name,home_guard_code,division_id,attendance_divisions(name)').eq('division_id', divisionId).eq('is_active', true).order('full_name'),
+      supabase.from('personnel_reports').select('id,division_id,guard_name,home_guard_code,division_name,category,description,status,created_at,evidence_photo').eq('division_id', divisionId).order('created_at', { ascending: false }),
     ]);
     if (rosterResult.error || reportResult.error) {
       setError(rosterResult.error?.message ?? reportResult.error?.message ?? 'Could not load reports.');
@@ -47,7 +60,7 @@ export function InchargePersonnelReports() {
       setReports((reportResult.data ?? []) as FiledReport[]);
     }
     setLoading(false);
-  }, [user]);
+  }, [user, divisionId, divisionResolved]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -56,6 +69,21 @@ export function InchargePersonnelReports() {
     if (!value || selectedGuard) return [];
     return guards.filter((guard) => `${guard.full_name} ${guard.home_guard_code} ${guard.division_name}`.toLowerCase().includes(value)).slice(0, 10);
   }, [guards, query, selectedGuard]);
+
+  async function attachEvidencePhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setCompressingPhoto(true);
+    setError('');
+    try {
+      setEvidencePhoto(await compressImage(file, 1200, 1200, 0.8));
+    } catch {
+      setError('Could not process that photo. Please try a different image.');
+    } finally {
+      setCompressingPhoto(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,11 +97,13 @@ export function InchargePersonnelReports() {
       division_id: selectedGuard.division_id,
       category,
       description: description.trim(),
+      ...(evidencePhoto ? { evidence_photo: evidencePhoto } : {}),
     });
     if (insertError) setError(insertError.message);
     else {
       setNotice(`Report filed for ${selectedGuard.full_name}. Administrators can review it.`);
       setDescription('');
+      setEvidencePhoto(null);
       setQuery('');
       setSelectedGuard(null);
       await load();
@@ -93,6 +123,7 @@ export function InchargePersonnelReports() {
             {reports.map((report) => <li key={report.id} className="space-y-2 p-4">
               <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-on-surface"><HomeGuardProfileLink code={report.home_guard_code} name={report.guard_name} className="text-left font-semibold text-on-surface hover:text-primary hover:underline">{report.guard_name}</HomeGuardProfileLink> <span className="font-mono text-xs text-on-surface-variant">{report.home_guard_code}</span></p><p className="text-xs text-on-surface-variant">{report.division_name} · {new Date(report.created_at).toLocaleDateString('en-IN')}</p></div><Chip tone={report.status === 'resolved' ? 'present' : 'live'}>{report.status === 'under_review' ? 'Under review' : report.status}</Chip></div>
               <p className="text-xs font-semibold uppercase tracking-wide text-secondary">{categoryOptions.find((item) => item.value === report.category)?.label ?? 'Other'}</p><p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
+              {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Evidence for report on ${report.guard_name}`} />}
             </li>)}
           </ul>
         ) : <EmptyState icon="inbox" title="No reports filed yet" body="Use Create report to file a report about a Home Guard." />}
@@ -111,7 +142,25 @@ export function InchargePersonnelReports() {
           {selectedGuard && <div className="rounded-lg bg-primary-fixed p-3 text-sm text-on-primary-fixed"><strong>{selectedGuard.full_name}</strong><br />{selectedGuard.division_name} · HG code {selectedGuard.home_guard_code}</div>}
           <label className="block text-label-md text-on-surface">Report category<select value={category} onChange={(event) => setCategory(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm"><option value="conduct">Conduct or behaviour</option><option value="attendance">Attendance or duty</option><option value="safety">Safety concern</option><option value="other">Other</option></select></label>
           <label className="block text-label-md text-on-surface">What happened?<textarea required minLength={10} maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the observed incident, including the relevant date or duty when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" /></label>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || !selectedGuard || description.trim().length < 10} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
+          <div>
+            <span className="mb-1.5 block text-label-md text-on-surface">Evidence photo {evidencePhoto ? '' : '(optional)'}</span>
+            {evidencePhoto ? (
+              <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
+                <img src={evidencePhoto} alt="Report evidence" className="h-14 w-20 rounded-md object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1 text-xs font-bold text-primary"><Icon icon="verified" size={14} className="shrink-0 text-tertiary" />Evidence attached</p>
+                  <button type="button" onClick={() => setEvidencePhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">Remove photo</button>
+                </div>
+              </div>
+            ) : (
+              <label className={`flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
+                {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
+                <input type="file" accept="image/*" className="hidden" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
+              </label>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setEvidencePhoto(null); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || !selectedGuard || description.trim().length < 10} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
         </form>
       </Card>}
     </div>

@@ -2,15 +2,20 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { Card, EmptyState, SegmentedFilter } from '@/components/ui/primitives';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import {
+  getMusterEventParticipants,
+  compressImage,
+  filePersonnelReport,
   loadAttendancePage,
   parseAttendanceEventId,
   saveDailyMark,
+  setMusterEventParticipant,
   type DailyMark,
   type MusterEvent,
   type RosterGuard,
@@ -40,22 +45,28 @@ function GuardRow({
   mark,
   onImageClick,
   onMarkStatus,
+  selectedForEvent,
+  onToggleEvent,
+  onFileReport,
   isSaving,
 }: {
   guard: RosterGuard;
   mark?: DailyMark;
   onImageClick?: (url: string, title: string) => void;
   onMarkStatus?: (guard: RosterGuard, status: 'present' | 'absent') => void;
+  selectedForEvent: boolean;
+  onToggleEvent: (guard: RosterGuard) => void;
+  onFileReport: (guard: RosterGuard) => void;
   isSaving?: boolean;
 }) {
   const present = mark?.status === 'present';
   const absent = mark?.status === 'absent';
   return (
-    <li className="flex flex-col gap-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3.5 shadow-card">
+    <li className="card-hover-lift flex flex-col gap-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3.5 shadow-card transition-all duration-300 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold shadow-xs transition-transform duration-200 hover:scale-105 ${
               absent ? 'bg-error-container text-on-error-container' : 'bg-primary-fixed text-on-primary-fixed'
             }`}
           >
@@ -63,61 +74,53 @@ function GuardRow({
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <HomeGuardProfileLink code={guard.home_guard_code} name={guard.full_name} className="truncate text-left text-[16px] font-semibold text-primary hover:underline">
+              <HomeGuardProfileLink code={guard.home_guard_code} name={guard.full_name} className="truncate text-left text-[16px] font-semibold text-primary transition-colors duration-200 hover:underline">
                 {guard.full_name}
               </HomeGuardProfileLink>
               <span className="shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-[13px] text-on-surface">{guard.home_guard_code}</span>
+              {selectedForEvent && (
+                <button type="button" onClick={() => onFileReport(guard)} className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-error hover:bg-error-container" aria-label={`Report ${guard.full_name}`}>
+                  <Icon icon="report_problem" size={15} />
+                  <span>Report</span>
+                </button>
+              )}
             </div>
             <span className="text-label-sm text-on-surface-variant">{guard.phone}</span>
           </div>
         </div>
-        {present ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-tertiary-fixed px-2 py-0.5 text-label-sm font-bold text-on-tertiary-fixed">
+        {present && selectedForEvent ? (
+          <span className="animate-check-pop inline-flex shrink-0 items-center gap-1 rounded-full bg-tertiary-fixed px-2 py-0.5 text-label-sm font-bold text-on-tertiary-fixed">
             <Icon icon="check" size={13} fill />
             {mark ? formatTime(mark.marked_at) : 'Present'}
           </span>
-        ) : absent ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-error-container px-2 py-0.5 text-label-sm font-bold text-on-error-container">
+        ) : absent && selectedForEvent ? (
+          <span className="animate-check-pop inline-flex shrink-0 items-center gap-1 rounded-full bg-error-container px-2 py-0.5 text-label-sm font-bold text-on-error-container">
             <Icon icon="close" size={13} />
             Absent
           </span>
+        ) : selectedForEvent ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary-fixed px-2 py-0.5 text-label-sm font-bold text-on-secondary-fixed-variant">
+            <Icon icon="pending" size={13} />
+            In event · not marked
+          </span>
         ) : (
           <span className="inline-flex shrink-0 items-center rounded-full bg-surface-container px-2 py-0.5 text-label-sm font-bold uppercase text-on-surface-variant">
-            Not marked
+            Not in event
           </span>
         )}
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-2 mt-1">
-        <button
-          type="button"
-          disabled={isSaving}
-          aria-pressed={present}
-          onClick={() => onMarkStatus?.(guard, 'present')}
-          className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
-            present
-              ? 'bg-on-tertiary-container text-on-tertiary shadow-sm'
-              : 'bg-surface-container-high text-on-surface hover:bg-on-tertiary-container hover:text-on-tertiary'
-          }`}
-        >
-          {isSaving && !present ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="check" size={16} />}
-          <span>Present</span>
+      <button type="button" onClick={() => onToggleEvent(guard)} className={`flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] ${selectedForEvent ? 'bg-error-container text-on-error-container' : 'bg-primary-container text-on-primary'}`}>
+        <Icon icon={selectedForEvent ? 'person_remove' : 'person_add'} size={18} />{selectedForEvent ? 'Remove from event' : 'Add to event'}
+      </button>
+      {selectedForEvent && <div className="mt-1 grid w-full grid-cols-2 gap-2">
+        <button type="button" disabled={isSaving} aria-pressed={present} onClick={() => onMarkStatus?.(guard, 'present')} className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${present ? 'bg-on-tertiary-container text-on-tertiary shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>
+          {isSaving && !present ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="check" size={16} className={present ? 'animate-check-pop' : ''} />} Present
         </button>
-        <button
-          type="button"
-          disabled={isSaving}
-          aria-pressed={absent}
-          onClick={() => onMarkStatus?.(guard, 'absent')}
-          className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
-            absent
-              ? 'bg-error text-on-error shadow-sm'
-              : 'bg-surface-container-high text-on-surface hover:bg-error hover:text-on-error'
-          }`}
-        >
-          {isSaving && !absent ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="close" size={16} />}
-          <span>Absent</span>
+        <button type="button" disabled={isSaving} aria-pressed={absent} onClick={() => onMarkStatus?.(guard, 'absent')} className={`flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${absent ? 'bg-error text-on-error shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>
+          {isSaving && !absent ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="close" size={16} className={absent ? 'animate-check-pop' : ''} />} Absent
         </button>
-      </div>
+      </div>}
 
       {mark?.photo_url && (
         <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2 border border-outline-variant/40">
@@ -155,6 +158,14 @@ export default function AdminEventDetailsPage() {
   const [search, setSearch] = useState('');
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const [reportGuard, setReportGuard] = useState<RosterGuard | null>(null);
+  const [reportCategory, setReportCategory] = useState('attendance');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportPhoto, setReportPhoto] = useState<string | null>(null);
+  const [reportError, setReportError] = useState('');
+  const [reportSuccess, setReportSuccess] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
 
   useEffect(() => {
     if (!parsed) {
@@ -166,17 +177,61 @@ export default function AdminEventDetailsPage() {
     setLoading(true);
     setError('');
     loadAttendancePage(parsed.divisionId, parsed.date)
-      .then((data) => {
+      .then(async (data) => {
         if (!live) return;
         setRoster(data.roster);
         setMarks(data.marks);
         setMusterEvent(data.musterEvent);
+        if (data.musterEvent) setParticipantIds(await getMusterEventParticipants(data.musterEvent.id));
         setDivisionName(data.divisions.find((division) => division.id === parsed.divisionId)?.name ?? 'Division');
       })
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load this record.'))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [parsed]);
+
+  /**
+   * Quick add/remove from the roster list. Adding a guard makes them an event
+   * participant and stamps them present; removing one drops the participant
+   * row and stamps them absent, matching the picker's save semantics.
+   */
+  async function toggleEventParticipant(guard: RosterGuard) {
+    if (!musterEvent || !parsed) return;
+    const add = !participantIds.includes(guard.id);
+    const want: DailyMark['status'] = add ? 'present' : 'absent';
+    const priorStatus = markByGuard.get(guard.id)?.status;
+    setParticipantIds((current) => add ? [...current, guard.id] : current.filter((id) => id !== guard.id));
+    setSavingId(guard.id);
+    try {
+      await setMusterEventParticipant(musterEvent.id, guard.id, add);
+      if (priorStatus !== want) {
+        await saveDailyMark(guard.id, parsed.divisionId, parsed.date, want);
+        const markedAt = new Date().toISOString();
+        setMarks((current) => {
+          const prior = current.find((mark) => mark.guard_id === guard.id);
+          if (prior) {
+            return current.map((mark) => (mark.guard_id === guard.id ? { ...mark, status: want, marked_at: markedAt } : mark));
+          }
+          return [
+            ...current,
+            {
+              id: `${guard.id}-${parsed.date}`,
+              guard_id: guard.id,
+              division_id: parsed.divisionId,
+              attendance_date: parsed.date,
+              status: want,
+              marked_at: markedAt,
+            },
+          ];
+        });
+      }
+    } catch (cause) {
+      setParticipantIds((current) => add ? current.filter((id) => id !== guard.id) : [...current, guard.id]);
+      setError(cause instanceof Error ? cause.message : 'Could not update event personnel.');
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   async function changeStatus(guard: RosterGuard, status: 'present' | 'absent') {
     if (!parsed) return;
@@ -205,10 +260,66 @@ export default function AdminEventDetailsPage() {
     }
   }
 
+  function openReport(guard: RosterGuard) {
+    setReportGuard(guard);
+    setReportCategory('attendance');
+    setReportDescription('');
+    setReportPhoto(null);
+    setReportError('');
+  }
+
+  async function attachReportPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setReportError('');
+    try {
+      setReportPhoto(await compressImage(file, 1200, 1200, 0.8));
+    } catch {
+      setReportError('Could not process that photo. Please choose another image.');
+    }
+  }
+
+  async function submitReport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reportGuard || !parsed || reportDescription.trim().length < 10) return;
+    setSubmittingReport(true);
+    setReportError('');
+    try {
+      await filePersonnelReport({
+        guardId: reportGuard.id,
+        divisionId: parsed.divisionId,
+        category: reportCategory,
+        description: reportDescription.trim(),
+        evidencePhoto: reportPhoto,
+      });
+      setReportSuccess(`Report filed for ${reportGuard.full_name}.`);
+      setReportGuard(null);
+      setReportPhoto(null);
+    } catch (cause) {
+      setReportError(cause instanceof Error ? cause.message : 'Could not file the report. Please try again.');
+    } finally {
+      setSubmittingReport(false);
+    }
+  }
+
   const markByGuard = useMemo(() => new Map(marks.map((mark) => [mark.guard_id, mark])), [marks]);
-  const presentCount = marks.filter((mark) => mark.status === 'present').length;
-  const absentCount = marks.filter((mark) => mark.status === 'absent').length;
-  const sanctionedCount = roster.length;
+
+  /**
+   * Effective muster status for one roster guard. Only event participants can
+   * be present; everyone else - and participants not yet marked - falls into
+   * the absent/pending buckets the muster counts.
+   */
+  const statusOf = (guard: RosterGuard): 'present' | 'absent' | 'pending' => {
+    if (!participantIds.includes(guard.id)) return 'absent';
+    return markByGuard.get(guard.id)?.status ?? 'pending';
+  };
+
+  const eventGuards = useMemo(() => roster.filter((guard) => participantIds.includes(guard.id)), [roster, participantIds]);
+  const presentCount = eventGuards.filter((guard) => statusOf(guard) === 'present').length;
+  const pendingCount = eventGuards.filter((guard) => statusOf(guard) === 'pending').length;
+  const absentCount = eventGuards.length - presentCount - pendingCount;
+  const sanctionedCount = eventGuards.length;
   const presentPct = sanctionedCount ? Math.round((presentCount / sanctionedCount) * 100) : 0;
   const absentPct = sanctionedCount ? Math.round((absentCount / sanctionedCount) * 100) : 0;
   const isOpen = parsed ? parsed.date >= todayISO() : false;
@@ -216,12 +327,12 @@ export default function AdminEventDetailsPage() {
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return roster.filter((guard) => {
-      const status = markByGuard.get(guard.id)?.status;
-      const matchesFilter = filter === 'all' || status === filter;
+      const matchesFilter = filter === 'all' || statusOf(guard) === filter;
       const matchesSearch = !term || `${guard.full_name} ${guard.home_guard_code}`.toLowerCase().includes(term);
-      return matchesFilter && matchesSearch;
+      return participantIds.includes(guard.id) && matchesFilter && matchesSearch;
     });
-  }, [roster, filter, search, markByGuard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, filter, search, markByGuard, participantIds]);
 
   return (
     <DashboardLayout title="Muster Record" subtitle="Admin event details">
@@ -245,6 +356,14 @@ export default function AdminEventDetailsPage() {
         </div>
       ) : (
         <>
+          {reportSuccess && (
+            <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-tertiary-fixed px-3 py-2 text-sm text-on-tertiary-fixed">
+              <span>{reportSuccess}</span>
+              <button type="button" onClick={() => setReportSuccess('')} aria-label="Dismiss report confirmation" className="rounded p-1 hover:bg-black/5">
+                <Icon icon="close" size={17} />
+              </button>
+            </div>
+          )}
           {/* Header */}
           <section className="px-1 pt-4">
             <div className="mb-1 flex items-start justify-between gap-2">
@@ -279,6 +398,12 @@ export default function AdminEventDetailsPage() {
               )}
             </div>
           </section>
+          {!musterEvent ? null : <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-container-low p-3">
+            <span className="text-sm font-semibold text-on-surface">{participantIds.length} guard{participantIds.length === 1 ? '' : 's'} in this event</span>
+            <div className="flex items-center gap-2">
+              <Link href={`/admin/events/${rawId}/personnel`} className="flex min-h-10 items-center gap-2 rounded-lg bg-primary-container px-3 text-sm font-bold text-on-primary"><Icon icon="person_add" size={18} />Add personnel</Link>
+            </div>
+          </div>}
 
           {/* Metrics */}
           <section className="px-1 py-2">
@@ -349,8 +474,10 @@ export default function AdminEventDetailsPage() {
           {/* Roster */}
           <section className="px-1 py-2">
             <div className="mb-1 flex items-baseline justify-between">
-              <h3 className="text-headline-sm font-bold text-primary">Rostered Personnel</h3>
-              <span className="text-label-sm font-bold uppercase text-on-surface-variant">Total {sanctionedCount}</span>
+              <h3 className="text-headline-sm font-bold text-primary">Event Personnel</h3>
+              <span className="text-label-sm font-bold uppercase text-on-surface-variant">
+                Total {sanctionedCount}
+              </span>
             </div>
             <SegmentedFilter<Filter>
               label="Filter by status"
@@ -380,15 +507,18 @@ export default function AdminEventDetailsPage() {
                 Loading record…
               </div>
             ) : visible.length === 0 ? (
-              <EmptyState icon="person_search" title="No personnel found" body="Check your spelling or reset the filter above." />
+              <EmptyState icon="person_search" title="No personnel added yet" body='Use "Add personnel" above to assign Home Guards to this event.' />
             ) : (
-              <ul className="flex flex-col gap-2.5">
-                {visible.map((guard) => (
+              <ul className="stagger-in flex flex-col gap-2.5">
+              {visible.map((guard) => (
                   <GuardRow
                     key={guard.id}
                     guard={guard}
                     mark={markByGuard.get(guard.id)}
                     isSaving={savingId === guard.id}
+                    selectedForEvent={participantIds.includes(guard.id)}
+                    onToggleEvent={(g) => void toggleEventParticipant(g)}
+                    onFileReport={openReport}
                     onMarkStatus={(g, status) => void changeStatus(g, status)}
                     onImageClick={(url, title) => setPreviewImage({ url, title })}
                   />
@@ -399,10 +529,62 @@ export default function AdminEventDetailsPage() {
         </>
       )}
 
+      {reportGuard && (
+        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReportGuard(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="admin-event-report-title" className="overlay-panel flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <header className="flex items-center justify-between bg-primary p-4 text-on-primary">
+              <div className="flex items-center gap-2">
+                <Icon icon="report_problem" size={20} />
+                <h3 id="admin-event-report-title" className="text-sm font-bold">File personnel report</h3>
+              </div>
+              <button type="button" onClick={() => setReportGuard(null)} aria-label="Close report form" className="rounded-md p-1 hover:bg-white/10">
+                <Icon icon="close" size={20} />
+              </button>
+            </header>
+            <form onSubmit={(event) => void submitReport(event)} className="flex flex-col gap-4 overflow-y-auto p-5">
+              <div className="rounded-lg bg-primary-fixed p-3 text-sm text-on-primary-fixed">
+                <strong>{reportGuard.full_name}</strong>
+                <span className="mt-0.5 block font-mono text-xs text-on-primary-fixed/80">{reportGuard.home_guard_code} · {divisionName} · {parsed ? formatDay(parsed.date) : ''}</span>
+              </div>
+              <label className="block text-xs font-bold text-on-surface-variant">
+                Report category
+                <select value={reportCategory} onChange={(event) => setReportCategory(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm font-normal text-on-surface">
+                  <option value="attendance">Late / absent from duty</option>
+                  <option value="conduct">Conduct or insubordination</option>
+                  <option value="safety">Safety concern</option>
+                  <option value="other">Other concern</option>
+                </select>
+              </label>
+              <label htmlFor="admin-event-report-description" className="block text-xs font-bold text-on-surface-variant">
+                Incident description <span className="font-normal">(at least 10 characters)</span>
+                <textarea id="admin-event-report-description" required minLength={10} maxLength={4000} rows={4} value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} placeholder="Describe what happened…" className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm font-normal text-on-surface placeholder:text-outline" />
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary hover:bg-surface-container">
+                <Icon icon="add_photo_alternate" size={18} />
+                {reportPhoto ? 'Replace evidence photo' : 'Attach evidence photo (optional)'}
+                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachReportPhoto(event)} />
+              </label>
+              {reportPhoto && <div className="flex items-center gap-3 rounded-lg bg-surface-container-low p-2">
+                <Image src={reportPhoto} alt="Evidence preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
+                <button type="button" onClick={() => setReportPhoto(null)} className="text-xs font-bold text-error underline">Remove photo</button>
+              </div>}
+              {reportError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container">{reportError}</p>}
+              <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
+                <button type="button" onClick={() => setReportGuard(null)} className="rounded-lg bg-surface-container px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high">Cancel</button>
+                <button type="submit" disabled={submittingReport || reportDescription.trim().length < 10} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50">
+                  {submittingReport && <Icon icon="sync" size={17} className="animate-spin" />}
+                  {submittingReport ? 'Filing…' : 'Submit report'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
       {/* Lightbox Image Preview Modal */}
       {previewImage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="relative max-w-3xl w-full flex flex-col items-center">
+        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="overlay-panel relative flex w-full max-w-3xl flex-col items-center">
             <div className="w-full flex items-center justify-between text-white mb-2 px-1">
               <span className="font-bold text-sm truncate">{previewImage.title}</span>
               <button

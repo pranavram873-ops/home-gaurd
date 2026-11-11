@@ -7,8 +7,6 @@ import { useAuth } from '@/lib/auth/authContext';
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { loadDivisionSummaries, type DivisionSummary } from '@/lib/services/simpleAttendanceService';
 
-// Presentation strings for the five Tiruppur sub-divisions seeded by
-// 20261024000001. Cards fall back to the database name when a code is new.
 const DISTRICT_NAMES: Record<string, string> = {
   AVN: 'Avinashi',
   DHP: 'Dharapuram',
@@ -43,7 +41,7 @@ function DivisionCard({
 }: {
   division: DivisionSummary;
   selected: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, target: HTMLButtonElement) => void;
 }) {
   const marked = division.presentCount + division.absentCount;
   const upToDate = division.guardCount > 0 && marked >= division.guardCount;
@@ -54,46 +52,46 @@ function DivisionCard({
   return (
     <button
       type="button"
-      onClick={() => onSelect(division.id)}
+      onClick={(event) => onSelect(division.id, event.currentTarget)}
       aria-pressed={selected}
-      className={`group relative flex w-full flex-col items-center overflow-visible rounded-[28px] border-0 bg-transparent p-0 text-center shadow-none transition-all duration-150 active:scale-[0.99] md:items-stretch md:gap-3 md:overflow-hidden md:border md:bg-white md:p-3.5 md:text-left md:shadow-[0_18px_40px_rgba(17,38,67,0.08)] md:hover:-translate-y-0.5 md:hover:shadow-[0_22px_46px_rgba(17,38,67,0.12)] ${selected ? 'md:border-[#24598a] md:ring-2 md:ring-[#24598a] md:ring-offset-2' : ''}`}
+      className={`group relative flex w-full flex-col items-center overflow-visible rounded-[28px] border-0 bg-transparent p-0 text-center shadow-none transition-all duration-300 active:scale-[0.98] md:items-stretch md:gap-3 md:overflow-hidden md:border md:bg-white md:p-3.5 md:text-left md:shadow-[0_18px_40px_rgba(17,38,67,0.08)] md:hover:-translate-y-1 md:hover:shadow-[0_26px_50px_rgba(17,38,67,0.13)] ${selected ? 'md:border-[#24598a] md:ring-2 md:ring-[#24598a] md:ring-offset-2' : ''}`}
     >
-      <div className={`relative flex aspect-square w-full items-center justify-center rounded-[28px] bg-[#3977a7] text-[clamp(4.5rem,19vw,7rem)] font-semibold text-white shadow-[0_12px_24px_rgba(32,77,116,0.16)] transition ${selected ? 'ring-[3px] ring-[#24598a] ring-offset-[5px]' : ''} md:hidden`}>
+      <div className={`relative flex aspect-square w-full items-center justify-center rounded-[28px] bg-[#3977a7] text-[clamp(4.5rem,19vw,7rem)] font-semibold text-white shadow-[0_12px_24px_rgba(32,77,116,0.16)] transition-all duration-300 group-hover:scale-[1.02] ${selected ? 'ring-[3px] ring-[#24598a] ring-offset-[5px]' : ''} md:hidden`}>
         {districtName.charAt(0).toUpperCase()}
         {selected && (
-          <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#9d3440] shadow-md">
+          <span className="animate-check-pop absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#9d3440] shadow-md">
             <Icon icon="check" size={22} fill />
           </span>
         )}
       </div>
-      <span className="mt-3 max-w-full truncate px-1 text-lg font-bold text-[#18334f] md:hidden">{districtName}</span>
+      <span className="mt-3 max-w-full truncate px-1 text-lg font-bold text-[#18334f] transition-colors duration-200 group-hover:text-primary md:hidden">{districtName}</span>
 
       <div className="hidden w-full flex-col gap-3 md:flex">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#102a43] to-[#24598a] text-xl font-bold text-white shadow-inner shadow-black/10">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#102a43] to-[#24598a] text-xl font-bold text-white shadow-inner shadow-black/10 transition-transform duration-300 group-hover:scale-105">
               {districtCode.slice(0, 2)}
             </span>
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b7d8d]">District</p>
-              <h3 className="mt-1 truncate text-xl font-bold text-[#102a43]">{districtName}</h3>
+              <h3 className="mt-1 truncate text-xl font-bold text-[#102a43] transition-colors duration-200 group-hover:text-[#24598a]">{districtName}</h3>
               <p className="text-sm text-[#526372]">{TAMIL_NAMES[division.code] ?? districtCode}</p>
             </div>
           </div>
-          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${selected ? 'bg-[#e7f0ff] text-[#24598a]' : upToDate ? 'bg-[#eaf7f2] text-[#1d7a5a]' : 'bg-[#fff2e8] text-[#b76114]'}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-200 ${selected ? 'animate-check-pop bg-[#e7f0ff] text-[#24598a]' : upToDate ? 'bg-[#eaf7f2] text-[#1d7a5a]' : 'bg-[#fff2e8] text-[#b76114]'}`}>
             {selected && <Icon icon="check_circle" size={14} fill />}
             {selected ? 'Selected' : badge}
           </span>
         </div>
 
-        <div className="rounded-2xl bg-[#f3f7fb] p-3">
+        <div className="rounded-2xl bg-[#f3f7fb] p-3 transition-colors duration-200 group-hover:bg-[#ebf2f8]">
           <div className="flex items-center justify-between gap-2 text-sm text-[#526372]">
             <span>{division.guardCount} Home Guards</span>
             <span className="font-semibold text-[#102a43]">{marked}/{division.guardCount || 0} marked</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dfe9f3]">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#2d7ec6] to-[#1f9d6f]"
+              className="h-full rounded-full bg-gradient-to-r from-[#2d7ec6] to-[#1f9d6f] transition-all duration-700 ease-out"
               style={{ width: `${division.guardCount ? (marked / division.guardCount) * 100 : 0}%` }}
             />
           </div>
@@ -126,6 +124,8 @@ export function DivisionChooser() {
   const [divisions, setDivisions] = useState<DivisionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [enteringDivision, setEnteringDivision] = useState<DivisionSummary | null>(null);
+  const [transitionOrigin, setTransitionOrigin] = useState({ x: '50vw', y: '50vh' });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -143,19 +143,22 @@ export function DivisionChooser() {
 
   useEffect(() => setSelectedId(divisionId), [divisionId]);
 
-  function select(id: string) {
+  function select(id: string, target: HTMLButtonElement) {
+    if (enteringDivision) return;
     setSelectedId(id);
-  }
-
-  function continueToWorkspace() {
-    if (!selectedId) return;
-    setDivisionId(selectedId);
-    router.push(role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
+    const division = divisions.find((item) => item.id === id);
+    if (!division) return;
+    const bounds = target.getBoundingClientRect();
+    setTransitionOrigin({ x: `${bounds.left + bounds.width / 2}px`, y: `${bounds.top + bounds.height / 2}px` });
+    setDivisionId(id);
+    setEnteringDivision(division);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(() => {
+      router.push(role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
+    }, reduceMotion ? 0 : 580);
   }
 
   const totalGuards = divisions.reduce((sum, division) => sum + division.guardCount, 0);
-  const selectedDivision = divisions.find((division) => division.id === selectedId);
-
   return (
     <div className="mx-auto max-w-[720px] space-y-4">
       <section className="hidden rounded-[32px] bg-gradient-to-br from-[#102a43] via-[#183d63] to-[#24598a] px-4 pb-5 pt-4 text-white shadow-[0_18px_40px_rgba(18,40,63,0.18)] sm:px-5 md:block">
@@ -226,7 +229,7 @@ export function DivisionChooser() {
           <p className="mt-1 text-sm text-[#526372]">Ask Command HQ to set up the attendance districts.</p>
         </div>
       ) : (
-        <div role="list" className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-4">
+        <div role="list" className="stagger-in grid grid-cols-2 gap-x-3 gap-y-5 md:gap-4">
           {divisions.map((division) => (
             <div key={division.id}>
               <DivisionCard division={division} selected={division.id === selectedId} onSelect={select} />
@@ -235,21 +238,31 @@ export function DivisionChooser() {
         </div>
       )}
 
-      {divisions.length > 0 && !loading && !error && (
-        <button
-          type="button"
-          onClick={continueToWorkspace}
-          disabled={!selectedDivision}
-          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#24598a] px-4 text-base font-bold text-white shadow-[0_12px_26px_rgba(36,89,138,0.24)] transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span>Continue{selectedDivision ? ` with ${DISTRICT_NAMES[selectedDivision.code] ?? selectedDivision.name}` : ''}</span>
-          <Icon icon="arrow_forward" size={20} />
-        </button>
-      )}
       <div className="flex items-center justify-center gap-2 py-5 text-center text-[#667085] md:hidden">
         <Icon icon="verified_user" size={18} className="text-[#9d3440]" />
         <span className="text-sm">Authorized for Official Review • TN Police Dept</span>
       </div>
+
+      {/* Polished division entry expand & workspace reveal transition */}
+      {enteringDivision && (
+        <div
+          className="division-entry fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-[#102a43] via-[#183d63] to-[#24598a] text-white"
+          style={{ '--division-origin-x': transitionOrigin.x, '--division-origin-y': transitionOrigin.y } as React.CSSProperties}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="division-entry-content flex flex-col items-center px-6 text-center">
+            <span className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-white text-3xl font-bold text-[#102a43]">
+              {(DISTRICT_NAMES[enteringDivision.code] ?? enteringDivision.name).charAt(0)}
+            </span>
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{DISTRICT_NAMES[enteringDivision.code] ?? enteringDivision.name}</h2>
+            <div className="mt-4 flex items-center gap-2.5 text-sm text-sky-100/90">
+              <Icon icon="sync" size={17} className="animate-spin" />
+              <span>Opening division workspace</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

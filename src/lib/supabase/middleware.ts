@@ -7,9 +7,8 @@ import {
   isSupabaseConfigured,
 } from './env';
 
-// Routes a signed-in visitor should be sent away from. `/reset-password` is
-// excluded: it is only reachable while a password-recovery session is live.
-const AUTH_ONLY_ROUTES = ['/login', '/register', '/forgot-password'];
+// Routes a signed-in visitor should be sent away from.
+const AUTH_ONLY_ROUTES = ['/login', '/register'];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -98,8 +97,6 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const isRecoveryPath = pathname.startsWith('/reset-password');
-
   // RLS policy "Users can view own profile" limits this read to the caller's row.
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -128,8 +125,7 @@ export async function updateSession(request: NextRequest) {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
     }
-    // A non-active account may still use the password-recovery and sign-out paths.
-    if (!isRecoveryPath && !isAuthRoute) {
+    if (!isAuthRoute) {
       return redirect('/login', {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
@@ -156,7 +152,7 @@ export async function updateSession(request: NextRequest) {
     return redirect('/homeguard/dashboard');
   }
 
-  if (isInchargeRoute && !['/incharge/divisions', '/incharge/attendance', '/incharge/reports'].includes(pathname)) {
+  if (isInchargeRoute && !['/incharge/divisions', '/incharge/attendance', '/incharge/personnel', '/incharge/reports'].includes(pathname)) {
     return redirect('/incharge/divisions');
   }
 

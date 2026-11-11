@@ -304,8 +304,8 @@ export default function AssignmentsPage() {
 
         {/* Schedule Duty Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-surface-container-lowest rounded-xl max-w-lg w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+          <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-4 backdrop-blur-xs">
+            <div className="overlay-panel flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
               <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon icon="fact_check" size={20} className="text-primary" />

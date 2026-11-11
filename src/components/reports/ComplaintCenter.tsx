@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Chip, EmptyState, PrimaryButton } from '@/components/ui/primitives';
 import { useAuth } from '@/lib/auth/authContext';
 import { createClient } from '@/lib/supabase/client';
+import { compressImage } from '@/lib/services/simpleAttendanceService';
 
 type ReportStatus = 'submitted' | 'under_review' | 'resolved' | 'dismissed';
 type ReportCategory = 'conduct' | 'attendance' | 'safety' | 'other';
@@ -26,6 +27,7 @@ interface GuardReport {
   subject_personnel_id: string | null;
   category: ReportCategory;
   description: string;
+  evidence_photo: string | null;
   status: ReportStatus;
   resolution_note: string | null;
   created_at: string;
@@ -56,7 +58,7 @@ const categories: { value: ReportCategory; label: string; icon: string }[] = [
 const categoryLabel = (value: ReportCategory) => categories.find((item) => item.value === value)?.label ?? 'Other concern';
 
 const reportColumns =
-  'id,reporter_id,reporter_name,reporter_personnel_id,subject_id,subject_name,subject_personnel_id,category,description,status,resolution_note,created_at,updated_at';
+  'id,reporter_id,reporter_name,reporter_personnel_id,subject_id,subject_name,subject_personnel_id,category,description,evidence_photo,status,resolution_note,created_at,updated_at';
 
 const MAX_DESCRIPTION = 4000;
 
@@ -81,6 +83,8 @@ export function ComplaintCenter() {
   const [guardQuery, setGuardQuery] = useState('');
   const [category, setCategory] = useState<ReportCategory>('conduct');
   const [description, setDescription] = useState('');
+  const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [adminDrafts, setAdminDrafts] = useState<Record<string, { status: ReportStatus; note: string }>>({});
 
@@ -145,6 +149,21 @@ export function ComplaintCenter() {
     setGuardQuery('');
   }
 
+  async function attachEvidencePhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setCompressingPhoto(true);
+    setError('');
+    try {
+      setEvidencePhoto(await compressImage(file, 1200, 1200, 0.8));
+    } catch {
+      setError('Could not process that photo. Please choose another image.');
+    } finally {
+      setCompressingPhoto(false);
+    }
+  }
+
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user || !subjectId || description.trim().length < 10) return;
@@ -158,9 +177,11 @@ export function ComplaintCenter() {
         subject_id: subjectId,
         category,
         description: description.trim(),
+        ...(evidencePhoto ? { evidence_photo: evidencePhoto } : {}),
       });
       if (insertError) throw insertError;
       setDescription('');
+      setEvidencePhoto(null);
       setSubjectId('');
       setGuardQuery('');
       setSuccess('Report recorded and routed to Command. The filing is visible to the administrator and the reported guard.');
@@ -200,7 +221,7 @@ export function ComplaintCenter() {
   function renderReviewCard(report: GuardReport, received = false) {
     const draft = adminDrafts[report.id] || { status: report.status, note: report.resolution_note || '' };
     return (
-      <article key={report.id} className="flex flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-card">
+      <article key={report.id} className="card-hover-lift flex flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-card transition-all duration-300 hover:shadow-md">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-label-lg font-bold text-on-surface">
@@ -222,6 +243,7 @@ export function ComplaintCenter() {
         <p className="whitespace-pre-wrap rounded-lg bg-surface-container-low p-2.5 text-body-md text-sm leading-6 text-on-surface">
           {report.description}
         </p>
+        {report.evidence_photo && <img src={report.evidence_photo} alt="Attached report evidence" className="max-h-52 w-fit max-w-full rounded-lg border border-outline-variant/60 object-contain" />}
         {report.resolution_note && !isAdmin && (
           <div className="rounded-lg bg-on-tertiary-container/10 p-3">
             <p className="text-label-sm font-bold uppercase text-on-tertiary-container">Command response</p>
@@ -272,7 +294,7 @@ export function ComplaintCenter() {
         <div className="flex flex-col gap-1 rounded-xl bg-surface-container-low p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary/10 px-2 py-0.5 text-label-sm uppercase tracking-wider text-secondary">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-secondary" aria-hidden />
+              <span className="beacon-pulse-red h-1.5 w-1.5 rounded-full bg-secondary" aria-hidden />
               Station Log Memo
             </span>
             <span className="flex items-center gap-1 text-label-sm text-on-surface-variant">
@@ -285,7 +307,7 @@ export function ComplaintCenter() {
         </div>
 
         {success && (
-          <div role="status" className="flex items-center justify-between gap-3 rounded-xl bg-tertiary-container p-3.5 text-on-tertiary-container shadow-md">
+          <div role="status" className="alert-enter flex items-center justify-between gap-3 rounded-xl bg-tertiary-container p-3.5 text-on-tertiary-container shadow-md">
             <div className="flex min-w-0 items-center gap-2.5">
               <Icon icon="check_circle" size={24} className="shrink-0 text-tertiary-fixed" />
               <div className="flex min-w-0 flex-col">
@@ -300,7 +322,7 @@ export function ComplaintCenter() {
         )}
 
         {error && (
-          <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+          <div role="alert" className="alert-enter flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
             <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
             <span className="min-w-0 flex-1 text-sm">{error}</span>
           </div>
@@ -474,9 +496,26 @@ export function ComplaintCenter() {
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <span className="text-label-sm font-bold uppercase tracking-wider text-on-surface">Evidence Photo <span className="font-normal normal-case tracking-normal text-on-surface-variant">(optional)</span></span>
+            {evidencePhoto ? (
+              <div className="flex items-center gap-3 rounded-xl bg-surface-container-lowest p-3 shadow-sm">
+                <img src={evidencePhoto} alt="Evidence photo preview" className="h-14 w-20 rounded-md object-cover" />
+                <div className="flex-1 text-sm font-semibold text-on-surface">Photo attached</div>
+                <button type="button" onClick={() => setEvidencePhoto(null)} className="text-xs font-bold text-error underline">Remove</button>
+              </div>
+            ) : (
+              <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 text-label-md font-semibold text-primary hover:bg-surface-container-low ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
+                {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
+                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
+              </label>
+            )}
+          </div>
+
           {/* Field 8: Primary action. */}
           <div className="flex flex-col gap-2 pt-1">
-            <PrimaryButton type="submit" icon={saving ? null : 'arrow_forward'} disabled={saving || !subjectId || description.trim().length < 10}>
+            <PrimaryButton type="submit" icon={saving ? null : 'arrow_forward'} disabled={saving || compressingPhoto || !subjectId || description.trim().length < 10}>
               {saving && <Icon icon="sync" size={20} className="animate-spin" />}
               Submit Incident Report
             </PrimaryButton>
@@ -501,7 +540,9 @@ export function ComplaintCenter() {
           {loading ? (
             <p className="flex items-center justify-center gap-2 py-8 text-sm text-on-surface-variant"><Icon icon="sync" size={18} className="animate-spin" />Loading reports…</p>
           ) : reports.length ? (
-            reports.map((report) => renderReviewCard(report))
+            <div className="stagger-in flex flex-col gap-3">
+              {reports.map((report) => renderReviewCard(report))}
+            </div>
           ) : (
             <EmptyState icon="inbox" title="No personnel reports" body="No reports have been submitted yet." />
           )}
@@ -537,7 +578,9 @@ function ReportSection({ title, description, reports, loading, empty, render }: 
       {loading ? (
         <p className="py-5 text-sm text-on-surface-variant">Loading…</p>
       ) : reports.length ? (
-        reports.map(render)
+        <div className="stagger-in flex flex-col gap-3">
+          {reports.map(render)}
+        </div>
       ) : (
         <EmptyState icon="inbox" title={empty} />
       )}

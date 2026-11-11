@@ -22,7 +22,9 @@ function DashboardFrame({ children, title, subtitle }: DashboardLayoutProps) {
   const router = useRouter();
   const { divisionId, resolved } = useDivision();
   const requiresDivision = pathname === '/admin/personnel'
+    || pathname === '/admin/dashboard'
     || pathname === '/incharge/attendance';
+  const choosingDivision = pathname === '/admin/divisions' || pathname === '/incharge/divisions';
 
   useEffect(() => {
     if (!resolved || divisionId || !requiresDivision) return;
@@ -33,10 +35,14 @@ function DashboardFrame({ children, title, subtitle }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(36,89,138,.07),_transparent_32rem)] bg-surface text-on-surface">
       <Sidebar />
-      <div className="flex min-h-screen min-w-0 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pl-[264px] lg:pb-0">
+      <div className={`flex min-h-screen min-w-0 flex-col ${choosingDivision ? '' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'} lg:pl-[264px] lg:pb-0`}>
         <Header title={title} subtitle={subtitle} />
         <main className="mx-auto w-full max-w-[640px] flex-1 px-4 py-5 sm:max-w-[1440px] sm:px-7 sm:py-8 lg:px-10">
-          {waitingForDivision ? null : children}
+          {waitingForDivision ? null : (
+            <div key={pathname} className="page-enter">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

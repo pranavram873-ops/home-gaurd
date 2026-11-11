@@ -44,12 +44,6 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-export function getAppUrl(): string {
-  // Trailing slash is stripped: callers append '/login' or '/reset-password', and
-  // a doubled slash would not match Supabase's Redirect URLs allow-list.
-  return (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
-}
-
 // Public enlistment switch (defaults to enabled).
 export function isPublicRegistrationEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION !== 'false';

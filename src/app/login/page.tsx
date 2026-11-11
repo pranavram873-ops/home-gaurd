@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/authContext';
 import { LOGIN_ROUTE_ERRORS } from '@/lib/auth/errors';
@@ -34,7 +33,7 @@ function Field({
         <label htmlFor={id} className="text-label-md text-on-surface">{label}</label>
         {hint && <span className="text-label-sm text-secondary">{hint}</span>}
       </div>
-      <div className="flex items-center rounded-lg bg-surface-container-low shadow-sm transition-colors focus-within:bg-surface-container-lowest">
+      <div className="field-shell flex items-center rounded-lg bg-surface-container-low shadow-sm">
         <span className="flex items-center pl-3.5 pr-2 text-on-surface-variant" aria-hidden>
           <Icon icon={icon} size={20} />
         </span>
@@ -55,7 +54,7 @@ function LoginForm() {
   const { login } = useAuth();
   const { setDivisionId } = useDivision();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,21 +76,21 @@ function LoginForm() {
     setErrorMsg(null);
     setInfoMsg(null);
 
-    const validation = loginSchema.safeParse({ email, password });
+    const validation = loginSchema.safeParse({ username, password });
     if (!validation.success) {
-      setErrorMsg(validation.error.errors[0]?.message || 'Enter your official email and password.');
+      setErrorMsg(validation.error.errors[0]?.message || 'Enter your username and password.');
       return;
     }
 
-    if (!email) {
-      setErrorMsg('Please enter your registered official email address.');
+    if (!username.trim()) {
+      setErrorMsg('Please enter your username.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const res = await login(email, password);
+      const res = await login(username.trim(), password);
       if (res.success && res.role) {
         // Start each admin/incharge session at the district chooser so their
         // workspace and personnel list begin in the division they selected.
@@ -117,7 +116,7 @@ function LoginForm() {
   return (
     <>
       {errorMsg && (
-        <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+        <div role="alert" className="alert-enter mb-4 flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
           <Icon icon="error" size={20} fill className="mt-0.5 shrink-0 text-error" />
           <div className="min-w-0 flex-1 text-xs">
             <span className="block text-sm font-bold">Security advisory</span>
@@ -135,7 +134,7 @@ function LoginForm() {
       )}
 
       {infoMsg && (
-        <div role="status" className="mb-4 flex items-start gap-2.5 rounded-lg bg-tertiary-fixed p-3 text-on-tertiary-fixed-variant">
+        <div role="status" className="alert-enter mb-4 flex items-start gap-2.5 rounded-lg bg-tertiary-fixed p-3 text-on-tertiary-fixed-variant">
           <Icon icon="check_circle" size={20} fill className="mt-0.5 shrink-0" />
           <span className="min-w-0 flex-1 text-xs">{infoMsg}</span>
         </div>
@@ -143,22 +142,21 @@ function LoginForm() {
 
       <form onSubmit={handleLogin} className="space-y-4">
         <Field
-          id="dept-email"
-          label="Official department email"
+          id="username"
+          label="Username"
           hint="Mandatory"
           icon="shield_person"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="officer.name@tnpolice.gov.in"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Enter your username"
           autoComplete="username"
           required
         />
 
         <Field
           id="dept-password"
-          label="Department password"
-          hint="Case-sensitive"
+          label="Password"
           icon="key"
           type={showPassword ? 'text' : 'password'}
           value={password}
@@ -178,26 +176,25 @@ function LoginForm() {
           }
         />
 
-        <div className="pt-1">
-          <Link href="/forgot-password" className="text-label-md text-secondary hover:text-on-secondary-fixed-variant">
-            Forgot password?
-          </Link>
-        </div>
+        <p className="flex items-center gap-2 text-xs text-on-surface-variant">
+          <Icon icon="devices" size={17} className="shrink-0 text-secondary" />
+          <span>Stay signed in on this device for 30 days.</span>
+        </p>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-label-lg text-base text-on-primary shadow-md transition-transform hover:bg-primary-container active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+          className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-label-lg text-base text-on-primary shadow-md transition-all duration-200 hover:bg-primary-container hover:shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
         >
           {isLoading ? (
             <>
               <Icon icon="sync" size={20} className="animate-spin" />
-              <span>Authenticating token…</span>
+              <span>Signing in…</span>
             </>
           ) : (
             <>
               <span>Sign in</span>
-              <Icon icon="arrow_forward" size={20} />
+              <Icon icon="arrow_forward" size={20} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </>
           )}
         </button>
@@ -209,13 +206,12 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-surface">
-      <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
-        {/* Ambient command banner. */}
-        <div className="relative overflow-hidden bg-[linear-gradient(125deg,#102a43_0%,#24598a_72%,#19736a_120%)] px-4 pb-8 pt-6 text-on-surface shadow-md">
+      <main className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-surface px-4 py-8 sm:justify-center">
+        <div className="auth-enter relative overflow-hidden rounded-t-2xl bg-primary px-6 pb-7 pt-6 text-on-primary">
           <svg
             viewBox="0 0 200 200"
             aria-hidden
-            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-surface opacity-10"
+            className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 fill-current text-on-primary opacity-10"
           >
             <path d="M100 15 L170 50 L170 120 C170 160 100 190 100 190 C100 190 30 160 30 120 L30 50 Z" />
           </svg>
@@ -225,37 +221,25 @@ export default function LoginPage() {
               <img src="/images/tn-home-guards-logo.png" alt="Tamil Nadu Home Guards emblem" className="h-full w-full object-contain" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-fixed/60">Tamil Nadu</p>
-              <p className="text-xl font-extrabold leading-tight tracking-tight text-on-surface">Home Guards</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-primary/70">Tamil Nadu</p>
+              <p className="text-xl font-extrabold leading-tight tracking-tight">Home Guards</p>
               <span className="mt-2 block h-1 w-12 rounded-full bg-secondary-fixed" aria-hidden />
             </div>
           </div>
           <div className="relative z-10 flex items-center justify-between gap-2 pt-1">
-            <p className="text-label-md text-primary-fixed/60">Government of Tamil Nadu</p>
+            <p className="text-label-md text-on-primary/70">Government of Tamil Nadu</p>
           </div>
         </div>
 
         {/* The card overlaps the banner, which is how the mockup binds the form
             to the identity strip above it. */}
-        <div className="relative z-20 -mt-4 flex flex-col gap-4 px-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container text-primary" aria-hidden>
-                <Icon icon="location_on" size={18} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <span className="block text-label-sm uppercase text-on-surface-variant">Sign-in node</span>
-                <p className="truncate text-label-lg text-on-surface">Secure Command Network</p>
-              </div>
-              <span className="shrink-0 rounded-md bg-surface-container-low px-2 py-1 text-xs font-bold text-on-tertiary-container">VERIFIED</span>
-            </div>
-          </Card>
+        <div className="auth-enter relative z-20 flex flex-col" style={{ animationDelay: '60ms' }}>
           <Card className="p-space-md">
             <div className="mb-4 flex items-start justify-between gap-2">
               <div>
                 <h1 className="text-headline-md text-on-surface">Welcome back</h1>
                 <p className="mt-0.5 text-body-md text-sm text-on-surface-variant">
-                  Sign in with your official Incharge or Officer credentials to continue.
+                  Use your personnel username and password to continue.
                 </p>
               </div>
               <Icon icon="badge" size={30} className="shrink-0 text-primary-container opacity-30" />

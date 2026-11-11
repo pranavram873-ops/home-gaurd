@@ -54,7 +54,7 @@ export interface MusterEvent {
 
 export async function loadAttendancePage(divisionId: string, date: string) {
   const supabase = createClient();
-  let musterEventQuery = divisionId
+  const musterEventQuery = divisionId
     ? supabase
         .from('muster_events')
         .select('id, division_id, event_date, event_name, address, evidence_photos, created_by, created_at, updated_at')
@@ -63,7 +63,7 @@ export async function loadAttendancePage(divisionId: string, date: string) {
         .maybeSingle()
     : Promise.resolve({ data: null, error: null });
 
-  let [divisions, roster, marks, musterEvent] = await Promise.all([
+  const [divisions, roster, initialMarks, initialMusterEvent] = await Promise.all([
     supabase.from('attendance_divisions').select('id, code, name').order('name'),
     divisionId
       ? supabase
@@ -82,6 +82,9 @@ export async function loadAttendancePage(divisionId: string, date: string) {
       : Promise.resolve({ data: [], error: null }),
     musterEventQuery,
   ]);
+
+  let marks = initialMarks;
+  let musterEvent = initialMusterEvent;
 
   if (marks.error && marks.error.message.includes('photo_url')) {
     const fallbackMarks = await supabase
@@ -187,6 +190,54 @@ export async function saveMusterEvent(
     throw new Error(error.message);
   }
   return data as MusterEvent;
+}
+
+export async function deleteMusterEvent(divisionId: string, date: string): Promise<void> {
+  const { error } = await createClient().rpc('delete_muster_event_and_attendance', {
+    p_division_id: divisionId,
+    p_event_date: date,
+  });
+  if (error) throw new Error(describeQueryError(error) || 'Could not delete this event.');
+}
+
+export async function getMusterEventParticipants(eventId: string): Promise<string[]> {
+  const { data, error } = await createClient().from('muster_event_participants').select('guard_id').eq('event_id', eventId);
+  if (error) throw new Error(describeQueryError(error) || 'Could not load selected personnel.');
+  return (data ?? []).map((row) => row.guard_id as string);
+}
+
+export async function setMusterEventParticipant(eventId: string, guardId: string, selected: boolean): Promise<void> {
+  const supabase = createClient();
+  const result = selected
+    ? await supabase.from('muster_event_participants').upsert({ event_id: eventId, guard_id: guardId }, { onConflict: 'event_id,guard_id' })
+    : await supabase.from('muster_event_participants').delete().eq('event_id', eventId).eq('guard_id', guardId);
+  if (result.error) throw new Error(describeQueryError(result.error) || 'Could not update event personnel.');
+}
+
+/**
+ * Admin-only removal of a Home Guard profile: drops them from the active
+ * division roster, suspends any matching personnel account, and clears
+ * event memberships so they stop appearing on muster lists.
+ */
+export async function deactivateHomeGuard(guardId: string, phone: string, homeGuardCode: string): Promise<void> {
+  const supabase = createClient();
+  const { error: rosterError } = await supabase
+    .from('home_guard_roster')
+    .update({ is_active: false })
+    .eq('id', guardId);
+  if (rosterError) throw new Error(describeQueryError(rosterError) || 'Could not remove this Home Guard.');
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ account_status: 'suspended' })
+    .or(`phone.eq.${phone},personnel_id.ilike.${homeGuardCode}`);
+  if (profileError) throw new Error(describeQueryError(profileError) || 'Could not suspend the personnel profile.');
+
+  const { error: memberError } = await supabase
+    .from('muster_event_participants')
+    .delete()
+    .eq('guard_id', guardId);
+  if (memberError) throw new Error(describeQueryError(memberError) || 'Could not clear event memberships.');
 }
 
 /**
@@ -412,6 +463,16 @@ export async function saveDailyMark(
   if (error) throw new Error(error.message);
 }
 
+export async function clearDailyMark(guardId: string, divisionId: string, date: string): Promise<void> {
+  const { error } = await createClient()
+    .from('daily_attendance')
+    .delete()
+    .eq('guard_id', guardId)
+    .eq('division_id', divisionId)
+    .eq('attendance_date', date);
+  if (error) throw new Error(describeQueryError(error) || 'Could not clear attendance for this event.');
+}
+
 export async function addRosterGuard(input: {
   full_name: string;
   phone: string;
@@ -546,6 +607,7 @@ export async function filePersonnelReport(input: {
   divisionId: string;
   category: string;
   description: string;
+  evidencePhoto?: string | null;
 }) {
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -557,6 +619,7 @@ export async function filePersonnelReport(input: {
     division_id: input.divisionId,
     category: input.category,
     description: input.description.trim(),
+    ...(input.evidencePhoto ? { evidence_photo: input.evidencePhoto } : {}),
   });
 
   if (error) throw new Error(error.message);

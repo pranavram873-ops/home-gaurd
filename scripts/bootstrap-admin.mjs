@@ -3,7 +3,7 @@
  * Secure First Administrator Bootstrap Script
  *
  * Usage (the password is entered without echo and is not saved in shell history):
- *   node scripts/bootstrap-admin.mjs <admin-email> "<full-name>"
+ *   node scripts/bootstrap-admin.mjs <admin-email> <admin-username> "<full-name>"
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -35,10 +35,11 @@ if (!supabaseUrl || !serviceRoleKey || serviceRoleKey.includes('dummy')) {
 }
 
 const email = process.argv[2]?.trim();
-const fullName = process.argv[3]?.trim();
+const username = process.argv[3]?.trim().toUpperCase();
+const fullName = process.argv[4]?.trim();
 
-if (!email || !fullName) {
-  console.log('\x1b[33mUsage:\x1b[0m node scripts/bootstrap-admin.mjs <email> "<full-name>"');
+if (!email || !username || !fullName) {
+  console.log('\x1b[33mUsage:\x1b[0m node scripts/bootstrap-admin.mjs <email> <username> "<full-name>"');
   process.exit(1);
 }
 
@@ -133,6 +134,7 @@ async function bootstrap() {
         id: userId,
         full_name: fullName,
         email,
+        personnel_id: username,
         role: 'admin',
         account_status: 'active',
         rank_designation: 'State Administrator',
@@ -147,10 +149,11 @@ async function bootstrap() {
 
   console.log('\x1b[32m[SUCCESS]\x1b[0m First Administrator successfully provisioned:');
   console.log(`  Name: ${profile.full_name}`);
+  console.log(`  Username: ${profile.personnel_id}`);
   console.log(`  Email: ${profile.email}`);
   console.log(`  Role: ${profile.role}`);
   console.log(`  Status: ${profile.account_status}`);
-  console.log('\nYou may now log in at /login with these credentials.\n');
+  console.log('\nYou may now log in at /login with the username and password.\n');
 }
 
 bootstrap().catch((err) => {

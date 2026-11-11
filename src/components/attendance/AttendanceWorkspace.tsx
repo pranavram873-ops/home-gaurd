@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   addMusterEventEvidencePhoto,
-  addRosterGuard,
-  addRosterGuards,
+  deleteMusterEvent,
+  getMusterEventParticipants,
+  setMusterEventParticipant,
   compressImage,
   filePersonnelReport,
   loadAttendancePage,
@@ -27,7 +29,8 @@ import {
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { useAuth } from '@/lib/auth/authContext';
 import { Icon } from '@/components/ui/Icon';
-import { BottomSheet, Card, Chip, Dot, EmptyState } from '@/components/ui/primitives';
+import { Card, Chip, EmptyState, SegmentedFilter } from '@/components/ui/primitives';
+import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
 
 function todayLocal() {
   const now = new Date();
@@ -52,6 +55,8 @@ function formatDay(date: string) {
 function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
 }
+
+type AttendanceFilter = 'all' | 'present' | 'absent';
 
 /**
  * Duty history register inside the profile modal: Home Guard code and duty counts.
@@ -151,12 +156,15 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
   );
 }
 
-export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: { canAddGuards?: boolean }) {
+export function AttendanceWorkspace() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { divisionId, setDivisionId } = useDivision();
   const { role } = useAuth();
-  const canAddGuards = canAddGuardsProp || role === 'admin';
+  const requestedDate = searchParams.get('date');
+  const requestedEventName = searchParams.get('event');
   const [divisions, setDivisions] = useState<AttendanceDivision[]>([]);
-  const [date, setDate] = useState(todayLocal);
+  const [date, setDate] = useState(() => requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayLocal());
   const [eventMonth, setEventMonth] = useState(() => todayLocal().slice(0, 7));
   const [monthEvents, setMonthEvents] = useState<AttendanceEventSummary[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -168,25 +176,21 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
   const [musterEvent, setMusterEvent] = useState<MusterEvent | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [showDeleteEventDialog, setShowDeleteEventDialog] = useState(false);
   const [uploadingEventPhoto, setUploadingEventPhoto] = useState(false);
 
   // Roster and marks state
   const [roster, setRoster] = useState<RosterGuard[]>([]);
   const [marks, setMarks] = useState<DailyMark[]>([]);
+  const [selectedGuardIds, setSelectedGuardIds] = useState<string[]>([]);
   const [bandobast, setBandobast] = useState<BandobastEvent[]>([]);
   const [search, setSearch] = useState('');
+  const [attendanceFilter, setAttendanceFilter] = useState<AttendanceFilter>('all');
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  // Add guard roster state
-  const [showAdd, setShowAdd] = useState(false);
-  const [bulkMode, setBulkMode] = useState(false);
-  const [bulkText, setBulkText] = useState('');
-  const [form, setForm] = useState({ full_name: '', phone: '', home_guard_code: '' });
-  const [adding, setAdding] = useState(false);
   const [evidenceByGuard, setEvidenceByGuard] = useState<Record<string, { name: string; dataUrl: string }>>({});
 
   // Profile Modal State
@@ -199,9 +203,15 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
   const [reportDescription, setReportDescription] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [reportPhoto, setReportPhoto] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
 
   // Image Preview Lightbox State
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) setDate(requestedDate);
+  }, [requestedDate]);
 
   useEffect(() => {
     let live = true;
@@ -215,6 +225,25 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         setRoster(data.roster);
         setMarks(data.marks);
 
+        // A direct link from the event list must open the selected event rather
+        // than landing on the date's event list again. Legacy attendance days
+        // may not have a muster_events row, so build the same fallback record
+        // used when selecting one from the in-page list.
+        if (role === 'incharge' && requestedDate === date) {
+          const selectedEvent: MusterEvent = data.musterEvent ?? {
+            id: `muster-${divisionId}-${date}`,
+            division_id: divisionId,
+            event_date: date,
+            event_name: requestedEventName || `${formatDay(date)} Muster`,
+            created_by: '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setMusterEvent(selectedEvent);
+          setEventName(selectedEvent.event_name);
+          setEventAddress(selectedEvent.address ?? '');
+        }
+
         // Restore guard photos from database marks
         const photosFromDb: Record<string, { name: string; dataUrl: string }> = {};
         for (const mark of data.marks) {
@@ -227,14 +256,66 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load attendance.'))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [divisionId, date, setDivisionId]);
+  }, [divisionId, date, requestedDate, requestedEventName, role, setDivisionId]);
 
   useEffect(() => {
     setMusterEvent(null);
+    setSelectedGuardIds([]);
     setEventName('');
     setEventAddress('');
     setShowEventForm(false);
   }, [divisionId]);
+
+  useEffect(() => {
+    let live = true;
+    if (!musterEvent) { setSelectedGuardIds([]); return; }
+    if (musterEvent.id === `muster-${divisionId}-${date}`) {
+      setSelectedGuardIds(marks.map((mark) => mark.guard_id));
+      return () => { live = false; };
+    }
+    getMusterEventParticipants(musterEvent.id).then((ids) => { if (live) setSelectedGuardIds(ids); }).catch((reason) => { if (live) setError(reason instanceof Error ? reason.message : 'Could not load event personnel.'); });
+    return () => { live = false; };
+  }, [musterEvent?.id, divisionId, date, marks]);
+
+  async function toggleEventGuard(guard: RosterGuard) {
+    if (!musterEvent) return;
+    const selected = !selectedGuardIds.includes(guard.id);
+    const want = selected ? 'present' : 'absent';
+    const priorStatus = markByGuard.get(guard.id)?.status;
+    setSelectedGuardIds((current) => selected ? [...current, guard.id] : current.filter((id) => id !== guard.id));
+    try {
+      await setMusterEventParticipant(musterEvent.id, guard.id, selected);
+      if (priorStatus !== want) {
+        await saveDailyMark(guard.id, divisionId, date, want);
+        setMarks((current) => {
+          const prior = current.find((mark) => mark.guard_id === guard.id);
+          if (prior) return current.map((mark) => (mark.guard_id === guard.id ? { ...mark, status: want } : mark));
+          return [...current, {
+            id: `${guard.id}-${date}`,
+            guard_id: guard.id,
+            division_id: divisionId,
+            attendance_date: date,
+            status: want,
+            marked_at: new Date().toISOString(),
+          }];
+        });
+      }
+    }
+    catch (reason) {
+      setSelectedGuardIds((current) => selected ? current.filter((id) => id !== guard.id) : [...current, guard.id]);
+      setError(reason instanceof Error ? reason.message : 'Could not update event personnel.');
+    }
+  }
+
+  function openParticipantPicker() {
+    if (!divisionId || !musterEvent) return;
+    if (role === 'admin') {
+      router.push(`/admin/events/${encodeURIComponent(`${divisionId}.${date}`)}/personnel`);
+      return;
+    }
+    const backHref = encodeURIComponent(`/incharge/attendance?date=${encodeURIComponent(date)}`);
+    router.push(`/incharge/personnel?division=${encodeURIComponent(divisionId)}&date=${encodeURIComponent(date)}&back=${backHref}`);
+  }
 
   useEffect(() => {
     let live = true;
@@ -265,6 +346,26 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
       setNotice(`“${saved.event_name}” event created. Upload evidence photos or mark personnel below.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not save this event.');
+    } finally {
+      setSavingEvent(false);
+    }
+  }
+
+  async function removeEvent() {
+    if (!musterEvent) return;
+    setSavingEvent(true);
+    setError('');
+    try {
+      await deleteMusterEvent(divisionId, date);
+      setShowDeleteEventDialog(false);
+      setMusterEvent(null);
+      setEventName('');
+      setEventAddress('');
+      setShowEventForm(false);
+      setMarks([]);
+      setNotice('Event and its attendance records deleted.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not delete this event.');
     } finally {
       setSavingEvent(false);
     }
@@ -319,9 +420,16 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
     );
   }, [roster, search]);
 
-  const presentCount = marks.filter((mark) => mark.status === 'present').length;
-  const absentCount = marks.filter((mark) => mark.status === 'absent').length;
-  const pendingCount = Math.max(0, roster.length - marks.length);
+  const eventMarks = marks.filter((mark) => selectedGuardIds.includes(mark.guard_id));
+  const presentCount = eventMarks.filter((mark) => mark.status === 'present').length;
+  const absentCount = eventMarks.filter((mark) => mark.status === 'absent').length;
+  const visibleEventGuards = filteredRoster.filter((guard) => {
+    if (!selectedGuardIds.includes(guard.id)) return false;
+    if (attendanceFilter === 'all') return true;
+    return markByGuard.get(guard.id)?.status === attendanceFilter;
+  });
+  const eventPresentPercent = selectedGuardIds.length ? Math.round((presentCount / selectedGuardIds.length) * 100) : 0;
+  const eventAbsentPercent = selectedGuardIds.length ? Math.round((absentCount / selectedGuardIds.length) * 100) : 0;
   const selectedDivision = divisions.find((division) => division.id === divisionId);
   const divisionBandobast = useMemo(() => {
     if (!selectedDivision) return null;
@@ -352,21 +460,6 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
       setError(reason instanceof Error ? reason.message : 'Could not save this attendance mark.');
     } finally {
       setSavingId(null);
-    }
-  }
-
-  async function syncMuster() {
-    setSyncing(true);
-    setError('');
-    try {
-      const data = await loadAttendancePage(divisionId, date);
-      setRoster(data.roster);
-      setMarks(data.marks);
-      setNotice('Muster roll synced with HQ Command.');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not reach HQ Command.');
-    } finally {
-      setSyncing(false);
     }
   }
 
@@ -412,42 +505,6 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
     }
   }
 
-  async function submitGuard(event: React.FormEvent) {
-    event.preventDefault();
-    if (!divisionId) return;
-    setAdding(true);
-    setError('');
-    try {
-      if (bulkMode) {
-        const rows = bulkText.split(/\r?\n/).map((line) => line.split('\t').map((cell) => cell.trim())).filter((cells) => cells.some(Boolean));
-        const dataRows = rows[0]?.[0]?.toLowerCase().includes('name') ? rows.slice(1) : rows;
-        const parsed = dataRows.map(([full_name, phone, home_guard_code]) => ({ full_name, phone, home_guard_code, division_id: divisionId }));
-        if (!parsed.length || parsed.some((row) => !row.full_name || !/^[0-9]{10}$/.test(row.phone) || !row.home_guard_code)) {
-          throw new Error('Check the pasted rows. Each line needs a name, a 10-digit phone number, and a Home Guard code in separate columns.');
-        }
-        await addRosterGuards(parsed);
-        const data = await loadAttendancePage(divisionId, date);
-        setRoster(data.roster);
-        setMarks(data.marks);
-        setBulkText('');
-        setShowAdd(false);
-        setNotice(`${parsed.length} Home Guards added to ${selectedDivision?.name}.`);
-        return;
-      }
-      await addRosterGuard({ ...form, division_id: divisionId });
-      const data = await loadAttendancePage(divisionId, date);
-      setRoster(data.roster);
-      setMarks(data.marks);
-      setForm({ full_name: '', phone: '', home_guard_code: '' });
-      setShowAdd(false);
-      setNotice('Home Guard added to this division.');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not add this Home Guard.');
-    } finally {
-      setAdding(false);
-    }
-  }
-
   async function openProfileModal(guard: RosterGuard) {
     setSelectedProfileGuard(guard);
     setProfileMemoCount(null);
@@ -463,7 +520,23 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
     setReportGuard(guard);
     setReportCategory('attendance');
     setReportDescription('');
+    setReportPhoto(null);
     setReportError('');
+  }
+
+  async function attachReportPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setCompressingPhoto(true);
+    setReportError('');
+    try {
+      setReportPhoto(await compressImage(file, 1200, 1200, 0.8));
+    } catch {
+      setReportError('Could not process that photo. Please try a different image.');
+    } finally {
+      setCompressingPhoto(false);
+    }
   }
 
   async function submitPersonnelReport(event: React.FormEvent) {
@@ -477,9 +550,11 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         divisionId,
         category: reportCategory,
         description: reportDescription.trim(),
+        evidencePhoto: reportPhoto,
       });
       setNotice(`Report successfully filed against ${reportGuard.full_name}. Command review initiated.`);
       setReportGuard(null);
+      setReportPhoto(null);
     } catch (cause) {
       setReportError(cause instanceof Error ? cause.message : 'Could not submit report. Try again.');
     } finally {
@@ -489,6 +564,16 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
 
   return (
     <div className="mx-auto max-w-5xl space-y-3 pb-28">
+      {role === 'incharge' && requestedDate && (
+        <button
+          type="button"
+          onClick={() => router.push('/incharge/attendance')}
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-surface-container-low px-3 text-sm font-bold text-primary transition hover:bg-surface-container"
+        >
+          <Icon icon="arrow_back" size={18} />
+          Back to events
+        </button>
+      )}
       {/* Operational context banner */}
       <section className="rounded-xl bg-surface-container-low p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
@@ -649,7 +734,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         </Card>
       ) : musterEvent ? (
         <Card className="p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-outline-variant/40">
+          <div className="flex flex-col gap-3 border-b border-outline-variant/40 pb-3">
             <button
               type="button"
               onClick={() => {
@@ -658,19 +743,31 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                 setNotice('');
                 setError('');
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-1.5 text-xs font-bold text-primary hover:bg-surface-container-highest transition cursor-pointer"
+              className="inline-flex min-h-9 w-fit items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
             >
               <Icon icon="arrow_back" size={16} />
-              <span>Back to Events List</span>
+              <span>Events</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowEventForm(true)}
-              className="flex items-center gap-1.5 shrink-0 rounded-lg border border-outline-variant px-3 py-1.5 text-label-md font-bold text-primary hover:bg-surface-container cursor-pointer"
-            >
-              <Icon icon="edit" size={16} />
-              <span>Edit Event</span>
-            </button>
+            <div className="grid w-full grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex sm:flex-wrap sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowEventForm(true)}
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-outline-variant px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-surface-container sm:px-3"
+              >
+                <Icon icon="edit" size={18} />
+                <span className="truncate">Edit event</span>
+              </button>
+              <button type="button" onClick={openParticipantPicker} className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-primary-container px-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary sm:px-3">
+                <Icon icon="person_add" size={18} />
+                <span className="truncate">Add personnel</span>
+              </button>
+              {role === 'admin' && (
+                <button type="button" onClick={() => { setError(''); setShowDeleteEventDialog(true); }} disabled={savingEvent} className="col-span-1 flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-error-container px-3 text-sm font-semibold text-on-error-container transition-colors hover:bg-error-container/80 disabled:opacity-60 min-[380px]:col-span-2 sm:col-span-1">
+                  <Icon icon="delete" size={18} />
+                  <span>Delete event</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -743,14 +840,49 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         </Card>
       ) : null}
 
+      {musterEvent && (
+        <section aria-label="Event attendance summary" className="grid grid-cols-3 gap-2">
+          <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
+            <div className="mb-1 flex items-center justify-between gap-1 text-on-tertiary-container">
+              <span className="text-[10px] font-bold uppercase tracking-wide">Present</span>
+              <Icon icon="check_circle" size={17} fill />
+            </div>
+            <div>
+              <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : presentCount}</span>
+              <p className="mt-0.5 text-[10px] font-semibold text-on-tertiary-container">{eventPresentPercent}%</p>
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
+            <div className="mb-1 flex items-center justify-between gap-1 text-error">
+              <span className="text-[10px] font-bold uppercase tracking-wide">Absent</span>
+              <Icon icon="cancel" size={17} fill />
+            </div>
+            <div>
+              <span className="text-headline-lg tracking-tight text-error">{loading ? '—' : absentCount}</span>
+              <p className="mt-0.5 text-[10px] font-semibold text-error">{eventAbsentPercent}%</p>
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
+            <div className="mb-1 flex items-center justify-between gap-1 text-on-surface-variant">
+              <span className="text-[10px] font-bold uppercase tracking-wide">In event</span>
+              <Icon icon="groups" size={17} />
+            </div>
+            <div>
+              <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : selectedGuardIds.length}</span>
+              <p className="mt-0.5 text-[10px] font-medium text-on-surface-variant">Home Guards</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {notice && (
-        <div role="status" className="flex items-start gap-2.5 rounded-lg bg-tertiary-fixed p-3 text-on-tertiary-fixed-variant">
+        <div role="status" className="alert-enter flex items-start gap-2.5 rounded-lg bg-tertiary-fixed p-3 text-on-tertiary-fixed-variant">
           <Icon icon="check_circle" size={18} fill className="mt-0.5 shrink-0" />
           <span className="min-w-0 flex-1 text-sm">{notice}</span>
         </div>
       )}
       {error && (
-        <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
+        <div role="alert" className="alert-enter flex items-start gap-2.5 rounded-lg bg-error-container p-3 text-on-error-container">
           <Icon icon="error" size={18} fill className="mt-0.5 shrink-0 text-error" />
           <span className="min-w-0 flex-1 text-sm">{error}</span>
         </div>
@@ -758,8 +890,23 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
 
       {/* Roster of Home Guards in that division */}
       {musterEvent && (
+        <>
         <Card className="overflow-hidden">
           <div className="border-b border-outline-variant/60 p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div><h3 className="text-headline-sm font-bold text-primary">Event personnel</h3><p className="text-xs text-on-surface-variant">{selectedGuardIds.length} Home Guards added</p></div>
+            </div>
+            <SegmentedFilter<AttendanceFilter>
+              label="Filter attendance"
+              value={attendanceFilter}
+              onChange={setAttendanceFilter}
+              className="mb-3 bg-surface-container-high"
+              options={[
+                { value: 'all', label: 'All', count: selectedGuardIds.length },
+                { value: 'present', label: 'Present', count: presentCount },
+                { value: 'absent', label: 'Absent', count: absentCount },
+              ]}
+            />
             <div className="relative w-full">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-on-surface-variant">
                 <Icon icon="search" size={20} />
@@ -772,27 +919,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                 placeholder="Search guard by name or HG code..."
                 className="h-12 w-full rounded-xl bg-surface-container-lowest pl-10 pr-3 text-label-lg text-on-surface shadow-sm ring-primary-container placeholder:text-outline focus:outline-none focus:ring-2 sm:pr-28"
               />
-              {canAddGuards && (
-                <button
-                  type="button"
-                  onClick={() => { setError(''); setNotice(''); setBulkMode(false); setShowAdd(true); }}
-                  className="absolute inset-y-1.5 right-1.5 hidden items-center gap-1.5 rounded-lg bg-primary-container px-3 text-label-md text-on-primary hover:bg-primary sm:flex"
-                >
-                  <Icon icon="add" size={18} />
-                  Add guards
-                </button>
-              )}
             </div>
-            {canAddGuards && (
-              <button
-                type="button"
-                onClick={() => { setError(''); setNotice(''); setBulkMode(false); setShowAdd(true); }}
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-primary-container px-3 text-label-md text-on-primary active:scale-[0.99] sm:hidden"
-              >
-                <Icon icon="add" size={18} />
-                Add / paste roster
-              </button>
-            )}
           </div>
 
           {loading ? (
@@ -804,18 +931,20 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
             <EmptyState
               icon="groups"
               title="No Home Guards in this division yet"
-              body={canAddGuards ? 'Use Add guards to start building the roster.' : 'Ask an administrator to add the division roster.'}
+              body="No active Home Guards are available to add to this event."
             />
-          ) : filteredRoster.length === 0 ? (
-            <p className="p-8 text-center text-sm text-on-surface-variant">No Home Guards match that search.</p>
+          ) : visibleEventGuards.length === 0 ? (
+            <p className="p-8 text-center text-sm text-on-surface-variant">
+              {attendanceFilter === 'all' ? 'No Home Guards match that search.' : `No ${attendanceFilter} Home Guards match that search.`}
+            </p>
           ) : (
-            <ul className="flex flex-col gap-2 p-3 sm:p-4">
-              {filteredRoster.map((guard) => {
+            <ul className="stagger-in flex flex-col gap-2 p-3 sm:p-4">
+              {visibleEventGuards.map((guard) => {
                 const mark = markByGuard.get(guard.id);
                 const isSaving = savingId === guard.id;
                 const guardPhoto = evidenceByGuard[guard.id]?.dataUrl || mark?.photo_url;
                 return (
-                  <li key={guard.id} className="rounded-xl bg-surface-container-low p-3.5 shadow-sm">
+                  <li key={guard.id} className="card-hover-lift rounded-xl bg-surface-container-low p-3.5 shadow-sm transition-all duration-200 hover:bg-surface-container/70">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <button
                         type="button"
@@ -823,15 +952,15 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                         className="flex min-w-0 items-center gap-3 text-left transition hover:opacity-85 cursor-pointer group"
                         title="Click to view full personnel profile"
                       >
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary font-extrabold text-sm shadow-xs group-hover:scale-105 transition-transform">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary font-extrabold text-sm shadow-xs group-hover:scale-105 transition-transform duration-200">
                           {initials(guard.full_name)}
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <p className="truncate text-base font-bold text-on-surface group-hover:text-primary transition-colors">
+                            <p className="truncate text-base font-bold text-on-surface group-hover:text-primary transition-colors duration-200">
                               {guard.full_name}
                             </p>
-                            <Icon icon="info" size={16} className="text-primary shrink-0 opacity-70 group-hover:opacity-100" />
+                            <Icon icon="info" size={16} className="text-primary shrink-0 opacity-70 group-hover:opacity-100 transition-opacity duration-200" />
                           </div>
                           <div className="mt-0.5 flex items-center gap-2">
                             <span className="truncate font-mono text-xs font-extrabold tracking-wider text-primary">
@@ -844,16 +973,16 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
 
                       <div className="flex items-center gap-2 shrink-0">
                         {mark?.status === 'present' ? (
-                          <Chip tone="present" icon="check_circle" className="!text-[13px]">Present</Chip>
+                          <Chip tone="present" icon="check_circle" className="!text-[13px] animate-check-pop">Present</Chip>
                         ) : mark?.status === 'absent' ? (
-                          <Chip tone="absent" icon="cancel" className="!text-[13px]">Absent</Chip>
+                          <Chip tone="absent" icon="cancel" className="!text-[13px] animate-check-pop">Absent</Chip>
                         ) : (
                           <Chip tone="pending" className="!text-[13px]">Not marked</Chip>
                         )}
                         <button
                           type="button"
                           onClick={() => openReportModal(guard)}
-                          className="flex items-center gap-1 rounded-lg bg-error-container/70 hover:bg-error-container px-2.5 py-1.5 text-xs font-bold text-on-error-container transition cursor-pointer"
+                          className="flex items-center gap-1 rounded-lg bg-error-container/70 hover:bg-error-container px-2.5 py-1.5 text-xs font-bold text-on-error-container transition-all duration-200 active:scale-95 cursor-pointer"
                           title={`Report ${guard.full_name}`}
                         >
                           <Icon icon="report_problem" size={15} className="text-error shrink-0" />
@@ -862,36 +991,15 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                       </div>
                     </div>
 
-                    <div className="mt-3 grid w-full grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        disabled={isSaving || !musterEvent}
-                        aria-pressed={mark?.status === 'present'}
-                        onClick={() => void changeStatus(guard, 'present')}
-                        className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
-                          mark?.status === 'present'
-                            ? 'bg-on-tertiary-container text-on-tertiary shadow-sm'
-                            : 'bg-surface-container-high text-on-surface hover:bg-on-tertiary-container hover:text-on-tertiary'
-                        }`}
-                      >
-                        {isSaving && mark?.status !== 'present' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
-                        <span>Present</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isSaving || !musterEvent}
-                        aria-pressed={mark?.status === 'absent'}
-                        onClick={() => void changeStatus(guard, 'absent')}
-                        className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${
-                          mark?.status === 'absent'
-                            ? 'bg-error text-on-error shadow-sm'
-                            : 'bg-surface-container-high text-on-surface hover:bg-error hover:text-on-error'
-                        }`}
-                      >
-                        {isSaving && mark?.status !== 'absent' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="close" size={18} />}
-                        <span>Absent</span>
-                      </button>
-                    </div>
+                    <>
+                    <button type="button" onClick={() => void toggleEventGuard(guard)} className="mt-3 flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-error-container px-3 text-xs font-bold text-on-error-container transition-all duration-200 active:scale-[0.98]">
+                      <Icon icon="person_remove" size={16} /> Remove from event
+                    </button>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <span className="sr-only">Attendance status for {guard.full_name}</span>
+                      <button type="button" disabled={isSaving || !musterEvent} onClick={() => void changeStatus(guard, 'present')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'present' ? 'bg-on-tertiary-container text-on-tertiary shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'present' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} className={mark?.status === 'present' ? 'animate-check-pop' : ''} />} Present</button>
+                      <button type="button" disabled={isSaving || !musterEvent} onClick={() => void changeStatus(guard, 'absent')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'absent' ? 'bg-error text-on-error shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'absent' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="close" size={18} className={mark?.status === 'absent' ? 'animate-check-pop' : ''} />} Absent</button>
+                    </div></>
 
                     <div className="mt-3 rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-2">
                       <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-label-md text-primary hover:bg-surface-container">
@@ -931,6 +1039,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
             </ul>
           )}
         </Card>
+        </>
       )}
 
       {/* Events this month card - only shown when NOT inside an active event */}
@@ -1001,140 +1110,10 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
         </Card>
       )}
 
-      {/* Sticky tally bar */}
-      {musterEvent && (
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 bg-surface-container-lowest/95 px-4 py-2.5 shadow-[0_-8px_28px_rgba(0,0,0,.5)] backdrop-blur-md lg:bottom-0 lg:left-[264px]">
-          <div className="mx-auto flex max-w-lg items-center justify-between gap-2 sm:max-w-[1440px]">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 text-[13px] font-bold text-on-surface-variant">
-                <span className="text-on-tertiary-container"><strong className="tabular-nums">{presentCount}</strong> Pres</span>
-                <span>•</span>
-                <span className="text-error"><strong className="tabular-nums">{absentCount}</strong> Abs</span>
-                <span>•</span>
-                <span><strong className="tabular-nums">{pendingCount}</strong> Left</span>
-              </div>
-              <div className="mt-0.5 flex items-center gap-1">
-                <Dot className="!h-1.5 !w-1.5 bg-tertiary-fixed-dim" />
-                <span className="truncate text-xs uppercase tracking-wider text-on-surface-variant">
-                  {syncing ? 'Refreshing attendance…' : 'Each attendance choice saves immediately'}
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void syncMuster()}
-              disabled={syncing || loading}
-              className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-primary-container px-4 text-label-lg text-on-primary shadow-md transition-all hover:bg-primary active:scale-95 disabled:opacity-60 disabled:active:scale-100 cursor-pointer"
-            >
-              {syncing ? (
-                <>
-                  <Icon icon="sync" size={20} className="animate-spin" />
-                  <span>Refreshing…</span>
-                </>
-              ) : (
-                <>
-                  <span>Refresh attendance</span>
-                  <Icon icon="refresh" size={20} />
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Personnel Modal */}
-      <BottomSheet
-        open={showAdd && canAddGuards}
-        onClose={() => setShowAdd(false)}
-        title="Add Home Guard"
-        description={selectedDivision ? `Adding to ${selectedDivision.name}` : undefined}
-      >
-        <form onSubmit={(event) => void submitGuard(event)} className="space-y-4">
-          <div role="group" aria-label="Add mode" className="grid grid-cols-2 gap-1 rounded-xl bg-surface-container p-1">
-            <button
-              type="button"
-              onClick={() => setBulkMode(false)}
-              aria-pressed={!bulkMode}
-              className={`h-10 rounded-lg text-label-md transition-colors ${!bulkMode ? 'bg-surface-container-lowest text-primary-container shadow-sm' : 'text-on-surface-variant'}`}
-            >
-              Add one
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkMode(true)}
-              aria-pressed={bulkMode}
-              className={`h-10 rounded-lg text-label-md transition-colors ${bulkMode ? 'bg-surface-container-lowest text-primary-container shadow-sm' : 'text-on-surface-variant'}`}
-            >
-              Paste roster
-            </button>
-          </div>
-          {bulkMode ? (
-            <>
-              <div className="rounded-lg bg-primary-fixed px-3 py-2.5 text-sm text-on-primary-fixed">
-                Copy three columns from a spreadsheet and paste below: <strong>Name · Phone · Home Guard code</strong>
-              </div>
-              <textarea
-                required
-                rows={8}
-                value={bulkText}
-                onChange={(event) => setBulkText(event.target.value)}
-                placeholder={'Name\tPhone\tHome Guard code\nRavi Kumar\t9876543210\tHG-001'}
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 font-mono text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container"
-              />
-              <p className="text-xs text-on-surface-variant">{bulkText.trim() ? `${bulkText.trim().split(/\r?\n/).filter(Boolean).length} rows pasted` : 'One Home Guard per line. Tab-separated columns.'}</p>
-            </>
-          ) : (
-            <>
-              <label className="block text-label-md text-on-surface">
-                Full name
-                <input
-                  required
-                  autoFocus
-                  maxLength={120}
-                  value={form.full_name}
-                  onChange={(event) => setForm({ ...form, full_name: event.target.value })}
-                  className="mt-1.5 h-12 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-body-md text-base text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container"
-                />
-              </label>
-              <label className="block text-label-md text-on-surface">
-                Phone number
-                <input
-                  required
-                  inputMode="numeric"
-                  pattern="[0-9]{10}"
-                  maxLength={10}
-                  value={form.phone}
-                  onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '') })}
-                  placeholder="10 digit mobile number"
-                  className="mt-1.5 h-12 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-body-md text-base text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container"
-                />
-              </label>
-              <label className="block text-label-md text-on-surface">
-                Home Guard code
-                <input
-                  required
-                  maxLength={40}
-                  value={form.home_guard_code}
-                  onChange={(event) => setForm({ ...form, home_guard_code: event.target.value.toUpperCase() })}
-                  className="mt-1.5 h-12 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-body-md text-base uppercase text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container"
-                />
-              </label>
-            </>
-          )}
-          <button
-            disabled={adding}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-label-lg text-base text-on-primary shadow-md transition-transform active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 cursor-pointer"
-          >
-            {adding ? <Icon icon="sync" size={20} className="animate-spin" /> : <Icon icon="person_add" size={20} />}
-            <span>{adding ? 'Adding…' : bulkMode ? 'Add pasted Home Guards' : 'Add to roster'}</span>
-          </button>
-        </form>
-      </BottomSheet>
-
       {/* Personnel Profile Modal */}
       {selectedProfileGuard && (
-        <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-xl max-w-sm w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-4 backdrop-blur-xs">
+          <div className="overlay-panel flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <div className="p-4 bg-primary text-on-primary flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Icon icon="shield" size={20} className="text-on-primary" />
@@ -1155,7 +1134,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                 {initials(selectedProfileGuard.full_name)}
               </div>
               <div className="flex flex-col gap-1 w-full">
-                <span className="text-outline font-bold uppercase tracking-wider text-xs">Service Number</span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard code</span>
                 <span className="font-mono text-xl font-extrabold text-primary">
                   {selectedProfileGuard.home_guard_code}
                 </span>
@@ -1213,8 +1192,8 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
 
       {/* File Personnel Report Modal */}
       {reportGuard && (
-        <div className="fixed inset-0 bg-surface-container/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-xl max-w-md w-full shadow-2xl border border-outline-variant overflow-hidden flex flex-col">
+        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-4 backdrop-blur-xs">
+          <div className="overlay-panel flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Icon icon="edit_document" size={20} className="text-on-primary" />
@@ -1229,7 +1208,7 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
               </button>
             </div>
 
-            <form onSubmit={(e) => void submitPersonnelReport(e)} className="p-5 flex flex-col gap-4 text-xs">
+            <form onSubmit={(e) => void submitPersonnelReport(e)} className="flex flex-col gap-4 overflow-y-auto p-5 text-xs">
               <div className="rounded-lg bg-primary-fixed p-3 text-xs text-on-primary-fixed">
                 <strong>{reportGuard.full_name}</strong>
                 <span className="block text-on-primary-fixed/80 mt-0.5 font-mono">
@@ -1271,6 +1250,32 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
                 />
               </div>
 
+              <div>
+                <span className="font-bold text-on-surface-variant block mb-1 text-xs">
+                  Evidence Photo {reportPhoto ? '' : '(optional)'}
+                </span>
+                {reportPhoto ? (
+                  <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
+                    <img src={reportPhoto} alt="Report evidence" className="h-14 w-20 rounded-md object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-primary flex items-center gap-1">
+                        <Icon icon="verified" size={14} className="text-tertiary shrink-0" />
+                        Evidence attached
+                      </p>
+                      <button type="button" onClick={() => setReportPhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">
+                        Remove photo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className={`flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                    {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
+                    {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
+                  </label>
+                )}
+              </div>
+
               {reportError && (
                 <p className="px-3 py-2 rounded-lg bg-error-container text-on-error-container font-semibold text-xs">
                   {reportError}
@@ -1301,8 +1306,8 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
 
       {/* Lightbox Image Preview Modal */}
       {previewImage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="relative max-w-3xl w-full flex flex-col items-center">
+        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="overlay-panel relative flex w-full max-w-3xl flex-col items-center">
             <div className="w-full flex items-center justify-between text-white mb-2 px-1">
               <span className="font-bold text-sm truncate">{previewImage.title}</span>
               <button
@@ -1322,6 +1327,14 @@ export function AttendanceWorkspace({ canAddGuards: canAddGuardsProp = false }: 
           </div>
         </div>
       )}
+      {showDeleteEventDialog && musterEvent && <EventDeleteDialog
+        title={`Delete “${musterEvent.event_name}”?`}
+        description={`This will permanently remove the event, its selected personnel, and all attendance recorded for ${formatDay(date)} in this division.`}
+        deleting={savingEvent}
+        error={error || undefined}
+        onCancel={() => setShowDeleteEventDialog(false)}
+        onConfirm={() => void removeEvent()}
+      />}
     </div>
   );
 }
