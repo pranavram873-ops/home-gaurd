@@ -9,6 +9,7 @@ import { Card, EmptyState, SegmentedFilter } from '@/components/ui/primitives';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import {
+  addMusterEventEvidencePhoto,
   getMusterEventParticipants,
   compressImage,
   filePersonnelReport,
@@ -166,6 +167,9 @@ export default function AdminEventDetailsPage() {
   const [reportError, setReportError] = useState('');
   const [reportSuccess, setReportSuccess] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [uploadingEventPhoto, setUploadingEventPhoto] = useState(false);
+  const [eventPhotoError, setEventPhotoError] = useState('');
+  const [eventPhotoNotice, setEventPhotoNotice] = useState('');
 
   useEffect(() => {
     if (!parsed) {
@@ -280,6 +284,25 @@ export default function AdminEventDetailsPage() {
     }
   }
 
+  async function uploadEventPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !parsed || !musterEvent) return;
+    setUploadingEventPhoto(true);
+    setEventPhotoError('');
+    setEventPhotoNotice('');
+    try {
+      const compressed = await compressImage(file, 1200, 1200, 0.8);
+      const photos = await addMusterEventEvidencePhoto(parsed.divisionId, parsed.date, compressed);
+      setMusterEvent((current) => current ? { ...current, evidence_photos: photos } : current);
+      setEventPhotoNotice('Event photo added.');
+    } catch (cause) {
+      setEventPhotoError(cause instanceof Error ? cause.message : 'Could not add the event photo.');
+    } finally {
+      setUploadingEventPhoto(false);
+    }
+  }
+
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reportGuard || !parsed || reportDescription.trim().length < 10) return;
@@ -337,7 +360,7 @@ export default function AdminEventDetailsPage() {
   return (
     <DashboardLayout title="Muster Record" subtitle="Admin event details">
       <div className="mx-auto max-w-2xl pb-10">
-      {/* Return bar */}
+      {/* Return link */}
       <div className="flex items-center justify-between rounded bg-surface-container-low px-4 py-2 shadow-sm">
         <Link href="/admin/dashboard" className="flex items-center gap-1 text-label-md font-bold text-primary active:opacity-75">
           <Icon icon="arrow_back" size={18} />
@@ -367,7 +390,7 @@ export default function AdminEventDetailsPage() {
           {/* Header */}
           <section className="px-1 pt-4">
             <div className="mb-1 flex items-start justify-between gap-2">
-              <h2 className="text-headline-md leading-snug tracking-tight text-primary font-bold">
+              <h2 className="text-headline-md font-bold leading-snug tracking-tight text-primary">
                 {musterEvent?.event_name || `${divisionName || 'Muster'} ${parsed ? formatDay(parsed.date) : ''}`}
               </h2>
               <span
@@ -391,8 +414,8 @@ export default function AdminEventDetailsPage() {
                 </div>
               )}
               {musterEvent?.address && (
-                <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                  <Icon icon="location_on" size={16} className="text-primary shrink-0" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Icon icon="location_on" size={16} className="shrink-0 text-primary" />
                   <span>{musterEvent.address}</span>
                 </div>
               )}
@@ -409,34 +432,16 @@ export default function AdminEventDetailsPage() {
           <section className="px-1 py-2">
             <div className="grid grid-cols-3 gap-1">
               <Card className="flex flex-col justify-between p-3">
-                <div className="mb-1 flex items-center justify-between text-on-tertiary-container">
-                  <span className="text-label-sm font-bold uppercase">Present</span>
-                  <Icon icon="check_circle" size={18} fill />
-                </div>
-                <div>
-                  <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : presentCount}</span>
-                  <p className="mt-0.5 text-label-sm font-semibold text-on-tertiary-container">{presentPct}%</p>
-                </div>
+                <div className="mb-1 flex items-center justify-between text-on-tertiary-container"><span className="text-label-sm font-bold uppercase">Present</span><Icon icon="check_circle" size={18} fill /></div>
+                <div><span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : presentCount}</span><p className="mt-0.5 text-label-sm font-semibold text-on-tertiary-container">{presentPct}%</p></div>
               </Card>
               <Card className="flex flex-col justify-between p-3">
-                <div className="mb-1 flex items-center justify-between text-error">
-                  <span className="text-label-sm font-bold uppercase">Absent</span>
-                  <Icon icon="cancel" size={18} fill />
-                </div>
-                <div>
-                  <span className="text-headline-lg tracking-tight text-error">{loading ? '—' : absentCount}</span>
-                  <p className="mt-0.5 text-label-sm font-semibold text-error">{absentPct}%</p>
-                </div>
+                <div className="mb-1 flex items-center justify-between text-error"><span className="text-label-sm font-bold uppercase">Absent</span><Icon icon="cancel" size={18} fill /></div>
+                <div><span className="text-headline-lg tracking-tight text-error">{loading ? '—' : absentCount}</span><p className="mt-0.5 text-label-sm font-semibold text-error">{absentPct}%</p></div>
               </Card>
               <Card className="flex flex-col justify-between p-3">
-                <div className="mb-1 flex items-center justify-between text-on-surface-variant">
-                  <span className="text-label-sm font-bold uppercase">Total Guards</span>
-                  <Icon icon="groups" size={18} />
-                </div>
-                <div>
-                  <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : sanctionedCount}</span>
-                  <p className="mt-0.5 text-label-sm font-medium text-on-surface-variant">Guards</p>
-                </div>
+                <div className="mb-1 flex items-center justify-between text-on-surface-variant"><span className="text-label-sm font-bold uppercase">Total Guards</span><Icon icon="groups" size={18} /></div>
+                <div><span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : sanctionedCount}</span><p className="mt-0.5 text-label-sm font-medium text-on-surface-variant">Guards</p></div>
               </Card>
             </div>
           </section>
@@ -444,12 +449,16 @@ export default function AdminEventDetailsPage() {
           {/* Evidence Photos Section */}
           <section className="px-1 py-2">
             <Card className="p-3.5">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-1.5 text-label-sm font-bold uppercase tracking-wider text-primary">
-                  <Icon icon="add_a_photo" size={18} />
-                  <span>Event Photo Evidence ({(musterEvent?.evidence_photos || []).length} Attached)</span>
-                </div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-label-sm font-bold uppercase tracking-wider text-primary"><Icon icon="add_a_photo" size={18} /><span>Event Photo Evidence ({(musterEvent?.evidence_photos || []).length} Attached)</span></div>
+                {musterEvent && <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary-container px-3 py-1.5 text-xs font-bold text-on-primary shadow-xs transition hover:bg-primary">
+                  {uploadingEventPhoto ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="upload" size={15} />}
+                  <span>{uploadingEventPhoto ? 'Uploading…' : 'Add Event Photo'}</span>
+                  <input type="file" accept="image/*" disabled={uploadingEventPhoto} className="hidden" onChange={(event) => void uploadEventPhoto(event)} />
+                </label>}
               </div>
+              {eventPhotoNotice && <p role="status" className="mb-2 rounded-lg bg-tertiary-fixed px-3 py-2 text-xs text-on-tertiary-fixed">{eventPhotoNotice}</p>}
+              {eventPhotoError && <p role="alert" className="mb-2 rounded-lg bg-error-container px-3 py-2 text-xs text-on-error-container">{eventPhotoError}</p>}
               {(musterEvent?.evidence_photos || []).length > 0 ? (
                 <div className="flex flex-wrap gap-2.5 mt-2">
                   {musterEvent!.evidence_photos!.map((photoUrl, idx) => (
@@ -464,7 +473,7 @@ export default function AdminEventDetailsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-on-surface-variant italic py-1">
+                <p className="py-1 text-xs italic text-on-surface-variant">
                   No event evidence photos attached yet for this muster.
                 </p>
               )}
@@ -475,9 +484,7 @@ export default function AdminEventDetailsPage() {
           <section className="px-1 py-2">
             <div className="mb-1 flex items-baseline justify-between">
               <h3 className="text-headline-sm font-bold text-primary">Event Personnel</h3>
-              <span className="text-label-sm font-bold uppercase text-on-surface-variant">
-                Total {sanctionedCount}
-              </span>
+              <span className="text-label-sm font-bold uppercase text-on-surface-variant">Total {sanctionedCount}</span>
             </div>
             <SegmentedFilter<Filter>
               label="Filter by status"
@@ -498,7 +505,7 @@ export default function AdminEventDetailsPage() {
                 type="search"
                 aria-label="Search guard name or HG code"
                 placeholder="Search guard name or HG code..."
-                className="w-full rounded-xl bg-surface-container-lowest py-2.5 pl-10 pr-3 text-body-md text-on-surface shadow-sm ring-primary/20 placeholder:text-outline focus:outline-none focus:ring-2"
+            className="w-full rounded-xl bg-surface-container-lowest py-2.5 pl-10 pr-3 text-body-md text-on-surface shadow-sm ring-primary/20 placeholder:text-outline focus:outline-none focus:ring-2"
               />
             </div>
             {loading ? (

@@ -577,11 +577,11 @@ export function AttendanceWorkspace() {
       {/* Operational context banner */}
       <section className="rounded-xl bg-surface-container-low p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-label-md text-on-primary shadow-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm text-on-primary shadow-sm">
             <Icon icon="shield" size={16} fill className="text-on-secondary-container" />
             <span className="max-w-[160px] truncate">{selectedDivision?.name || 'Loading division…'}</span>
           </span>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5 text-label-md text-on-surface shadow-sm transition-colors hover:bg-surface-container-high">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5 text-sm text-on-surface shadow-sm transition-colors hover:bg-surface-container-high">
             <Icon icon="calendar_today" size={16} className="text-primary" />
             <span>{formatDay(date)}</span>
             <input
@@ -797,7 +797,7 @@ export function AttendanceWorkspace() {
                 <Icon icon="add_a_photo" size={16} className="text-primary" />
                 <span>Event Evidence Photos ({(musterEvent.evidence_photos || []).length} attached)</span>
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary-container px-3 py-1.5 text-xs font-bold text-on-primary hover:bg-primary transition shadow-xs">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary-container px-3 py-1.5 text-xs font-bold text-on-primary shadow-xs transition hover:bg-primary">
                 {uploadingEventPhoto ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="upload" size={15} />}
                 <span>{uploadingEventPhoto ? 'Uploading…' : 'Add Event Photo'}</span>
                 <input
@@ -832,8 +832,8 @@ export function AttendanceWorkspace() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-on-surface-variant/80 italic">
-                No event evidence photos attached yet. Click Add Event Photo to upload parade/event photos for admin view.
+              <p className="text-xs italic text-on-surface-variant/80">
+                No event evidence photos attached yet.
               </p>
             )}
           </div>
@@ -843,34 +843,16 @@ export function AttendanceWorkspace() {
       {musterEvent && (
         <section aria-label="Event attendance summary" className="grid grid-cols-3 gap-2">
           <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
-            <div className="mb-1 flex items-center justify-between gap-1 text-on-tertiary-container">
-              <span className="text-[10px] font-bold uppercase tracking-wide">Present</span>
-              <Icon icon="check_circle" size={17} fill />
-            </div>
-            <div>
-              <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : presentCount}</span>
-              <p className="mt-0.5 text-[10px] font-semibold text-on-tertiary-container">{eventPresentPercent}%</p>
-            </div>
+            <div className="mb-1 flex items-center justify-between gap-1 text-on-tertiary-container"><span className="text-[10px] font-bold uppercase tracking-wide">Present</span><Icon icon="check_circle" size={17} fill /></div>
+            <div><span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : presentCount}</span><p className="mt-0.5 text-[10px] font-semibold text-on-tertiary-container">{eventPresentPercent}%</p></div>
           </div>
           <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
-            <div className="mb-1 flex items-center justify-between gap-1 text-error">
-              <span className="text-[10px] font-bold uppercase tracking-wide">Absent</span>
-              <Icon icon="cancel" size={17} fill />
-            </div>
-            <div>
-              <span className="text-headline-lg tracking-tight text-error">{loading ? '—' : absentCount}</span>
-              <p className="mt-0.5 text-[10px] font-semibold text-error">{eventAbsentPercent}%</p>
-            </div>
+            <div className="mb-1 flex items-center justify-between gap-1 text-error"><span className="text-[10px] font-bold uppercase tracking-wide">Absent</span><Icon icon="cancel" size={17} fill /></div>
+            <div><span className="text-headline-lg tracking-tight text-error">{loading ? '—' : absentCount}</span><p className="mt-0.5 text-[10px] font-semibold text-error">{eventAbsentPercent}%</p></div>
           </div>
           <div className="flex min-w-0 flex-col justify-between rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 shadow-sm">
-            <div className="mb-1 flex items-center justify-between gap-1 text-on-surface-variant">
-              <span className="text-[10px] font-bold uppercase tracking-wide">In event</span>
-              <Icon icon="groups" size={17} />
-            </div>
-            <div>
-              <span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : selectedGuardIds.length}</span>
-              <p className="mt-0.5 text-[10px] font-medium text-on-surface-variant">Home Guards</p>
-            </div>
+            <div className="mb-1 flex items-center justify-between gap-1 text-on-surface-variant"><span className="text-[10px] font-bold uppercase tracking-wide">In event</span><Icon icon="groups" size={17} /></div>
+            <div><span className="text-headline-lg tracking-tight text-primary">{loading ? '—' : selectedGuardIds.length}</span><p className="mt-0.5 text-[10px] font-medium text-on-surface-variant">Home Guards</p></div>
           </div>
         </section>
       )}
