@@ -18,6 +18,10 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   const isAuthRoute = AUTH_ONLY_ROUTES.some((route) => pathname.startsWith(route));
+  // A recovery link must be able to reach the password form even when the
+  // account's profile is pending or inactive. The recovery session only grants
+  // access to the reset page; normal sign-in and protected routes stay gated.
+  const isPasswordRecoveryRoute = pathname === '/reset-password';
 
   const isAdminRoute = pathname.startsWith('/admin');
   const isInchargeRoute = pathname.startsWith('/incharge');
@@ -123,7 +127,7 @@ export async function updateSession(request: NextRequest) {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
     }
-    if (!isAuthRoute) {
+    if (!isAuthRoute && !isPasswordRecoveryRoute) {
       return redirect('/login', {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
