@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/Icon';
-import { createClient } from '@/lib/supabase/client';
 
 const inputClass = 'h-12 w-full rounded-xl border border-outline-variant bg-surface px-4 text-on-surface outline-none transition-colors focus:border-primary';
 
@@ -37,31 +36,24 @@ export default function RegisterPage() {
     if (!enabled) return;
     setBusy(true);
     try {
-      const supabase = createClient();
-      const { data, error: signupError } = await supabase.auth.signUp({
-        email: form.email.trim(), password: form.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login?notice=email_confirmed`,
-          data: {
-            full_name: form.fullName.trim(),
-            phone: form.phone.trim(),
-            personnel_id: username,
-            requested_role: form.requestedRole,
-          },
-        },
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: form.fullName.trim(),
+          username,
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          requestedRole: form.requestedRole,
+          password: form.password,
+        }),
       });
-      if (signupError) throw signupError;
-      // If email confirmation is off for this Supabase project, avoid leaving a
-      // pending applicant signed into the public registration screen.
-      if (data.session) await supabase.auth.signOut();
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not create your account.');
       setSubmitted(true);
     } catch (reason) {
       const text = reason instanceof Error ? reason.message : 'Could not create your account.';
-      setError(/rate limit|too many.*email/i.test(text)
-        ? 'Email rate limit exceeded.'
-        : /already|registered|duplicate|unique/i.test(text)
-          ? 'That username or email is already in use. Check the details or contact Command HQ.'
-          : text);
+      setError(text);
     } finally { setBusy(false); }
   }
 
@@ -70,9 +62,9 @@ export default function RegisterPage() {
       <Link href="/login" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"><Icon icon="arrow_back" size={18} /> Back to sign in</Link>
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container text-primary"><Icon icon="person_add" size={24} /></div>
       <h1 className="text-headline-md text-on-surface">Create an account</h1>
-      <p className="mt-1 text-sm text-on-surface-variant">Create your account with a username and password. Command HQ must approve the selected role before you can sign in.</p>
+      <p className="mt-1 text-sm text-on-surface-variant">Create an Administrator or Incharge account with a username and password.</p>
       {!enabled ? <p className="mt-5 rounded-xl bg-surface-container p-4 text-sm text-on-surface-variant">Public account creation is currently closed. Please contact Command HQ.</p>
-        : submitted ? <div className="mt-5 space-y-4"><p role="status" className="rounded-xl bg-tertiary-fixed p-4 text-sm text-on-tertiary-fixed-variant">Your account has been created. Check your email to verify the address. Command HQ must approve your selected role before you can sign in.</p><Link href="/login" className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary font-semibold text-on-primary">Return to sign in</Link></div>
+        : submitted ? <div className="mt-5 space-y-4"><p role="status" className="rounded-xl bg-tertiary-fixed p-4 text-sm text-on-tertiary-fixed-variant">Your account is ready. Sign in with your username and password.</p><Link href="/login" className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary font-semibold text-on-primary">Sign in</Link></div>
         : loadingOptions ? <p className="py-8 text-center text-sm text-on-surface-variant">Loading account request form…</p>
         : <form onSubmit={submit} className="mt-6 grid gap-4 sm:grid-cols-2">
           <fieldset className="sm:col-span-2">
