@@ -88,7 +88,6 @@ export default function RegisterPage() {
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-xs text-on-surface-variant">Choosing Administrator or Incharge submits a request only. An active administrator must verify and approve the requested role.</p>
           </fieldset>
           <div className="sm:col-span-2"><label htmlFor="full-name" className="mb-1.5 block text-sm font-medium text-on-surface">Full name</label><input id="full-name" className={inputClass} value={form.fullName} onChange={e => update('fullName', e.target.value)} autoComplete="name" minLength={3} required /></div>
           <div><label htmlFor="username" className="mb-1.5 block text-sm font-medium text-on-surface">Username</label><input id="username" className={inputClass} value={form.username} onChange={e => update('username', e.target.value)} autoComplete="username" placeholder="Choose a username" required /></div>
