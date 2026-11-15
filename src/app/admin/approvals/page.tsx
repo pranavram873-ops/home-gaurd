@@ -61,7 +61,7 @@ export default function ApprovalsPage() {
     void pushNotification(request.id, {
       title: approved ? 'Enrolment approved' : 'Enrolment review complete',
       message: approved
-        ? `Your application to the Tamil Nadu Home Guards has been verified. Sign in to your duty portal, ${request.full_name}.`
+        ? `Your ${request.requested_role} account request has been verified. Sign in to your duty portal, ${request.full_name}.`
         : 'Your enrolment application could not be approved. Report to your District Command office with identity proof.',
       type: 'approval',
       link: approved ? '/login' : null,
@@ -73,12 +73,12 @@ export default function ApprovalsPage() {
       actorId: user?.id ?? null,
       actorEmail: user?.email ?? null,
       actorRole: 'admin',
-      details: { applicant: request.full_name, email: request.email },
+      details: { applicant: request.full_name, email: request.email, requested_role: request.requested_role },
     });
 
     setNotice(
       action === 'approve'
-        ? `${request.full_name} is now an active Home Guard Volunteer with an issued service badge and can sign in to the portal.`
+        ? `${request.full_name} is now active as ${request.requested_role === 'admin' ? 'an Administrator' : request.requested_role === 'incharge' ? 'an Incharge' : 'a Home Guard Volunteer'} and can sign in to the portal.`
         : `Enrolment for ${request.full_name} has been rejected.`,
     );
     void load();
@@ -123,9 +123,8 @@ export default function ApprovalsPage() {
           <div>
             <span className="font-bold block">Security Governance Mandate</span>
             <p className="text-on-surface-variant leading-relaxed mt-0.5">
-              Only the <strong>State Administrator</strong> at Command Headquarters approves public recruit
-              applications — there is no Area Command step in this workflow. An approved applicant receives the
-              verified <strong>Home Guard Volunteer</strong> cadre status and an official service badge ID.
+              Only an active administrator can approve account requests. Review each applicant’s requested account
+              type before approving; approval is what activates the chosen role.
             </p>
           </div>
         </div>
@@ -194,7 +193,7 @@ export default function ApprovalsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-on-surface">{request.full_name}</span>
                         <span className="text-xs font-mono font-bold bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.2 rounded uppercase">
-                          Pending Approval
+                          Requests {request.requested_role === 'admin' ? 'Administrator' : request.requested_role === 'incharge' ? 'Incharge' : 'Home Guard'}
                         </span>
                         {request.rank_designation && (
                           <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">

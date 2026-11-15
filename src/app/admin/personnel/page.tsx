@@ -4,7 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
+  createStaffAccount,
   listPersonnel,
+  resetStaffPassword,
   setAccountStatus,
 } from '@/lib/services/personnelService';
 import { listDistricts } from '@/lib/services/referenceService';
@@ -213,6 +215,17 @@ export default function PersonnelDirectoryPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState(false);
 
+  // Create-login (user account) modal state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [userForm, setUserForm] = useState({ full_name: '', email: '', personnel_id: '', phone: '', role: 'home_guard' as Profile['role'], rank_designation: '' });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [userFormError, setUserFormError] = useState<string | null>(null);
+  const [userCredentials, setUserCredentials] = useState<{ email: string; temporaryPassword: string } | null>(null);
+
+  // Password reset state (shown once inside the profile modal)
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+
   useEffect(() => {
     if (districts.length === 0) return;
     setNewGuard((prev) =>
@@ -348,6 +361,64 @@ export default function PersonnelDirectoryPage() {
     }
   }
 
+  function openCreateUser() {
+    setUserForm({ full_name: '', email: '', personnel_id: '', phone: '', role: 'home_guard', rank_designation: '' });
+    setUserFormError(null);
+    setUserCredentials(null);
+    setShowCreateUser(true);
+  }
+
+  async function handleCreateUser(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selectedDistrict) {
+      setUserFormError('Select a division before creating a user account.');
+      return;
+    }
+    setCreatingUser(true);
+    setUserFormError(null);
+    try {
+      const result = await createStaffAccount({
+        full_name: userForm.full_name,
+        email: userForm.email,
+        personnel_id: userForm.personnel_id,
+        phone: userForm.phone || null,
+        role: userForm.role,
+        rank_designation: userForm.rank_designation,
+        district_id: selectedDistrict.id,
+      });
+      if (result.error || !result.data) {
+        setUserFormError(result.error || 'The user account could not be created.');
+        return;
+      }
+      setUserCredentials({ email: result.data.email, temporaryPassword: result.data.temporaryPassword });
+      void rosterQuery.refresh();
+      void attendanceRosterQuery.refresh();
+    } catch (error) {
+      setUserFormError(error instanceof Error ? error.message : 'The user account could not be created.');
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!selectedProfile || selectedProfile.id.startsWith('attendance-')) return;
+    setResettingPassword(true);
+    setDeleteProfileError(null);
+    setTempPassword(null);
+    try {
+      const result = await resetStaffPassword(selectedProfile.id);
+      if (result.error || !result.data) {
+        setDeleteProfileError(result.error || 'The password could not be reset.');
+        return;
+      }
+      setTempPassword(result.data.temporaryPassword);
+    } catch (error) {
+      setDeleteProfileError(error instanceof Error ? error.message : 'The password could not be reset.');
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
   async function handleCreateGuard(e: React.FormEvent) {
     e.preventDefault();
     if (!divisionId || !selectedDistrict) {
@@ -390,7 +461,14 @@ export default function PersonnelDirectoryPage() {
             <h2 className="text-xl font-bold text-on-surface">Tamil Nadu Home Guards Directory</h2>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={openCreateUser}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary-fixed text-on-secondary-fixed-variant font-bold text-xs shadow-xs transition-colors cursor-pointer hover:bg-secondary-fixed/70"
+            >
+              <Icon icon="person_add_alt" size={16} />
+              <span>Create user</span>
+            </button>
             <button
               onClick={() => {
                 resetForm();
@@ -487,7 +565,7 @@ export default function PersonnelDirectoryPage() {
                 <li key={p.id}>
                   <button
                     type="button"
-                    onClick={() => { setReportSuccess(false); setDeleteProfileError(null); setSelectedProfile(p); }}
+                    onClick={() => { setReportSuccess(false); setDeleteProfileError(null); setTempPassword(null); setSelectedProfile(p); }}
                     className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-all duration-200 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer active:scale-[0.99]"
                     aria-label={`Open profile for ${p.full_name}`}
                   >
@@ -567,29 +645,56 @@ export default function PersonnelDirectoryPage() {
                   {deleteProfileError}
                 </p>
               )}
+              {tempPassword && (
+                <div className="w-full rounded-lg border border-outline-variant bg-surface-container-low p-3 text-left">
+                  <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">New temporary password</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <code className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-primary">{tempPassword}</code>
+                    <button
+                      type="button"
+                      onClick={() => void navigator.clipboard?.writeText(tempPassword)}
+                      className="shrink-0 rounded-md bg-primary-fixed px-2.5 py-1 text-xs font-bold text-on-primary-fixed hover:bg-primary-container hover:text-on-primary"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-on-surface-variant">Shown once — share it securely. The user must change it at next sign-in.</p>
+                </div>
+              )}
               <button
                 onClick={() => setSelectedProfile(null)}
                 className="w-full px-4 py-2.5 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
               >
                 Close
               </button>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => void openReportModal()}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary-fixed text-on-secondary-fixed-variant font-bold hover:bg-secondary-fixed/70 cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-secondary-fixed text-on-secondary-fixed-variant font-bold text-xs hover:bg-secondary-fixed/70 cursor-pointer"
                 >
-                  <Icon icon="report_problem" size={16} />
+                  <Icon icon="report_problem" size={15} />
                   Report
                 </button>
+                {!selectedProfile.id.startsWith('attendance-') && (
+                  <button
+                    type="button"
+                    onClick={() => void handleResetPassword()}
+                    disabled={resettingPassword}
+                    className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-xs hover:bg-surface-container-highest cursor-pointer disabled:opacity-60"
+                  >
+                    {resettingPassword ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="key" size={15} />}
+                    Reset
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void handleDeleteProfile()}
                   disabled={deletingProfile}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-error-container text-on-error-container font-bold hover:bg-error-container/80 cursor-pointer disabled:opacity-60"
+                  className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-error-container text-on-error-container font-bold text-xs hover:bg-error-container/80 cursor-pointer disabled:opacity-60"
                 >
-                  {deletingProfile ? <Icon icon="sync" size={16} className="animate-spin" /> : <Icon icon="delete" size={16} />}
-                  {deletingProfile ? 'Deleting…' : 'Delete'}
+                  {deletingProfile ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="delete" size={15} />}
+                  Delete
                 </button>
               </div>
             </div>
@@ -860,6 +965,101 @@ export default function PersonnelDirectoryPage() {
                     className="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary cursor-pointer disabled:bg-surface-container-highest disabled:cursor-not-allowed"
                   >
                     {saving ? 'Adding Home Guard…' : 'Add Home Guard'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Create user account modal: mints a login + profile via the admin API. */}
+      {showCreateUser && (
+        <div className="overlay-enter fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-surface-container/40 p-3 pb-6 pt-[8vh] backdrop-blur-xs sm:p-4 sm:pt-[10vh]">
+          <div className="overlay-panel w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            {userCredentials ? (
+              <div className="p-5">
+                <div className="flex items-center gap-2">
+                  <Icon icon="check_circle" size={22} className="text-primary" />
+                  <h3 className="font-bold text-base text-on-surface">User account created</h3>
+                </div>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Login created for <strong className="text-on-surface">{userCredentials.email}</strong>. Share the temporary password securely — it is shown only once.
+                </p>
+                <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Temporary password</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <code className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-primary">{userCredentials.temporaryPassword}</code>
+                    <button
+                      type="button"
+                      onClick={() => void navigator.clipboard?.writeText(userCredentials.temporaryPassword)}
+                      className="shrink-0 rounded-md bg-primary-fixed px-2.5 py-1 text-xs font-bold text-on-primary-fixed hover:bg-primary-container hover:text-on-primary"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUser(false)}
+                  className="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={(e) => void handleCreateUser(e)} className="flex flex-col gap-3 p-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-base text-on-surface">Create user account</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateUser(false)}
+                    aria-label="Close"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface cursor-pointer"
+                  >
+                    <Icon icon="close" size={20} />
+                  </button>
+                </div>
+                <p className="text-xs text-on-surface-variant">
+                  Creates a sign-in login and personnel profile for {selectedDistrict?.name ?? 'the selected division'}.
+                </p>
+
+                <label className="block text-label-md text-on-surface">Full name
+                  <input required minLength={3} value={userForm.full_name} onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" />
+                </label>
+                <label className="block text-label-md text-on-surface">Email (login)
+                  <input required type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" />
+                </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block text-label-md text-on-surface">Username / HG code
+                    <input required minLength={2} value={userForm.personnel_id} onChange={(e) => setUserForm({ ...userForm, personnel_id: e.target.value.toUpperCase() })} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 font-mono text-sm uppercase text-on-surface" />
+                  </label>
+                  <label className="block text-label-md text-on-surface">Phone{userForm.role === 'home_guard' ? ' *' : ''}
+                    <input required={userForm.role === 'home_guard'} inputMode="numeric" maxLength={10} value={userForm.phone} onChange={(e) => setUserForm({ ...userForm, phone: e.target.value.replace(/\D/g, '') })} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" />
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block text-label-md text-on-surface">Role
+                    <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value as Profile['role'] })} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface">
+                      <option value="home_guard">Home Guard</option>
+                      <option value="admin">Administrator</option>
+                      <option value="incharge">Incharge</option>
+                    </select>
+                  </label>
+                  <label className="block text-label-md text-on-surface">Rank / designation
+                    <input required minLength={2} value={userForm.rank_designation} onChange={(e) => setUserForm({ ...userForm, rank_designation: e.target.value })} placeholder="e.g. Guard, Havildar" className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" />
+                  </label>
+                </div>
+
+                {userFormError && <p role="alert" className="text-sm font-semibold text-error">{userFormError}</p>}
+                {!selectedDistrict && <p role="alert" className="text-sm font-semibold text-error">Select a division before creating a user account.</p>}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setShowCreateUser(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={creatingUser || !selectedDistrict} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary-container disabled:opacity-60 cursor-pointer">
+                    {creatingUser ? 'Creating…' : 'Create account'}
                   </button>
                 </div>
               </form>

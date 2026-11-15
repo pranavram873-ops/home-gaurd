@@ -620,9 +620,14 @@ export function AttendanceWorkspace() {
         )}
       </section>
 
-      {/* Event creation and edit card */}
-      {showEventForm ? (
-        <Card className="p-4 sm:p-5">
+      {/* Event creation and edit modal */}
+      {showEventForm && (
+        <div
+          className="overlay-enter fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface-container/40 p-3 pb-6 pt-[8vh] backdrop-blur-xs sm:p-4 sm:pt-[10vh]"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setShowEventForm(false); }}
+        >
+        <Card className="max-h-[90dvh] w-full max-w-lg overflow-y-auto p-4 sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-2 border-b border-outline-variant/50 pb-3">
             <div>
               <h2 className="text-headline-sm font-bold text-on-surface">
@@ -732,7 +737,9 @@ export function AttendanceWorkspace() {
             </div>
           </form>
         </Card>
-      ) : musterEvent ? (
+        </div>
+      )}
+      {musterEvent && (
         <Card className="p-4 flex flex-col gap-3">
           <div className="flex flex-col gap-3 border-b border-outline-variant/40 pb-3">
             <button
@@ -838,7 +845,7 @@ export function AttendanceWorkspace() {
             )}
           </div>
         </Card>
-      ) : null}
+      )}
 
       {musterEvent && (
         <section aria-label="Event attendance summary" className="grid grid-cols-3 gap-2">

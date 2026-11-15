@@ -1,7 +1,6 @@
 'use client';
 
-import { createClient } from '@/lib/supabase/client';
-import { describeQueryError, describeThrownError, type ActionResult, type ListResult } from './queryError';
+import { type ActionResult, type ListResult } from './queryError';
 
 /**
  * A public enrolment waiting for the State Administrator to verify it.
@@ -24,30 +23,7 @@ export interface EnrolmentRequest {
   created_at: string | null;
   district_name: string | null;
   unit_name: string | null;
-}
-
-// Each embed names its constraint: `units.commander_id` also references
-// `profiles`, and without the hint PostgREST refuses the join with PGRST201
-// ("more than one relationship was found for 'profiles' and 'units'").
-const REQUEST_COLUMNS = [
-  'id', 'full_name', 'email', 'phone', 'personnel_id', 'blood_group',
-  'emergency_contact', 'rank_designation', 'created_at',
-  'districts!profiles_district_id_fkey ( name )',
-  'units!profiles_unit_id_fkey ( name )',
-].join(', ');
-
-type RequestRow = Omit<EnrolmentRequest, 'district_name' | 'unit_name'> & {
-  districts: { name: string } | null;
-  units: { name: string } | null;
-};
-
-function toRequest(row: RequestRow): EnrolmentRequest {
-  const { districts, units, ...rest } = row;
-  return {
-    ...rest,
-    district_name: districts?.name ?? null,
-    unit_name: units?.name ?? null,
-  };
+  requested_role: 'admin' | 'incharge' | 'home_guard';
 }
 
 /**
@@ -59,39 +35,27 @@ function toRequest(row: RequestRow): EnrolmentRequest {
  */
 export async function listEnrolmentRequests(): Promise<ListResult<EnrolmentRequest>> {
   try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(REQUEST_COLUMNS)
-      .eq('account_status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (error) return { data: [], error: describeQueryError(error) };
-    return { data: ((data ?? []) as unknown as RequestRow[]).map(toRequest), error: null };
+    const response = await fetch('/api/admin/approvals', { cache: 'no-store' });
+    const result = await response.json().catch(() => null) as { requests?: EnrolmentRequest[]; error?: string } | null;
+    if (!response.ok) return { data: [], error: result?.error || 'The enrolment queue is unavailable.' };
+    return { data: result?.requests ?? [], error: null };
   } catch (err) {
-    return { data: [], error: describeThrownError(err, 'The enrolment queue is unavailable.') };
+    return { data: [], error: err instanceof Error ? err.message : 'The enrolment queue is unavailable.' };
   }
 }
 
 async function decide(id: string, status: 'active' | 'rejected'): Promise<ActionResult> {
   try {
-    const supabase = createClient();
-    // The extra `account_status = 'pending'` filter means a stale row in this
-    // browser cannot overwrite a decision that was already recorded elsewhere.
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ account_status: status })
-      .eq('id', id)
-      .eq('account_status', 'pending')
-      .select('id');
-
-    if (error) return { ok: false, error: describeQueryError(error) };
-    if (!data || data.length === 0) {
-      return { ok: false, error: 'That application has already been processed. Refresh the queue.' };
-    }
+    const response = await fetch('/api/admin/approvals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, decision: status === 'active' ? 'approve' : 'reject' }),
+    });
+    const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+    if (!response.ok || !result?.ok) return { ok: false, error: result?.error || 'The decision could not be saved.' };
     return { ok: true, error: null };
   } catch (err) {
-    return { ok: false, error: describeThrownError(err, 'The decision could not be saved.') };
+    return { ok: false, error: err instanceof Error ? err.message : 'The decision could not be saved.' };
   }
 }
 

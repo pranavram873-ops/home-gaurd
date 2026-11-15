@@ -166,6 +166,32 @@ export async function createStaffAccount(
  * transition into 'active' for a row that has no badge yet, so restoring an
  * officer keeps their existing number.
  */
+/**
+ * Admin-initiated password reset. Returns the temporary password once; the
+ * server route mints it and the application never stores it.
+ */
+export async function resetStaffPassword(
+  userId: string,
+): Promise<OneResult<{ temporaryPassword: string }>> {
+  try {
+    const response = await fetch('/api/admin/personnel/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { temporaryPassword?: string; error?: string }
+      | null;
+
+    if (!response.ok || !payload?.temporaryPassword) {
+      return { data: null, error: payload?.error || 'The password could not be reset.' };
+    }
+    return { data: { temporaryPassword: payload.temporaryPassword }, error: null };
+  } catch (err) {
+    return { data: null, error: describeThrownError(err, 'The password could not be reset.') };
+  }
+}
+
 export async function setAccountStatus(
   userId: string,
   status: AccountStatus,

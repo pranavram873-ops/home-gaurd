@@ -44,8 +44,6 @@ export async function updateSession(request: NextRequest) {
       ? '/homeguard/dashboard'
       : '/incharge/divisions';
 
-  if (pathname.startsWith('/register')) return redirect('/login');
-
   // ---------------------------------------------------------------------------
   // Supabase sessions. Every decision below is made from the verified JWT and
   // the personnel row RLS allows the caller to read; no cookie can stand in for

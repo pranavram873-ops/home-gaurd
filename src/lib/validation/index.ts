@@ -101,7 +101,7 @@ export const staffAccountSchema = z.object({
     .regex(/^[0-9]{10}$/, 'Mobile number must be a valid 10-digit number')
     .optional()
     .nullable(),
-  role: z.enum(['admin', 'home_guard']),
+  role: z.enum(['admin', 'incharge', 'home_guard']),
   rank_designation: z.string().min(2, 'Rank / designation is required'),
   district_id: z.string().min(1, 'District is required'),
   unit_id: z.string().optional().nullable(),

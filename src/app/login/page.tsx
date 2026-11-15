@@ -8,6 +8,7 @@ import { loginSchema } from '@/lib/validation';
 import { Icon } from '@/components/ui/Icon';
 import { Card } from '@/components/ui/primitives';
 import { useDivision } from '@/lib/attendance/divisionContext';
+import Link from 'next/link';
 
 /**
  * Field shell from the mockups: the icon leads, the input fills, and the whole
@@ -199,6 +200,10 @@ function LoginForm() {
           )}
         </button>
       </form>
+      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+        <Link href="/forgot-password" className="font-medium text-primary hover:underline">Forgot password?</Link>
+        <Link href="/register" className="font-medium text-primary hover:underline">Create an account</Link>
+      </div>
     </>
   );
 }

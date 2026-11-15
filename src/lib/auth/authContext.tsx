@@ -114,7 +114,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const supabase = createClient();
-      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+        // A password-recovery link establishes a short-lived session that must
+        // survive the app's remembered-login deadline until the user can change
+        // their password. A stale 30-day marker from an older login must not
+        // sign out this recovery session on page load.
+        if (event === 'PASSWORD_RECOVERY' && nextSession) {
+          window.localStorage.setItem(
+            REMEMBERED_SESSION_KEY,
+            String(Date.now() + REMEMBERED_SESSION_DURATION_MS),
+          );
+        }
         const version = ++sessionVersionRef.current;
         sessionRef.current = nextSession;
         setIsLoading(true);

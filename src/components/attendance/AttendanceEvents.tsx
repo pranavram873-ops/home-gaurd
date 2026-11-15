@@ -192,19 +192,27 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
       </section>
 
       {showCreate && canCreate && (
-        <form onSubmit={(event) => void createEvent(event)} className="space-y-3 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-card">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-headline-sm text-primary">New event</h2>
-            <button type="button" onClick={() => setShowCreate(false)} aria-label="Close event form" className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
-              <Icon icon="close" size={20} />
-            </button>
+        <div
+          className="overlay-enter fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface-container/40 p-3 pb-6 pt-[8vh] backdrop-blur-xs sm:p-4 sm:pt-[10vh]"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreate(false); }}
+        >
+          <div className="overlay-panel flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <form onSubmit={(event) => void createEvent(event)} className="flex flex-col gap-3 overflow-y-auto p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-headline-sm text-primary">New event</h2>
+                <button type="button" onClick={() => setShowCreate(false)} aria-label="Close event form" className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
+                  <Icon icon="close" size={20} />
+                </button>
+              </div>
+              <label className="block text-label-md text-on-surface">Event name<input required minLength={2} maxLength={140} value={eventName} onChange={(event) => setEventName(event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" /></label>
+              <label className="block text-label-md text-on-surface">Date<input required type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" /></label>
+              <label className="block text-label-md text-on-surface">Location<input value={eventAddress} onChange={(event) => setEventAddress(event.target.value)} maxLength={300} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" /></label>
+              {!divisionId && <p role="alert" className="text-sm text-error">Select a division before creating an event.</p>}
+              <button type="submit" disabled={saving || !divisionId} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">{saving ? 'Saving…' : 'Save event'}</button>
+            </form>
           </div>
-          <label className="block text-label-md text-on-surface">Event name<input required minLength={2} maxLength={140} value={eventName} onChange={(event) => setEventName(event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-white px-3 text-sm" /></label>
-          <label className="block text-label-md text-on-surface">Date<input required type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-white px-3 text-sm" /></label>
-          <label className="block text-label-md text-on-surface">Location<input value={eventAddress} onChange={(event) => setEventAddress(event.target.value)} maxLength={300} className="mt-1 block h-11 w-full rounded-lg border border-outline-variant bg-white px-3 text-sm" /></label>
-          {!divisionId && <p role="alert" className="text-sm text-error">Select a division before creating an event.</p>}
-          <button type="submit" disabled={saving || !divisionId} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">{saving ? 'Saving…' : 'Save event'}</button>
-        </form>
+        </div>
       )}
 
       <section className="flex flex-col gap-3.5">
