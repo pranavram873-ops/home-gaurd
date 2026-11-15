@@ -29,10 +29,11 @@ export async function POST(request: NextRequest) {
       const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(profile.id);
       if (authUserError) console.error('[auth.reset-password] Auth account lookup failed:', authUserError.message);
       if (authUser.user?.email?.toLowerCase() === profile.email.toLowerCase()) {
-        // Local development must send recovery links back to the local app,
-        // even when NEXT_PUBLIC_APP_URL points at the deployed production site.
-        // Production uses the configured canonical URL behind Vercel proxies.
-        const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+        // APP_URL is server-only: reset links are generated on the server and
+        // this origin does not need to be exposed in the browser bundle.
+        // Keep NEXT_PUBLIC_APP_URL as a compatibility fallback for deployments
+        // that have not renamed the Vercel environment variable yet.
+        const configuredOrigin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL)?.replace(/\/$/, '');
         const origin = process.env.NODE_ENV === 'development'
           ? request.nextUrl.origin
           : configuredOrigin || request.nextUrl.origin;
