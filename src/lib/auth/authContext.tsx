@@ -124,6 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             REMEMBERED_SESSION_KEY,
             String(Date.now() + REMEMBERED_SESSION_DURATION_MS),
           );
+          // Some Supabase recovery templates redirect to the site's default
+          // URL (often /login) instead of the redirectTo supplied by the app.
+          // Once the recovery session is verified, always take the user to the
+          // password form, preserving any hash Supabase still needs to parse.
+          if (window.location.pathname !== '/reset-password') {
+            const recoveryHash = window.location.hash;
+            router.replace(`/reset-password${recoveryHash}`);
+          }
         }
         const version = ++sessionVersionRef.current;
         sessionRef.current = nextSession;
