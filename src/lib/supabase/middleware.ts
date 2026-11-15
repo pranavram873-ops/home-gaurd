@@ -21,7 +21,7 @@ export async function updateSession(request: NextRequest) {
   // A recovery link must be able to reach the password form even when the
   // account's profile is pending or inactive. The recovery session only grants
   // access to the reset page; normal sign-in and protected routes stay gated.
-  const isPasswordRecoveryRoute = pathname === '/reset-password';
+  const isPasswordRecoveryRoute = pathname === '/reset-password' || pathname === '/confirm-recovery';
 
   const isAdminRoute = pathname.startsWith('/admin');
   const isInchargeRoute = pathname.startsWith('/incharge');
