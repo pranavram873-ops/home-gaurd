@@ -127,7 +127,10 @@ export async function updateSession(request: NextRequest) {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
     }
-    if (!isAuthRoute && !isPasswordRecoveryRoute) {
+    // The public root page checks the URL fragment for a Supabase recovery
+    // session before sending ordinary visitors to sign-in. Fragments are not
+    // sent to middleware, so let `/` reach that client-side check as well.
+    if (!isAuthRoute && !isPasswordRecoveryRoute && pathname !== '/') {
       return redirect('/login', {
         error: profile.account_status === 'pending' ? 'pending_approval' : 'inactive_account',
       });
