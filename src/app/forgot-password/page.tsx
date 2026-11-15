@@ -18,8 +18,24 @@ export default function ForgotPasswordPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Could not request a password reset.');
+      // Read as text first: Next.js may return an empty or HTML error response
+      // (for example after a dev-server restart), which makes response.json()
+      // throw the confusing "Unexpected end of JSON input" message.
+      const responseText = await response.text();
+      let result: { error?: string; message?: string } = {};
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText) as typeof result;
+        } catch {
+          // Use the friendly fallback below for non-JSON server responses.
+        }
+      }
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not request a password reset. Please try again.');
+      }
+      if (!result.message) {
+        throw new Error('Could not request a password reset. Please try again.');
+      }
       setMessage(result.message);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not request a password reset.');
