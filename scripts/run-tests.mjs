@@ -2,6 +2,7 @@
  * TAMIL NADU HOME GUARDS SUPERVISION SYSTEM
  * Automated Rule & Security Verification Test Runner
  */
+import { getRecoveryTokenHash } from '../src/lib/auth/recovery-link.mjs';
 
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3;
@@ -112,9 +113,31 @@ assert(getDashboardRouteForRole('home_guard') === '/homeguard/dashboard', 'Home 
 assert(getDashboardRouteForRole('commander') === '/login', 'Retired commander role is granted no dashboard');
 
 // -----------------------------------------------------------------------------
-// Test 5: Duplicate Check-In Guard (15-min debounce)
+// Test 5: Recovery Link Token Extraction
 // -----------------------------------------------------------------------------
-console.log('\n\x1b[36m[TEST SUITE 5] Consecutive Attendance Transition Validation\x1b[0m');
+console.log('\n\x1b[36m[TEST SUITE 5] Password Recovery Link Verification\x1b[0m');
+
+assert(
+  getRecoveryTokenHash('?confirmation_url=https%3A%2F%2Fproject.supabase.co%2Fauth%2Fv1%2Fverify%3Ftoken%3Dabc123%26type%3Drecovery') === 'abc123',
+  'Token hash is extracted from Supabase confirmation URL',
+);
+assert(
+  getRecoveryTokenHash('?confirmation_url=https://project.supabase.co/auth/v1/verify?token=outer-token&type=recovery') === 'outer-token',
+  'Token hash is recovered when email template parameters are not fully encoded',
+);
+assert(
+  getRecoveryTokenHash('?token_hash=direct-token&type=recovery') === 'direct-token',
+  'Direct recovery token hash is accepted',
+);
+assert(
+  getRecoveryTokenHash('?token_hash=signup-token&type=email') === null,
+  'Non-recovery verification tokens are rejected',
+);
+
+// -----------------------------------------------------------------------------
+// Test 6: Duplicate Check-In Guard (15-min debounce)
+// -----------------------------------------------------------------------------
+console.log('\n\x1b[36m[TEST SUITE 6] Consecutive Attendance Transition Validation\x1b[0m');
 
 function validateAttendanceTransition(lastEvent, newEventType, newTimestamp) {
   if (!lastEvent) return { valid: true };
