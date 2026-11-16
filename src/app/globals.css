@@ -165,6 +165,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html.native-keyboard-open nav[aria-label='Main navigation'] {
+    display: none !important;
+  }
+
   /*
    * A visible, on-brand focus ring. A novice operator needs to see exactly what
    * is selected when they tab or tap; the browser default is easy to miss.

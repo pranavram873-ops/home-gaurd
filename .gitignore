@@ -17,6 +17,16 @@
 /.next/
 /out/
 
+# Android
+/android/.gradle/
+/android/local.properties
+/android/**/build/
+/android/app-release-*.apk
+/android/app-release-*.aab
+/android/app-release-*.json
+/android/**/*.jks
+/android/**/*.keystore
+
 # production
 /build
 
