@@ -200,9 +200,8 @@ function LoginForm() {
           )}
         </button>
       </form>
-      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+      <div className="mt-4 flex items-center justify-end gap-3 text-sm">
         <Link href="/forgot-password" className="font-medium text-primary hover:underline">Forgot password?</Link>
-        <Link href="/register" className="font-medium text-primary hover:underline">Create an account</Link>
       </div>
     </>
   );
