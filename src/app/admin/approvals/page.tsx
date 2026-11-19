@@ -116,7 +116,7 @@ export default function ApprovalsPage() {
       title="Enrolment Approvals Desk"
       subtitle="Tamil Nadu Home Guards • Administrative Verification"
     >
-      <div className="max-w-5xl mx-auto flex flex-col gap-6">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6 lg:max-w-7xl">
         {/* Banner */}
         <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-on-primary-fixed text-xs flex items-start gap-3">
           <Icon icon="shield" size={20} className="text-primary shrink-0 mt-0.5" />

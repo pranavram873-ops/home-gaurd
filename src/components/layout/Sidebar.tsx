@@ -23,9 +23,9 @@ export function Sidebar() {
   const primary: Item[] = admin
     ? [
         // The dashboard is the events list, so the tab doubles as "back from
-        // Personnel" on mobile where there is no rail.
+        // Profiles" on mobile where there is no rail.
         { label: 'Events', href: '/admin/dashboard', icon: 'event_note' },
-        { label: 'Personnel', href: '/admin/personnel', icon: 'groups' },
+        { label: 'Profiles', href: '/admin/personnel', icon: 'groups' },
         { label: 'Reports', href: '/admin/reports', icon: 'assignment_late' },
       ]
     : role === 'home_guard'
@@ -45,19 +45,20 @@ export function Sidebar() {
           },
           { label: 'Reports', href: '/incharge/reports', icon: 'assignment_late' },
         ];
-  const secondary: Item[] = admin
+  const moreItems: Item[] = admin
     ? [
         { label: 'Change district', href: '/admin/divisions', icon: 'domain' },
+        { label: 'Create account', href: '/register', icon: 'person_add' },
       ]
+    : role === 'incharge'
+      ? [{ label: 'Change district', href: '/incharge/divisions', icon: 'domain' }]
     : role === 'home_guard'
       ? [
           { label: 'GPS check-in', href: '/homeguard/location', icon: 'location_on' },
           { label: 'My reports', href: '/homeguard/reports', icon: 'description' },
           { label: 'My profile', href: '/homeguard/profile', icon: 'badge' },
         ]
-      : [
-          { label: 'Change district', href: '/incharge/divisions', icon: 'domain' },
-        ];
+      : [];
 
   const active = (item: Item) =>
     (item.matches ?? [item.href]).some((href) => pathname === href || pathname.startsWith(`${href}/`));
@@ -69,8 +70,8 @@ export function Sidebar() {
         key={`${item.label}-${item.href}`}
         href={item.href}
         aria-current={selected ? 'page' : undefined}
-        className={`group press-scale flex items-center gap-3 rounded-xl px-3 py-2.5 text-label-md transition-all duration-200 ${
-          selected ? 'bg-primary-container font-bold text-on-primary shadow-sm shadow-primary/10' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+        className={`group press-scale flex items-center gap-3 rounded-xl px-3 py-3 text-[14px] transition-all duration-200 ${
+          selected ? 'bg-primary-container font-bold text-on-primary shadow-sm shadow-primary/15' : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
         }`}
       >
         <Icon icon={item.icon} size={20} fill={selected} className="transition-transform duration-200 group-hover:scale-110" />
@@ -100,48 +101,31 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col border-r border-outline-variant/60 bg-surface-container-lowest lg:flex">
-        <div className="flex items-center gap-2.5 border-b border-surface-container px-5 py-5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-secondary-container ring-1 ring-primary/10">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[276px] flex-col border-r border-outline-variant/70 bg-surface-container-low text-on-surface lg:flex">
+        <div className="flex items-center gap-3 border-b border-outline-variant/70 px-6 py-6">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary shadow-sm">
             <Icon icon="local_police" size={22} />
           </span>
           <div className="min-w-0">
-            <p className="text-label-sm font-bold uppercase tracking-[0.14em] text-secondary">Tamil Nadu Police</p>
-            <p className="truncate text-[15px] font-bold text-on-surface">Home Guards</p>
-            <p className="truncate text-body-md text-on-surface-variant">Field Operations</p>
+            <p className="truncate text-[16px] font-bold tracking-tight text-on-surface">TN Home Guards</p>
+            <p className="truncate text-[13px] text-on-surface-variant">Field operations</p>
           </div>
         </div>
 
         <div className="px-4 pt-5">
-          <p className="px-3 pb-2 text-label-sm font-bold uppercase tracking-[0.14em] text-on-surface-variant">Workspace</p>
-          <nav className="flex flex-col gap-1">{primary.map(railLink)}</nav>
+          <p className="px-3 pb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Workspace</p>
+          <nav className="flex flex-col gap-1.5">{primary.map(railLink)}</nav>
         </div>
-        {secondary.length > 0 && (
-          <div className="px-4 pt-6">
-            <p className="px-3 pb-2 text-label-sm font-bold uppercase tracking-[0.14em] text-on-surface-variant">Operations</p>
-            <nav className="flex flex-col gap-1">{secondary.map(railLink)}</nav>
-          </div>
-        )}
-
-        <div className="mt-auto border-t border-surface-container p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-xl bg-surface-container-low p-3 transition-all duration-200 hover:bg-surface-container">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-sm font-bold text-primary-container shadow-xs transition-transform duration-200 hover:scale-105">
-              {user?.full_name?.charAt(0).toUpperCase() || <Icon icon="person" size={18} />}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-label-lg text-on-surface">{user?.full_name || 'Signed in'}</p>
-              <p className="truncate text-body-md text-xs text-on-surface-variant">
-                {admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}
-                {user?.personnel_id ? ` · ${user.personnel_id}` : ''}
-              </p>
-            </div>
-          </div>
+        <div className="mt-auto border-t border-outline-variant/70 p-4">
           <button
-            onClick={() => void logout()}
-            className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-label-md text-on-surface-variant transition-all duration-200 hover:bg-surface-container hover:text-on-surface active:scale-[0.98]"
+            type="button"
+            aria-expanded={moreOpen}
+            aria-label="More options"
+            onClick={() => setMoreOpen((value) => !value)}
+            className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-label-md transition-colors ${moreOpen ? 'bg-primary-container text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'}`}
           >
-            <Icon icon="logout" size={20} />
-            Sign out
+            <Icon icon={moreOpen ? 'close' : 'menu'} size={20} />
+            More
           </button>
         </div>
       </aside>
@@ -167,19 +151,19 @@ export function Sidebar() {
       </nav>}
 
       {moreMenu.mounted && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="fixed inset-0 z-[60]">
           <button aria-label="Close navigation" data-open={moreMenu.visible} onClick={() => setMoreOpen(false)} className="sheet-scrim" />
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="All features"
+            aria-label="More"
             data-open={moreMenu.visible}
-            className="sheet-panel sheet-from-bottom absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest px-5 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-2xl sm:max-w-none"
+            className="sheet-panel sheet-from-bottom absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest px-5 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-2xl sm:max-w-none lg:inset-x-auto lg:bottom-5 lg:left-[280px] lg:max-h-[min(82vh,680px)] lg:w-[340px] lg:rounded-2xl lg:px-5 lg:pb-5"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-outline-variant" aria-hidden />
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="text-headline-md text-on-surface">All features</p>
+                <p className="text-headline-md text-on-surface">More</p>
                 <p className="text-body-md text-sm text-on-surface-variant">{admin ? 'Command and administration' : 'Your field workspace'}</p>
               </div>
               <button
@@ -190,26 +174,30 @@ export function Sidebar() {
                 <Icon icon="close" size={20} />
               </button>
             </div>
-            {(admin || role === 'incharge') && (
-              <Link
-                href={admin ? '/admin/divisions' : '/incharge/divisions'}
-                onClick={() => setMoreOpen(false)}
-                className="mb-4 flex min-h-[64px] items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-label-lg text-on-surface transition-colors hover:bg-surface-container-low"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-fixed text-primary">
-                  <Icon icon="domain" size={20} />
-                </span>
-                <span>Change district</span>
-              </Link>
-            )}
-            <div className="flex items-center justify-between border-t border-outline-variant/60 pt-4">
+            <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-container text-lg font-bold text-on-primary shadow-xs">
+                {user?.full_name?.charAt(0).toUpperCase() || <Icon icon="person" size={20} />}
+              </span>
               <div className="min-w-0">
                 <p className="truncate text-label-lg text-on-surface">{user?.full_name || 'Signed in'}</p>
-                <p className="text-body-md text-xs text-on-surface-variant">{admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}</p>
+                <p className="truncate text-xs text-on-surface-variant">
+                  {admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}
+                  {user?.personnel_id ? ` · ${user.personnel_id}` : ''}
+                </p>
               </div>
+            </div>
+            <nav aria-label="More options" className="mb-4 flex flex-col gap-1">
+              {moreItems.map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-label-md text-on-surface transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary">
+                  <Icon icon={item.icon} size={20} className="text-primary" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+            <div className="border-t border-outline-variant/60 pt-4">
               <button
                 onClick={() => void logout()}
-                className="flex h-10 items-center gap-2 rounded-lg px-3 text-label-md text-on-surface-variant hover:text-on-surface"
+                className="flex h-11 w-full items-center gap-2 rounded-xl px-3 text-label-md text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Icon icon="logout" size={20} />
                 Sign out

@@ -66,7 +66,7 @@ export function AdminMemoReports() {
   }, [reports]);
   const visible = reports.filter((report) => `${report.subject_name} ${report.subject_personnel_id ?? ''} ${report.reporter_name} ${report.description}`.toLowerCase().includes(filter.toLowerCase()));
 
-  return <div className="mx-auto flex max-w-6xl flex-col gap-5">
+  return <div className="mx-auto flex max-w-6xl flex-col gap-5 lg:max-w-none">
     {newMemo && <div role="alert" className="flex items-start gap-3 rounded-xl border border-secondary/20 bg-secondary-fixed px-4 py-3 text-on-secondary-fixed-variant">
       <Icon icon="notifications_active" size={20} className="mt-0.5 shrink-0" />
       <div className="min-w-0 flex-1"><p className="font-bold">New memo reported</p><p className="text-sm">{newMemo.subject_name} now has {reports.filter((r) => r.subject_id === newMemo.subject_id).length + 1} memo(s) on file.</p></div>

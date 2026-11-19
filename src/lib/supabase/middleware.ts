@@ -137,7 +137,8 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (isAuthRoute && profile.account_status === 'active') {
+  const adminRegistrationPage = pathname === '/register' && profile.role === 'admin';
+  if (isAuthRoute && profile.account_status === 'active' && !adminRegistrationPage) {
     return redirect(dashboardFor(profile.role));
   }
 

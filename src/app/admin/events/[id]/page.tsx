@@ -14,10 +14,12 @@ import {
   compressImage,
   filePersonnelReport,
   loadAttendancePage,
+  loadGuardDutyCounts,
   parseAttendanceEventId,
   saveDailyMark,
   setMusterEventParticipant,
   type DailyMark,
+  type GuardDutyCount,
   type MusterEvent,
   type RosterGuard,
 } from '@/lib/services/simpleAttendanceService';
@@ -50,6 +52,7 @@ function GuardRow({
   onToggleEvent,
   onFileReport,
   isSaving,
+  dutyCount,
 }: {
   guard: RosterGuard;
   mark?: DailyMark;
@@ -59,6 +62,7 @@ function GuardRow({
   onToggleEvent: (guard: RosterGuard) => void;
   onFileReport: (guard: RosterGuard) => void;
   isSaving?: boolean;
+  dutyCount?: GuardDutyCount;
 }) {
   const present = mark?.status === 'present';
   const absent = mark?.status === 'absent';
@@ -78,7 +82,6 @@ function GuardRow({
               <HomeGuardProfileLink code={guard.home_guard_code} name={guard.full_name} className="truncate text-left text-[16px] font-semibold text-primary transition-colors duration-200 hover:underline">
                 {guard.full_name}
               </HomeGuardProfileLink>
-              <span className="shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-[13px] text-on-surface">{guard.home_guard_code}</span>
               {selectedForEvent && (
                 <button type="button" onClick={() => onFileReport(guard)} className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-error hover:bg-error-container" aria-label={`Report ${guard.full_name}`}>
                   <Icon icon="report_problem" size={15} />
@@ -86,7 +89,14 @@ function GuardRow({
                 </button>
               )}
             </div>
-            <span className="text-label-sm text-on-surface-variant">{guard.phone}</span>
+            <div className="mt-1 grid w-fit grid-cols-2 items-center gap-x-3 whitespace-nowrap text-label-sm font-semibold">
+              <span className="text-on-surface-variant">
+                Attended: <span className="font-extrabold tabular-nums text-tertiary">{dutyCount?.attended ?? '—'}</span>
+              </span>
+              <span className="text-error">
+                Not attended: <span className="font-extrabold tabular-nums">{dutyCount?.notAttended ?? '—'}</span>
+              </span>
+            </div>
           </div>
         </div>
         {present && selectedForEvent ? (
@@ -150,6 +160,8 @@ export default function AdminEventDetailsPage() {
   const parsed = useMemo(() => parseAttendanceEventId(rawId), [rawId]);
 
   const [roster, setRoster] = useState<RosterGuard[]>([]);
+  const [dutyCounts, setDutyCounts] = useState<Map<string, GuardDutyCount> | null>(null);
+  const [dutyCountError, setDutyCountError] = useState('');
   const [marks, setMarks] = useState<DailyMark[]>([]);
   const [divisionName, setDivisionName] = useState('');
   const [musterEvent, setMusterEvent] = useState<MusterEvent | null>(null);
@@ -180,14 +192,24 @@ export default function AdminEventDetailsPage() {
     let live = true;
     setLoading(true);
     setError('');
+    setDutyCounts(null);
+    setDutyCountError('');
     loadAttendancePage(parsed.divisionId, parsed.date)
       .then(async (data) => {
         if (!live) return;
         setRoster(data.roster);
         setMarks(data.marks);
         setMusterEvent(data.musterEvent);
+        const countsPromise = loadGuardDutyCounts(data.roster.map((guard) => guard.id)).catch((cause: unknown) => {
+          if (live) {
+            setDutyCountError(cause instanceof Error ? cause.message : 'Could not load duty counts.');
+          }
+          return null;
+        });
         if (data.musterEvent) setParticipantIds(await getMusterEventParticipants(data.musterEvent.id));
         setDivisionName(data.divisions.find((division) => division.id === parsed.divisionId)?.name ?? 'Division');
+        const counts = await countsPromise;
+        if (live && counts) setDutyCounts(counts);
       })
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load this record.'))
       .finally(() => live && setLoading(false));
@@ -305,7 +327,7 @@ export default function AdminEventDetailsPage() {
 
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reportGuard || !parsed || reportDescription.trim().length < 10) return;
+    if (!reportGuard || !parsed || !reportDescription.trim() || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError('');
     try {
@@ -315,6 +337,8 @@ export default function AdminEventDetailsPage() {
         category: reportCategory,
         description: reportDescription.trim(),
         evidencePhoto: reportPhoto,
+        eventName: musterEvent?.event_name || `${divisionName || 'Muster'} event`,
+        eventDate: parsed.date,
       });
       setReportSuccess(`Report filed for ${reportGuard.full_name}.`);
       setReportGuard(null);
@@ -359,7 +383,7 @@ export default function AdminEventDetailsPage() {
 
   return (
     <DashboardLayout title="Muster Record" subtitle="Admin event details">
-      <div className="mx-auto max-w-2xl pb-10">
+      <div className="mx-auto max-w-2xl pb-10 lg:max-w-6xl xl:max-w-7xl">
       {/* Return link */}
       <div className="flex items-center justify-between rounded bg-surface-container-low px-4 py-2 shadow-sm">
         <Link href="/admin/dashboard" className="flex items-center gap-1 text-label-md font-bold text-primary active:opacity-75">
@@ -486,6 +510,11 @@ export default function AdminEventDetailsPage() {
               <h3 className="text-headline-sm font-bold text-primary">Event Personnel</h3>
               <span className="text-label-sm font-bold uppercase text-on-surface-variant">Total {sanctionedCount}</span>
             </div>
+            {dutyCountError && (
+              <p role="alert" className="mb-2 rounded-lg bg-error-container px-3 py-2 text-xs text-on-error-container">
+                Duty counts could not be loaded: {dutyCountError}
+              </p>
+            )}
             <SegmentedFilter<Filter>
               label="Filter by status"
               value={filter}
@@ -522,6 +551,7 @@ export default function AdminEventDetailsPage() {
                     key={guard.id}
                     guard={guard}
                     mark={markByGuard.get(guard.id)}
+                    dutyCount={dutyCounts?.get(guard.id)}
                     isSaving={savingId === guard.id}
                     selectedForEvent={participantIds.includes(guard.id)}
                     onToggleEvent={(g) => void toggleEventParticipant(g)}
@@ -551,7 +581,8 @@ export default function AdminEventDetailsPage() {
             <form onSubmit={(event) => void submitReport(event)} className="flex flex-col gap-4 overflow-y-auto p-5">
               <div className="rounded-lg bg-primary-fixed p-3 text-sm text-on-primary-fixed">
                 <strong>{reportGuard.full_name}</strong>
-                <span className="mt-0.5 block font-mono text-xs text-on-primary-fixed/80">{reportGuard.home_guard_code} · {divisionName} · {parsed ? formatDay(parsed.date) : ''}</span>
+                <span className="mt-0.5 block font-mono text-xs text-on-primary-fixed/80">{reportGuard.home_guard_code} · {divisionName}</span>
+                <span className="mt-1 block text-xs">Event: {musterEvent?.event_name || `${divisionName || 'Muster'} event`} · {parsed ? formatDay(parsed.date) : ''}</span>
               </div>
               <label className="block text-xs font-bold text-on-surface-variant">
                 Report category
@@ -563,22 +594,33 @@ export default function AdminEventDetailsPage() {
                 </select>
               </label>
               <label htmlFor="admin-event-report-description" className="block text-xs font-bold text-on-surface-variant">
-                Incident description <span className="font-normal">(at least 10 characters)</span>
-                <textarea id="admin-event-report-description" required minLength={10} maxLength={4000} rows={4} value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} placeholder="Describe what happened…" className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm font-normal text-on-surface placeholder:text-outline" />
+                Incident description
+                <textarea id="admin-event-report-description" required maxLength={4000} rows={4} value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} placeholder="Describe what happened…" className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm font-normal text-on-surface placeholder:text-outline" />
               </label>
-              <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary hover:bg-surface-container">
-                <Icon icon="add_photo_alternate" size={18} />
-                {reportPhoto ? 'Replace evidence photo' : 'Attach evidence photo (optional)'}
-                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachReportPhoto(event)} />
-              </label>
-              {reportPhoto && <div className="flex items-center gap-3 rounded-lg bg-surface-container-low p-2">
-                <Image src={reportPhoto} alt="Evidence preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
-                <button type="button" onClick={() => setReportPhoto(null)} className="text-xs font-bold text-error underline">Remove photo</button>
-              </div>}
+              <div>
+                <p className="mb-1.5 text-xs font-bold text-on-surface-variant">Memo photo <span className="text-error">(required)</span></p>
+                {reportPhoto ? (
+                  <div className="flex items-center gap-3 rounded-lg bg-surface-container-low p-2">
+                    <Image src={reportPhoto} alt="Memo photo preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
+                    <button type="button" onClick={() => setReportPhoto(null)} className="text-xs font-bold text-error underline">Remove photo</button>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary hover:bg-surface-container">
+                      <Icon icon="photo_camera" size={18} />Take memo photo
+                      <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => void attachReportPhoto(event)} />
+                    </label>
+                    <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary hover:bg-surface-container">
+                      <Icon icon="add_photo_alternate" size={18} />Choose from gallery
+                      <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachReportPhoto(event)} />
+                    </label>
+                  </div>
+                )}
+              </div>
               {reportError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container">{reportError}</p>}
               <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
                 <button type="button" onClick={() => setReportGuard(null)} className="rounded-lg bg-surface-container px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high">Cancel</button>
-                <button type="submit" disabled={submittingReport || reportDescription.trim().length < 10} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50">
+                <button type="submit" disabled={submittingReport || !reportDescription.trim() || !reportPhoto} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50">
                   {submittingReport && <Icon icon="sync" size={17} className="animate-spin" />}
                   {submittingReport ? 'Filing…' : 'Submit report'}
                 </button>

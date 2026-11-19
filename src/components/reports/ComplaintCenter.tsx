@@ -243,7 +243,7 @@ export function ComplaintCenter() {
         <p className="whitespace-pre-wrap rounded-lg bg-surface-container-low p-2.5 text-body-md text-sm leading-6 text-on-surface">
           {report.description}
         </p>
-        {report.evidence_photo && <img src={report.evidence_photo} alt="Attached report evidence" className="max-h-52 w-fit max-w-full rounded-lg border border-outline-variant/60 object-contain" />}
+        {report.evidence_photo && <img src={report.evidence_photo} alt="Attached report memo" className="max-h-52 w-fit max-w-full rounded-lg border border-outline-variant/60 object-contain" />}
         {report.resolution_note && !isAdmin && (
           <div className="rounded-lg bg-on-tertiary-container/10 p-3">
             <p className="text-label-sm font-bold uppercase text-on-tertiary-container">Command response</p>
@@ -288,7 +288,7 @@ export function ComplaintCenter() {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5 lg:max-w-6xl">
       {/* Writer desk form. */}
       <section className="flex flex-col gap-5">
         <div className="flex flex-col gap-1 rounded-xl bg-surface-container-low p-4 shadow-sm">
@@ -497,19 +497,25 @@ export function ComplaintCenter() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-label-sm font-bold uppercase tracking-wider text-on-surface">Evidence Photo <span className="font-normal normal-case tracking-normal text-on-surface-variant">(optional)</span></span>
+            <span className="text-label-sm font-bold uppercase tracking-wider text-on-surface">Memo Photo <span className="font-normal normal-case tracking-normal text-on-surface-variant">(optional)</span></span>
             {evidencePhoto ? (
               <div className="flex items-center gap-3 rounded-xl bg-surface-container-lowest p-3 shadow-sm">
-                <img src={evidencePhoto} alt="Evidence photo preview" className="h-14 w-20 rounded-md object-cover" />
+                <img src={evidencePhoto} alt="Memo photo preview" className="h-14 w-20 rounded-md object-cover" />
                 <div className="flex-1 text-sm font-semibold text-on-surface">Photo attached</div>
                 <button type="button" onClick={() => setEvidencePhoto(null)} className="text-xs font-bold text-error underline">Remove</button>
               </div>
             ) : (
-              <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 text-label-md font-semibold text-primary hover:bg-surface-container-low ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
-                {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
-                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
-              </label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 text-label-md font-semibold text-primary hover:bg-surface-container-low ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                  {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
+                  {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
+                  <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
+                </label>
+                <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest px-3 text-label-md font-semibold text-primary hover:bg-surface-container-low ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                  <Icon icon="add_photo_alternate" size={18} />Choose from gallery
+                  <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
+                </label>
+              </div>
             )}
           </div>
 

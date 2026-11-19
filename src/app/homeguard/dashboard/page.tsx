@@ -37,7 +37,7 @@ export default function HomeGuardDashboardPage() {
       title="Home Guard Duty Portal"
       subtitle="Tamil Nadu Home Guards • Personnel Operations Desk"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 lg:max-w-7xl">
         {/* Guard Identification Banner */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">

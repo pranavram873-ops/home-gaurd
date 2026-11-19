@@ -33,11 +33,11 @@ function DashboardFrame({ children, title, subtitle }: DashboardLayoutProps) {
 
   const waitingForDivision = requiresDivision && (!resolved || !divisionId);
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(36,89,138,.07),_transparent_32rem)] bg-surface text-on-surface">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(36,89,138,.07),_transparent_32rem)] bg-surface text-on-surface lg:bg-[#edf2f6]">
       <Sidebar />
-      <div className={`flex min-h-screen min-w-0 flex-col ${choosingDivision ? '' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'} lg:pl-[264px] lg:pb-0`}>
+      <div className={`flex min-h-screen min-w-0 flex-col ${choosingDivision ? '' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'} lg:pl-[276px] lg:pb-0`}>
         <Header title={title} subtitle={subtitle} />
-        <main className="mx-auto w-full max-w-[640px] flex-1 px-4 py-5 sm:max-w-[1440px] sm:px-7 sm:py-8 lg:px-10">
+        <main className="mx-auto w-full max-w-[640px] flex-1 px-4 py-5 sm:max-w-[1440px] sm:px-7 sm:py-8 lg:max-w-none lg:px-10 lg:py-8 xl:px-12 2xl:px-16">
           {waitingForDivision ? null : (
             <div key={pathname} className="page-enter">
               {children}

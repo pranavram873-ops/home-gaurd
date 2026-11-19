@@ -43,7 +43,7 @@ export default function HomeGuardTasksPage() {
       title="My Assigned Tasks"
       subtitle="Tamil Nadu Home Guards • Directive Checkpoints"
     >
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6 lg:max-w-7xl">
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs">
           <h2 className="text-xl font-bold text-on-surface">
             Assigned Operational Tasks {!tasksQuery.loading && `(${tasks.length})`}

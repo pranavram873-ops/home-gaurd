@@ -8,7 +8,7 @@ interface AuthLikeError {
 }
 
 const CREDENTIALS_INVALID =
-  'Email or password is incorrect. Verify your official email and try again.';
+  'Username or password is incorrect. Verify your username and try again.';
 
 export function describeSignInError(error: AuthLikeError | undefined | null): string {
   const text = (error?.message || '').toLowerCase();

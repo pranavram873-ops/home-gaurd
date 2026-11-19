@@ -157,7 +157,7 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
   }, [events, search]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-3">
+    <div className="mx-auto max-w-3xl space-y-3 lg:max-w-none lg:space-y-5">
       <section className="rounded-2xl bg-primary-container px-4 py-4 text-on-primary">
         <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
         <p className="mt-1 text-sm text-on-primary-container">{divisionId ? 'Events and attendance in your selected division' : 'Events and attendance across divisions'}</p>
@@ -238,7 +238,7 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
             </p>
           </div>
         ) : (
-          <div className="stagger-in flex flex-col gap-3.5">
+          <div className="stagger-in grid grid-cols-1 gap-3.5 lg:grid-cols-2 2xl:grid-cols-3">
             {visible.map((event) => (
               <EventCard key={event.id} event={event} forIncharge={forIncharge} canDelete={role === 'admin' && deletingId !== event.id} onDelete={handleDelete} />
             ))}

@@ -162,7 +162,7 @@ export default function HomeGuardLocationPage() {
       title="Biometric & GPS Muster Verification"
       subtitle="Tamil Nadu Home Guards • Geofenced Duty Attendance"
     >
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6 lg:max-w-7xl">
         {/* Geofence Notice Banner */}
         <div className="p-4 rounded-xl bg-primary-fixed border border-outline-variant text-on-primary-fixed text-xs flex items-start gap-3">
           <Icon icon="verified_user" size={20} className="text-primary shrink-0 mt-0.5" />

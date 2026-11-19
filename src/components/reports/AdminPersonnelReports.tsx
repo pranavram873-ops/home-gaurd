@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Card, Chip, EmptyState } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/Icon';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +11,7 @@ import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLi
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { compressImage, filePersonnelReport } from '@/lib/services/simpleAttendanceService';
 import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
+import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
 
 type PersonnelReport = {
   id: string;
@@ -21,6 +23,8 @@ type PersonnelReport = {
   division_name: string;
   category: string;
   description: string;
+  event_name: string | null;
+  event_date: string | null;
   status: string;
   created_at: string;
   evidence_photo: string | null;
@@ -42,10 +46,13 @@ export function AdminPersonnelReports() {
   const [guardSearch, setGuardSearch] = useState('');
   const [category, setCategory] = useState('conduct');
   const [description, setDescription] = useState('');
+  const [eventName, setEventName] = useState('');
+  const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+  const [reportToDelete, setReportToDelete] = useState<PersonnelReport | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [error, setError] = useState('');
@@ -70,7 +77,7 @@ export function AdminPersonnelReports() {
     const [reportResult, rosterResult] = await Promise.all([
       supabase
         .from('personnel_reports')
-        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,status,created_at,evidence_photo')
+        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo')
         .eq('division_id', divisionId)
         .order('created_at', { ascending: false }),
       supabase
@@ -101,6 +108,15 @@ export function AdminPersonnelReports() {
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [showForm]);
 
+  useEffect(() => {
+    if (!reportToDelete || deletingReportId) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReportToDelete(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [reportToDelete, deletingReportId]);
+
   async function attachEvidence(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -115,7 +131,7 @@ export function AdminPersonnelReports() {
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!divisionId || !selectedGuard || description.trim().length < 10) return;
+    if (!divisionId || !selectedGuard || !description.trim() || !eventName.trim() || !evidencePhoto) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -126,12 +142,16 @@ export function AdminPersonnelReports() {
         category,
         description: description.trim(),
         evidencePhoto,
+        eventName,
+        eventDate,
       });
       setNotice(`Report filed for ${selectedGuard.full_name}.`);
       setSelectedGuardId('');
       setGuardSearch('');
       setCategory('conduct');
       setDescription('');
+      setEventName('');
+      setEventDate(new Date().toISOString().slice(0, 10));
       setEvidencePhoto(null);
       setShowForm(false);
       await load();
@@ -142,24 +162,31 @@ export function AdminPersonnelReports() {
     }
   }
 
-  async function deleteReport(report: PersonnelReport) {
-    if (deletingReportId || !window.confirm(`Delete the report filed for ${report.guard_name}? This cannot be undone.`)) return;
+  async function confirmDeleteReport() {
+    if (!reportToDelete || deletingReportId) return;
+    const report = reportToDelete;
     setDeletingReportId(report.id);
     setError('');
     setNotice('');
-    const { error: deleteError } = await createClient()
-      .from('personnel_reports')
-      .delete()
-      .eq('id', report.id)
-      .select('id')
-      .single();
-    if (deleteError) {
-      setError(deleteError.message || 'Could not delete this report.');
-    } else {
-      setReports((current) => current.filter((item) => item.id !== report.id));
-      setNotice(`Report for ${report.guard_name} deleted.`);
+    try {
+      const { error: deleteError } = await createClient()
+        .from('personnel_reports')
+        .delete()
+        .eq('id', report.id)
+        .select('id')
+        .single();
+      if (deleteError) {
+        window.alert(deleteError.message || 'Could not delete this report.');
+      } else {
+        setReports((current) => current.filter((item) => item.id !== report.id));
+        window.alert(`Report for ${report.guard_name} deleted.`);
+      }
+    } catch (cause) {
+      window.alert(cause instanceof Error ? cause.message : 'Could not delete this report.');
+    } finally {
+      setDeletingReportId(null);
+      setReportToDelete(null);
     }
-    setDeletingReportId(null);
   }
 
   return (
@@ -201,7 +228,7 @@ export function AdminPersonnelReports() {
                     <Chip tone={report.status === 'resolved' ? 'present' : 'live'}>{report.status === 'under_review' ? 'Under review' : report.status}</Chip>
                     <button
                       type="button"
-                      onClick={() => void deleteReport(report)}
+                      onClick={() => setReportToDelete(report)}
                       disabled={deletingReportId !== null}
                       aria-label={`Delete report for ${report.guard_name}`}
                       title="Delete report"
@@ -212,8 +239,19 @@ export function AdminPersonnelReports() {
                   </div>
                 </div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-secondary">{categoryOptions.find((item) => item.value === report.category)?.label ?? 'Other'}</p>
+                <p className="text-xs text-on-surface-variant">
+                  Event:{' '}
+                  {report.event_date ? (
+                    <Link href={`/admin/events/${report.division_id}.${report.event_date}`} className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
+                      {report.event_name || 'Event'}
+                    </Link>
+                  ) : (
+                    <strong className="text-on-surface">{report.event_name || 'Not specified'}</strong>
+                  )}
+                  {report.event_date && ` · ${new Date(`${report.event_date}T00:00:00`).toLocaleDateString('en-IN')}`}
+                </p>
                 <p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
-                {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Evidence for report on ${report.guard_name}`} />}
+                {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Memo photo for report on ${report.guard_name}`} />}
                 <p className="text-xs text-on-surface-variant">Filed by {report.reporter_name}{report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''}</p>
               </li>
             ))}
@@ -276,30 +314,97 @@ export function AdminPersonnelReports() {
             </label>
             <label className="block text-label-md text-on-surface">
               What happened?
-              <textarea required minLength={10} maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the incident and the relevant duty or date when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" />
+              <textarea required maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the incident and the relevant duty or date when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" />
+            </label>
+            <EventNameAutocomplete
+              divisionId={divisionId}
+              value={eventName}
+              onChange={setEventName}
+              onSelect={(event) => setEventDate(event.event_date)}
+              inputClassName="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+            />
+            <label className="block text-label-md text-on-surface">
+              Event date
+              <input required type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface" />
             </label>
             <div>
-              <span className="mb-1.5 block text-label-md text-on-surface">Evidence photo (optional)</span>
+              <span className="mb-1.5 block text-label-md text-on-surface">Memo photo <span className="text-error">(required)</span></span>
               {evidencePhoto ? (
                 <div className="flex items-center gap-3 rounded-lg bg-surface-container-low p-2">
-                  <Image src={evidencePhoto} alt="Report evidence preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
+                  <Image src={evidencePhoto} alt="Report memo preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
                   <button type="button" onClick={() => setEvidencePhoto(null)} className="text-xs font-bold text-error underline">Remove photo</button>
                 </div>
               ) : (
-                <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-semibold text-primary hover:bg-surface-container">
-                  <Icon icon="add_photo_alternate" size={18} />Attach evidence photo
-                  <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidence(event)} />
-                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-semibold text-primary hover:bg-surface-container">
+                    <Icon icon="photo_camera" size={18} />Take memo photo
+                    <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => void attachEvidence(event)} />
+                  </label>
+                  <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-semibold text-primary hover:bg-surface-container">
+                    <Icon icon="add_photo_alternate" size={18} />Choose from gallery
+                    <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidence(event)} />
+                  </label>
+                </div>
               )}
             </div>
             {error && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
             <div className="flex justify-end border-t border-outline-variant pt-3">
-              <button type="submit" disabled={saving || !selectedGuardId || description.trim().length < 10} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
+              <button type="submit" disabled={saving || !selectedGuardId || !description.trim() || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
                 {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}
                 {saving ? 'Submitting…' : 'Submit report'}
               </button>
             </div>
           </form>
+          </section>
+        </div>,
+        document.body,
+      )}
+
+      {portalReady && reportToDelete && createPortal(
+        <div
+          className="overlay-enter fixed inset-0 z-[110] flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deletingReportId) setReportToDelete(null);
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-personnel-report-title"
+            aria-describedby="delete-personnel-report-description"
+            className="overlay-panel w-full max-w-md rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5 shadow-2xl sm:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-container text-on-error-container">
+                <Icon icon="delete" size={22} />
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <h2 id="delete-personnel-report-title" className="text-headline-sm text-on-surface">Delete report?</h2>
+                <p id="delete-personnel-report-description" className="mt-1 text-sm leading-6 text-on-surface-variant">
+                  Delete the report filed for {reportToDelete.guard_name}? This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setReportToDelete(null)}
+                disabled={Boolean(deletingReportId)}
+                className="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold text-on-surface hover:bg-surface-container disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteReport()}
+                disabled={Boolean(deletingReportId)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-error px-4 text-sm font-semibold text-white hover:bg-error/90 disabled:opacity-60"
+              >
+                {deletingReportId ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="delete" size={18} />}
+                {deletingReportId ? 'Deleting report…' : 'Delete report'}
+              </button>
+            </div>
           </section>
         </div>,
         document.body,

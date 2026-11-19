@@ -190,7 +190,7 @@ export function AttendanceReports({ children }: { children?: React.ReactNode }) 
   }, [reports, search]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-0">
+    <div className="mx-auto max-w-2xl space-y-0 lg:max-w-6xl">
       {/* Contextual sub-bar / district scope. */}
       <section className="rounded-b-xl bg-primary-container px-4 py-3 text-on-primary">
         <div className="flex items-center justify-between">

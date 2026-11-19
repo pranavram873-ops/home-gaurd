@@ -50,7 +50,7 @@ export default function HomeGuardDutiesPage() {
       title="My Scheduled Duties"
       subtitle="Tamil Nadu Home Guards • Personnel Duty Roster"
     >
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6 lg:max-w-7xl">
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs">
           <h2 className="text-xl font-bold text-on-surface">
             Personal Duty Schedule {!dutiesQuery.loading && `(${duties.length})`}

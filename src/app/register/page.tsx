@@ -57,8 +57,8 @@ export default function RegisterPage() {
     } finally { setBusy(false); }
   }
 
-  return <main className="mx-auto flex min-h-screen max-w-[560px] items-center bg-surface px-4 py-8">
-    <Card className="w-full p-6 sm:p-8">
+  return <main className="mx-auto flex min-h-screen max-w-[560px] items-center bg-surface px-4 py-8 lg:max-w-[920px] lg:bg-[#edf2f6]">
+    <Card className="w-full p-6 sm:p-8 lg:p-10">
       <Link href="/login" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"><Icon icon="arrow_back" size={18} /> Back to sign in</Link>
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container text-primary"><Icon icon="person_add" size={24} /></div>
       <h1 className="text-headline-md text-on-surface">Create an account</h1>

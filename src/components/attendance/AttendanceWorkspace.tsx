@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   addMusterEventEvidencePhoto,
@@ -11,6 +12,7 @@ import {
   filePersonnelReport,
   loadAttendancePage,
   loadAttendanceEvents,
+  loadGuardDutyCounts,
   loadBandobastForDate,
   loadGuardDutyHistory,
   loadGuardMemoCount,
@@ -22,6 +24,7 @@ import {
   type AttendanceEventSummary,
   type BandobastEvent,
   type DailyMark,
+  type GuardDutyCount,
   type GuardDutyHistory,
   type MusterEvent,
   type RosterGuard,
@@ -31,6 +34,7 @@ import { useAuth } from '@/lib/auth/authContext';
 import { Icon } from '@/components/ui/Icon';
 import { Card, Chip, EmptyState, SegmentedFilter } from '@/components/ui/primitives';
 import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
+import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
 
 function todayLocal() {
   const now = new Date();
@@ -56,12 +60,24 @@ function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
 }
 
+function formatProfileDate(date: string | null | undefined) {
+  if (!date) return 'Not provided';
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 type AttendanceFilter = 'all' | 'present' | 'absent';
 
 /**
  * Duty history register inside the profile modal: Home Guard code and duty counts.
  */
 function DutyHistorySection({ phone }: { phone?: string | null }) {
+  const router = useRouter();
+  const { role } = useAuth();
   const [history, setHistory] = useState<GuardDutyHistory | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [showHistory, setShowHistory] = useState(false);
@@ -83,11 +99,6 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
       live = false;
     };
   }, [phone]);
-
-  const monthLabel = (key: string) => {
-    const [y, m] = key.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-  };
 
   return (
     <div className="w-full border border-outline-variant rounded-lg divide-y divide-outline-variant text-left">
@@ -120,37 +131,68 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
               </span>
             </div>
           </div>
-          {showHistory && (
-            <ul className="px-4 py-2 flex flex-col">
-              {history.months.slice(1).map((bucket) => (
-                <li key={bucket.month} className="flex items-center justify-between py-1.5 text-[13px]">
-                  <span className="font-semibold text-on-surface-variant">{monthLabel(bucket.month)}</span>
-                  <span className="tabular-nums">
-                    <strong className="text-primary">{bucket.present}</strong>
-                    <span className="text-outline"> present</span>
-                    {bucket.absent > 0 && (
-                      <>
-                        <span className="text-outline"> · </span>
-                        <strong className="text-on-error-container">{bucket.absent}</strong>
-                        <span className="text-outline"> absent</span>
-                      </>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
           <div className="px-4 py-2.5">
             <button
               type="button"
-              onClick={() => setShowHistory((v) => !v)}
+              aria-haspopup="dialog"
+              onClick={() => setShowHistory(true)}
               className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary font-bold text-xs hover:bg-surface-container-low transition-colors cursor-pointer"
             >
-              <Icon icon={showHistory ? 'expand_less' : 'history'} size={16} />
-              <span>{showHistory ? 'Hide history' : 'See duty history'}</span>
+              <Icon icon="history" size={16} />
+              <span>View event dates</span>
             </button>
           </div>
         </>
+      )}
+      {showHistory && history && createPortal(
+        <div
+          className="overlay-enter fixed inset-0 z-[90] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setShowHistory(false); }}
+        >
+          <section role="dialog" aria-modal="true" aria-labelledby="attendance-profile-event-dates-title" className="overlay-panel flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <header className="flex shrink-0 items-center justify-between bg-primary p-4 text-on-primary">
+              <h2 id="attendance-profile-event-dates-title" className="font-bold">Home Guard event dates</h2>
+              <button type="button" onClick={() => setShowHistory(false)} aria-label="Close event dates" className="rounded p-1 hover:bg-white/10">
+                <Icon icon="close" size={20} />
+              </button>
+            </header>
+            {history.events.length ? (
+              <ul className="divide-y divide-outline-variant overflow-y-auto overscroll-contain p-4">
+                {history.events.map((event) => (
+                  <li key={event.date}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHistory(false);
+                        router.push(role === 'admin'
+                          ? `/admin/events/${history.divisionId}.${event.date}`
+                          : `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(history.divisionId)}&event=${encodeURIComponent(event.eventName ?? '')}`);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-md py-3 text-left text-[13px] hover:bg-surface-container-low"
+                    >
+                      <span className="font-semibold text-primary underline underline-offset-2">
+                        {formatProfileDate(event.date)}
+                        {event.eventName ? ` · ${event.eventName}` : ''}
+                      </span>
+                      <span className={event.status === 'present' ? 'shrink-0 text-on-tertiary-container' : 'shrink-0 text-error'}>
+                        {event.status}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="p-4 text-center text-sm text-on-surface-variant">No event dates recorded.</p>
+            )}
+            <footer className="shrink-0 border-t border-outline-variant p-3">
+              <button type="button" onClick={() => setShowHistory(false)} className="min-h-10 w-full rounded-lg bg-surface-container text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high">
+                Close
+              </button>
+            </footer>
+          </section>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -181,6 +223,7 @@ export function AttendanceWorkspace() {
 
   // Roster and marks state
   const [roster, setRoster] = useState<RosterGuard[]>([]);
+  const [dutyCounts, setDutyCounts] = useState<Map<string, GuardDutyCount> | null>(null);
   const [marks, setMarks] = useState<DailyMark[]>([]);
   const [selectedGuardIds, setSelectedGuardIds] = useState<string[]>([]);
   const [bandobast, setBandobast] = useState<BandobastEvent[]>([]);
@@ -201,6 +244,8 @@ export function AttendanceWorkspace() {
   const [reportGuard, setReportGuard] = useState<RosterGuard | null>(null);
   const [reportCategory, setReportCategory] = useState('attendance');
   const [reportDescription, setReportDescription] = useState('');
+  const [reportEventName, setReportEventName] = useState('');
+  const [reportEventDate, setReportEventDate] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportError, setReportError] = useState('');
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
@@ -257,6 +302,18 @@ export function AttendanceWorkspace() {
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [divisionId, date, requestedDate, requestedEventName, role, setDivisionId]);
+
+  useEffect(() => {
+    let live = true;
+    setDutyCounts(null);
+    if (roster.length === 0) return () => { live = false; };
+    loadGuardDutyCounts(roster.map((guard) => guard.id))
+      .then((counts) => { if (live) setDutyCounts(counts); })
+      .catch((cause: unknown) => {
+        if (live) setError(cause instanceof Error ? `Duty counts could not be loaded: ${cause.message}` : 'Duty counts could not be loaded.');
+      });
+    return () => { live = false; };
+  }, [roster]);
 
   useEffect(() => {
     setMusterEvent(null);
@@ -520,6 +577,8 @@ export function AttendanceWorkspace() {
     setReportGuard(guard);
     setReportCategory('attendance');
     setReportDescription('');
+    setReportEventName(eventName || `${selectedDivision?.name || 'Muster'} event`);
+    setReportEventDate(date);
     setReportPhoto(null);
     setReportError('');
   }
@@ -541,7 +600,7 @@ export function AttendanceWorkspace() {
 
   async function submitPersonnelReport(event: React.FormEvent) {
     event.preventDefault();
-    if (!reportGuard || reportDescription.trim().length < 10) return;
+    if (!reportGuard || !reportDescription.trim() || !reportEventName.trim() || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError('');
     try {
@@ -551,6 +610,8 @@ export function AttendanceWorkspace() {
         category: reportCategory,
         description: reportDescription.trim(),
         evidencePhoto: reportPhoto,
+        eventName: reportEventName,
+        eventDate: reportEventDate,
       });
       setNotice(`Report successfully filed against ${reportGuard.full_name}. Command review initiated.`);
       setReportGuard(null);
@@ -563,7 +624,7 @@ export function AttendanceWorkspace() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3 pb-28">
+    <div className="mx-auto max-w-5xl space-y-3 pb-28 lg:max-w-none lg:space-y-5">
       {role === 'incharge' && requestedDate && (
         <button
           type="button"
@@ -742,19 +803,6 @@ export function AttendanceWorkspace() {
       {musterEvent && (
         <Card className="p-4 flex flex-col gap-3">
           <div className="flex flex-col gap-3 border-b border-outline-variant/40 pb-3">
-            <button
-              type="button"
-              onClick={() => {
-                setMusterEvent(null);
-                setShowEventForm(false);
-                setNotice('');
-                setError('');
-              }}
-              className="inline-flex min-h-9 w-fit items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
-            >
-              <Icon icon="arrow_back" size={16} />
-              <span>Events</span>
-            </button>
             <div className="grid w-full grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex sm:flex-wrap sm:justify-end">
               <button
                 type="button"
@@ -951,11 +999,13 @@ export function AttendanceWorkspace() {
                             </p>
                             <Icon icon="info" size={16} className="text-primary shrink-0 opacity-70 group-hover:opacity-100 transition-opacity duration-200" />
                           </div>
-                          <div className="mt-0.5 flex items-center gap-2">
-                            <span className="truncate font-mono text-xs font-extrabold tracking-wider text-primary">
-                              {guard.home_guard_code}
+                          <div className="mt-1 grid w-fit grid-cols-2 items-center gap-x-3 whitespace-nowrap text-xs font-semibold">
+                            <span className="text-on-surface-variant">
+                              Attended: <span className="font-extrabold tabular-nums text-tertiary">{dutyCounts?.get(guard.id)?.attended ?? '—'}</span>
                             </span>
-                            <span className="truncate text-xs text-on-surface-variant">• {guard.phone}</span>
+                            <span className="text-error">
+                              Not attended: <span className="font-extrabold tabular-nums">{dutyCounts?.get(guard.id)?.notAttended ?? '—'}</span>
+                            </span>
                           </div>
                         </div>
                       </button>
@@ -1137,6 +1187,14 @@ export function AttendanceWorkspace() {
                 <span className="text-lg font-semibold text-on-surface">
                   {selectedProfileGuard.phone || 'Not provided'}
                 </span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Date of birth</span>
+                <span className="text-sm font-semibold text-on-surface">
+                  {formatProfileDate(selectedProfileGuard.date_of_birth)}
+                </span>
+                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Joining date</span>
+                <span className="text-sm font-semibold text-on-surface">
+                  {formatProfileDate(selectedProfileGuard.joining_date)}
+                </span>
                 <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Rank / Designation</span>
                 <span className="text-sm font-semibold text-on-surface">Home Guard Volunteer</span>
               </div>
@@ -1151,6 +1209,7 @@ export function AttendanceWorkspace() {
                     {(profileMemoCount ?? 0) === 1 ? 'memo' : 'memos'}
                   </span>
                 </p>
+                <GuardPersonnelMemos guardId={selectedProfileGuard.id} onNavigate={() => setSelectedProfileGuard(null)} />
               </div>
 
               <div className="flex flex-col gap-2 w-full mt-2">
@@ -1205,6 +1264,15 @@ export function AttendanceWorkspace() {
                 </span>
               </div>
 
+              <label className="block font-bold text-on-surface-variant text-xs">
+                Event / duty name
+                <input required value={reportEventName} onChange={(event) => setReportEventName(event.target.value)} maxLength={140} className="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-normal text-on-surface" />
+              </label>
+              <label className="block font-bold text-on-surface-variant text-xs">
+                Event date
+                <input required type="date" value={reportEventDate} onChange={(event) => setReportEventDate(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm font-normal text-on-surface" />
+              </label>
+
               <div>
                 <label htmlFor="report-category" className="font-bold text-on-surface-variant block mb-1 text-xs">
                   Report Category
@@ -1224,12 +1292,11 @@ export function AttendanceWorkspace() {
 
               <div>
                 <label htmlFor="report-description" className="font-bold text-on-surface-variant block mb-1 text-xs">
-                  Incident Description (Min. 10 characters)
+                  Incident Description
                 </label>
                 <textarea
                   id="report-description"
                   required
-                  minLength={10}
                   maxLength={4000}
                   rows={4}
                   value={reportDescription}
@@ -1240,16 +1307,14 @@ export function AttendanceWorkspace() {
               </div>
 
               <div>
-                <span className="font-bold text-on-surface-variant block mb-1 text-xs">
-                  Evidence Photo {reportPhoto ? '' : '(optional)'}
-                </span>
+                <span className="font-bold text-on-surface-variant block mb-1 text-xs">Memo photo <span className="text-error">(required)</span></span>
                 {reportPhoto ? (
                   <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
-                    <img src={reportPhoto} alt="Report evidence" className="h-14 w-20 rounded-md object-cover" />
+                    <img src={reportPhoto} alt="Report memo" className="h-14 w-20 rounded-md object-cover" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-primary flex items-center gap-1">
                         <Icon icon="verified" size={14} className="text-tertiary shrink-0" />
-                        Evidence attached
+                        Memo attached
                       </p>
                       <button type="button" onClick={() => setReportPhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">
                         Remove photo
@@ -1257,11 +1322,17 @@ export function AttendanceWorkspace() {
                     </div>
                   </div>
                 ) : (
-                  <label className={`flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                    {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
-                    {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
-                  </label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                      {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
+                      {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
+                    </label>
+                    <label className={`flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                      <Icon icon="add_photo_alternate" size={18} />Choose from gallery
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
+                    </label>
+                  </div>
                 )}
               </div>
 
@@ -1281,7 +1352,7 @@ export function AttendanceWorkspace() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingReport || reportDescription.trim().length < 10}
+                  disabled={submittingReport || !reportDescription.trim() || !reportEventName.trim() || !reportEventDate || !reportPhoto}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary/90 cursor-pointer text-sm disabled:opacity-50"
                 >
                   {submittingReport ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}

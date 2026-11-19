@@ -9,11 +9,24 @@ type EventDeleteDialogProps = {
   description: string;
   deleting: boolean;
   error?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  pendingLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
 
-export function EventDeleteDialog({ title, description, deleting, error, onCancel, onConfirm }: EventDeleteDialogProps) {
+export function EventDeleteDialog({
+  title,
+  description,
+  deleting,
+  error,
+  confirmLabel = 'Delete event',
+  cancelLabel = 'Keep event',
+  pendingLabel = 'Deleting event…',
+  onCancel,
+  onConfirm,
+}: EventDeleteDialogProps) {
   const [portalReady, setPortalReady] = useState(false);
 
   useEffect(() => setPortalReady(true), []);
@@ -34,22 +47,22 @@ export function EventDeleteDialog({ title, description, deleting, error, onCance
       role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onCancel(); }}
     >
-      <section role="alertdialog" aria-modal="true" aria-labelledby="delete-event-title" aria-describedby="delete-event-description" className="overlay-panel w-full max-w-md rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5 shadow-2xl sm:p-6">
+      <section role="alertdialog" aria-modal="true" aria-labelledby="delete-confirmation-title" aria-describedby="delete-confirmation-description" className="overlay-panel w-full max-w-md rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5 shadow-2xl sm:p-6">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-container text-on-error-container">
             <Icon icon="delete" size={22} />
           </span>
           <div className="min-w-0 pt-0.5">
-            <h2 id="delete-event-title" className="text-headline-sm text-on-surface">{title}</h2>
-            <p id="delete-event-description" className="mt-1 text-sm leading-6 text-on-surface-variant">{description}</p>
+            <h2 id="delete-confirmation-title" className="text-headline-sm text-on-surface">{title}</h2>
+            <p id="delete-confirmation-description" className="mt-1 text-sm leading-6 text-on-surface-variant">{description}</p>
           </div>
         </div>
         {error && <p role="alert" className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onCancel} disabled={deleting} className="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold text-on-surface hover:bg-surface-container disabled:opacity-50">Keep event</button>
+          <button type="button" onClick={onCancel} disabled={deleting} className="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold text-on-surface hover:bg-surface-container disabled:opacity-50">{cancelLabel}</button>
           <button type="button" onClick={onConfirm} disabled={deleting} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-error px-4 text-sm font-semibold text-white hover:bg-error/90 disabled:opacity-60">
             {deleting ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="delete" size={18} />}
-            {deleting ? 'Deleting event…' : 'Delete event'}
+            {deleting ? pendingLabel : confirmLabel}
           </button>
         </div>
       </section>

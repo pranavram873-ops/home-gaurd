@@ -9,9 +9,11 @@ import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLi
 import {
   getMusterEventParticipants,
   loadAttendancePage,
+  loadGuardDutyCounts,
   saveDailyMark,
   setMusterEventParticipant,
   type DailyMark,
+  type GuardDutyCount,
   type MusterEvent,
   type RosterGuard,
 } from '@/lib/services/simpleAttendanceService';
@@ -21,12 +23,6 @@ function formatDay(date: string) {
   const dt = new Date(y, m - 1, d);
   if (Number.isNaN(dt.getTime())) return date;
   return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function formatTime(iso: string) {
-  const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return '';
-  return dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 function initials(name: string) {
@@ -51,6 +47,7 @@ export function EventPersonnelPicker({
   const router = useRouter();
   const [roster, setRoster] = useState<RosterGuard[]>([]);
   const [marks, setMarks] = useState<DailyMark[]>([]);
+  const [dutyCounts, setDutyCounts] = useState<Map<string, GuardDutyCount> | null>(null);
   const [musterEvent, setMusterEvent] = useState<MusterEvent | null>(null);
   const [divisionName, setDivisionName] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
@@ -65,6 +62,7 @@ export function EventPersonnelPicker({
     let live = true;
     setLoading(true);
     setError('');
+    setDutyCounts(null);
     loadAttendancePage(divisionId, date)
       .then(async (data) => {
         if (!live) return;
@@ -72,6 +70,12 @@ export function EventPersonnelPicker({
         setMarks(data.marks);
         setMusterEvent(data.musterEvent);
         setDivisionName(data.divisions.find((division) => division.id === divisionId)?.name ?? 'Division');
+        const countsPromise = loadGuardDutyCounts(data.roster.map((guard) => guard.id)).catch((cause: unknown) => {
+          if (live) {
+            setError(cause instanceof Error ? `Duty counts could not be loaded: ${cause.message}` : 'Duty counts could not be loaded.');
+          }
+          return null;
+        });
         if (data.musterEvent) {
           const ids = await getMusterEventParticipants(data.musterEvent.id);
           if (!live) return;
@@ -79,6 +83,8 @@ export function EventPersonnelPicker({
           setDraftIds(ids);
           setDraftReady(true);
         }
+        const counts = await countsPromise;
+        if (live && counts) setDutyCounts(counts);
       })
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load this event.'))
       .finally(() => live && setLoading(false));
@@ -150,7 +156,7 @@ export function EventPersonnelPicker({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-3 pb-28">
+    <div className="mx-auto max-w-2xl space-y-3 pb-6 lg:max-w-6xl lg:pb-10">
       <Card className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -169,6 +175,24 @@ export function EventPersonnelPicker({
         <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
           Selected guards are recorded as <span className="font-bold text-on-tertiary-container">present</span>; guards removed from the event are recorded as <span className="font-bold text-error">absent</span>. Guards who were never on the event are not marked.
         </p>
+        <div className="mt-3 hidden justify-end gap-2 sm:gap-3 lg:flex">
+          <Link
+            href={backHref}
+            className="flex h-11 min-w-[120px] items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-outline-variant px-4 text-label-lg font-bold text-on-surface-variant transition-colors hover:bg-surface-container"
+          >
+            <Icon icon="close" size={18} />
+            Close
+          </Link>
+          <button
+            type="button"
+            disabled={saving || loading || !draftReady || !musterEvent}
+            onClick={() => void saveSelection()}
+            className="flex h-11 min-w-[148px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary-container px-5 text-label-lg font-bold text-on-primary shadow-sm transition-colors hover:bg-primary disabled:opacity-60"
+          >
+            {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
+            {saving ? 'Saving…' : 'Save muster'}
+          </button>
+        </div>
       </Card>
 
       {error && (
@@ -177,6 +201,7 @@ export function EventPersonnelPicker({
           <span className="min-w-0 flex-1 text-sm">{error}</span>
         </div>
       )}
+
 
       <Card className="overflow-hidden">
         <div className="border-b border-outline-variant/60 p-3 sm:p-4">
@@ -223,8 +248,6 @@ export function EventPersonnelPicker({
           <ul className="stagger-in flex flex-col gap-2 p-3 sm:p-4">
             {visible.map((guard) => {
               const selected = draftIds.includes(guard.id);
-              const onEvent = participantIds.includes(guard.id);
-              const mark = onEvent ? markByGuard.get(guard.id) : undefined;
               return (
                 <li key={guard.id} className="card-hover-lift rounded-xl bg-surface-container-low p-3.5 shadow-sm transition-all duration-200 hover:bg-surface-container/70">
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -239,23 +262,16 @@ export function EventPersonnelPicker({
                           </HomeGuardProfileLink>
                           {selected && <Icon icon="check_circle" size={16} fill className="shrink-0 text-tertiary" />}
                         </div>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span className="truncate font-mono text-xs font-extrabold tracking-wider text-primary">{guard.home_guard_code}</span>
-                          <span className="truncate text-xs text-on-surface-variant">• {guard.phone}</span>
+                        <div className="mt-1 grid w-fit grid-cols-2 items-center gap-x-3 whitespace-nowrap text-xs font-semibold">
+                          <span className="text-on-surface-variant">
+                            Attended: <span className="font-extrabold tabular-nums text-tertiary">{dutyCounts?.get(guard.id)?.attended ?? '—'}</span>
+                          </span>
+                          <span className="text-error">
+                            Not attended: <span className="font-extrabold tabular-nums">{dutyCounts?.get(guard.id)?.notAttended ?? '—'}</span>
+                          </span>
                         </div>
                       </div>
                     </div>
-                    {mark?.status === 'present' ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-tertiary-fixed px-2 py-0.5 text-label-sm font-bold text-on-tertiary-fixed">
-                        <Icon icon="check" size={13} fill />
-                        {formatTime(mark.marked_at) || 'Present'}
-                      </span>
-                    ) : mark?.status === 'absent' ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-error-container px-2 py-0.5 text-label-sm font-bold text-on-error-container">
-                        <Icon icon="close" size={13} />
-                        Absent
-                      </span>
-                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -272,27 +288,25 @@ export function EventPersonnelPicker({
         )}
       </Card>
 
-      {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-outline-variant/50 bg-surface-container-lowest/95 px-4 py-2.5 shadow-[var(--shadow-float)] backdrop-blur-md lg:bottom-0 lg:left-[264px]">
-        <div className="mx-auto flex max-w-lg items-center gap-2 sm:max-w-[1440px]">
-          <Link
-            href={backHref}
-            className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant px-4 text-label-lg font-bold text-on-surface-variant transition-colors hover:bg-surface-container"
-          >
-            <Icon icon="close" size={18} />
-            Close
-          </Link>
-          <button
-            type="button"
-            disabled={saving || loading || !draftReady || !musterEvent}
-            onClick={() => void saveSelection()}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary-container px-5 text-label-lg font-bold text-on-primary shadow-md transition-all hover:bg-primary active:scale-95 disabled:opacity-60 disabled:active:scale-100"
-          >
-            {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
-            {saving ? 'Saving…' : 'Save muster'}
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-3 pb-2 lg:hidden">
+        <Link
+          href={backHref}
+          className="flex min-h-12 min-w-0 w-full items-center justify-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-3 text-label-md font-bold text-on-surface-variant transition-colors hover:bg-surface-container"
+        >
+          <Icon icon="close" size={18} />
+          Close
+        </Link>
+        <button
+          type="button"
+          disabled={saving || loading || !draftReady || !musterEvent}
+          onClick={() => void saveSelection()}
+          className="flex min-h-12 min-w-0 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-label-md font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
+          {saving ? 'Saving…' : 'Save muster'}
+        </button>
       </div>
+
     </div>
   );
 }

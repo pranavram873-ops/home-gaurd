@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   listPersonnel,
@@ -9,19 +10,34 @@ import {
   setAccountStatus,
 } from '@/lib/services/personnelService';
 import { listDistricts } from '@/lib/services/referenceService';
-import { addRosterGuard, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
+import { addRosterGuard, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, saveGuardProfileDates, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { District, Profile } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 import { createClient } from '@/lib/supabase/client';
 import { useDivision } from '@/lib/attendance/divisionContext';
+import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
+import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
+import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
 
 const blankRecruit = {
   full_name: '',
   phone: '',
   personnel_id: '',
   district_id: '',
+  date_of_birth: '',
+  joining_date: '',
 };
+
+function formatProfileDate(date: string | null | undefined) {
+  if (!date) return 'Not provided';
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 const PERSONNEL_DISTRICT_NAMES = [
   'Avinashi',
@@ -43,11 +59,14 @@ export default function PersonnelDirectoryPage() {
   const [districtScopeError, setDistrictScopeError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [deletingProfile, setDeletingProfile] = useState(false);
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ guardId: string; divisionId: string; name: string; code: string } | null>(null);
   const [reportCategory, setReportCategory] = useState('attendance');
   const [reportDescription, setReportDescription] = useState('');
+  const [reportEventName, setReportEventName] = useState('');
+  const [reportEventDate, setReportEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
@@ -83,25 +102,6 @@ export default function PersonnelDirectoryPage() {
     () => divisionId ? listDivisionRoster(divisionId) : Promise.resolve({ data: [], error: null }),
     divisionId,
   );
-  useEffect(() => {
-    let live = true;
-    const supabase = createClient();
-    const loadMemoCounts = async () => {
-      const { data, error } = await supabase.from('guard_reports').select('subject_id');
-      if (!live || error) return;
-      const counts: Record<string, number> = {};
-      for (const row of data ?? []) counts[row.subject_id] = (counts[row.subject_id] ?? 0) + 1;
-      setMemoCounts(counts);
-    };
-    void loadMemoCounts();
-    const channel = supabase.channel('personnel-memo-counts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guard_reports' }, (payload) => {
-        const subjectId = (payload.new as { subject_id: string }).subject_id;
-        setMemoCounts((current) => ({ ...current, [subjectId]: (current[subjectId] ?? 0) + 1 }));
-      }).subscribe();
-    return () => { live = false; void supabase.removeChannel(channel); };
-  }, []);
-
   const districtsQuery = useLiveQuery<District[]>(() => listDistricts());
   const districts = useMemo(() => {
     const allowedNames = new Set(PERSONNEL_DISTRICT_NAMES.map((name) => name.toLocaleLowerCase('en-IN')));
@@ -139,6 +139,48 @@ export default function PersonnelDirectoryPage() {
       } satisfies Profile));
     return [...profiles, ...attendanceOnly];
   }, [rosterQuery.data, attendanceRosterQuery.data, selectedDistrict]);
+
+  useEffect(() => {
+    let live = true;
+    const supabase = createClient();
+    const loadMemoCounts = async () => {
+      const [legacyReports, personnelReports] = await Promise.all([
+        supabase.from('guard_reports').select('subject_id'),
+        supabase.from('personnel_reports').select('home_guard_code'),
+      ]);
+      if (!live) return;
+      if (legacyReports.error || personnelReports.error) {
+        console.error('Could not load personnel memo counts:', legacyReports.error || personnelReports.error);
+        return;
+      }
+
+      const counts: Record<string, number> = {};
+      for (const row of legacyReports.data ?? []) {
+        counts[row.subject_id] = (counts[row.subject_id] ?? 0) + 1;
+      }
+
+      const profileIdByCode = new Map(
+        personnel
+          .filter((profile) => profile.personnel_id)
+          .map((profile) => [profile.personnel_id!.toUpperCase(), profile.id]),
+      );
+      for (const report of personnelReports.data ?? []) {
+        const profileId = profileIdByCode.get(report.home_guard_code.toUpperCase());
+        if (profileId) counts[profileId] = (counts[profileId] ?? 0) + 1;
+      }
+      setMemoCounts(counts);
+    };
+    void loadMemoCounts();
+    const channel = supabase.channel('personnel-memo-counts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guard_reports' }, () => {
+        void loadMemoCounts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'personnel_reports' }, () => {
+        void loadMemoCounts();
+      })
+      .subscribe();
+    return () => { live = false; void supabase.removeChannel(channel); };
+  }, [personnel]);
 
   // Older admin-created records were saved only in `profiles`. Bring those
   // active guards into the attendance roster when this admin directory loads.
@@ -266,7 +308,6 @@ export default function PersonnelDirectoryPage() {
 
   async function handleDeleteProfile() {
     if (!selectedProfile) return;
-    if (!window.confirm(`Delete ${selectedProfile.full_name}? They will be removed from the roster and event lists, and their personnel account will be suspended.`)) return;
     setDeletingProfile(true);
     setDeleteProfileError(null);
     try {
@@ -283,6 +324,7 @@ export default function PersonnelDirectoryPage() {
       } else {
         throw new Error('This Home Guard is not in the attendance roster, so there is nothing to delete.');
       }
+      setConfirmDeleteProfile(false);
       setSelectedProfile(null);
       void rosterQuery.refresh();
       void attendanceRosterQuery.refresh();
@@ -312,6 +354,8 @@ export default function PersonnelDirectoryPage() {
     if (!selectedProfile) return;
     setReportCategory('attendance');
     setReportDescription('');
+    setReportEventName('');
+    setReportEventDate(new Date().toISOString().slice(0, 10));
     setReportPhoto(null);
     setReportError(null);
     setReportSuccess(false);
@@ -331,7 +375,7 @@ export default function PersonnelDirectoryPage() {
 
   async function submitPersonnelReport(event: React.FormEvent) {
     event.preventDefault();
-    if (!reportTarget || reportDescription.trim().length < 10) return;
+    if (!reportTarget || !reportDescription.trim() || !reportEventName.trim() || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError(null);
     try {
@@ -341,9 +385,18 @@ export default function PersonnelDirectoryPage() {
         category: reportCategory,
         description: reportDescription,
         evidencePhoto: reportPhoto,
+        eventName: reportEventName,
+        eventDate: reportEventDate,
       });
+      if (selectedProfile) {
+        setMemoCounts((current) => ({
+          ...current,
+          [selectedProfile.id]: (current[selectedProfile.id] ?? 0) + 1,
+        }));
+      }
       setReportOpen(false);
       setReportDescription('');
+      setReportEventName('');
       setReportPhoto(null);
       setReportSuccess(true);
     } catch (error) {
@@ -378,6 +431,10 @@ export default function PersonnelDirectoryPage() {
       setFormError('Select a division before adding a Home Guard.');
       return;
     }
+    if (newGuard.joining_date < newGuard.date_of_birth) {
+      setFormError('Joining date cannot be earlier than the date of birth.');
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
@@ -386,6 +443,8 @@ export default function PersonnelDirectoryPage() {
         phone: newGuard.phone,
         home_guard_code: newGuard.personnel_id,
         division_id: divisionId,
+        date_of_birth: newGuard.date_of_birth,
+        joining_date: newGuard.joining_date,
       });
       setCreated(true);
       void attendanceRosterQuery.refresh();
@@ -402,7 +461,7 @@ export default function PersonnelDirectoryPage() {
       title="Personnel Directory & Roster"
       subtitle={selectedDistrict ? `Tamil Nadu Home Guards • ${selectedDistrict.name}` : 'Tamil Nadu Home Guards • Selected district'}
     >
-      <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto xl:max-w-none">
         {rosterSyncError && (
           <div role="alert" className="rounded-lg bg-error-container p-4 text-sm text-on-error-container">
             {rosterSyncError}
@@ -576,6 +635,12 @@ export default function PersonnelDirectoryPage() {
                   {memoCounts[selectedProfile.id] ?? 0}
                   <span className="text-sm font-medium text-on-surface-variant">{(memoCounts[selectedProfile.id] ?? 0) === 1 ? 'memo' : 'memos'}</span>
                 </p>
+                <GuardPersonnelMemos
+                  guardId={attendanceRosterQuery.data?.find(
+                    (guard) => guard.home_guard_code.toUpperCase() === selectedProfile.personnel_id?.toUpperCase(),
+                  )?.id ?? null}
+                  onNavigate={() => setSelectedProfile(null)}
+                />
               </div>
             </div>
 
@@ -635,7 +700,7 @@ export default function PersonnelDirectoryPage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => void handleDeleteProfile()}
+                  onClick={() => { setDeleteProfileError(null); setConfirmDeleteProfile(true); }}
                   disabled={deletingProfile}
                   className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-error-container text-on-error-container font-bold text-xs hover:bg-error-container/80 cursor-pointer disabled:opacity-60"
                 >
@@ -647,6 +712,23 @@ export default function PersonnelDirectoryPage() {
           </div>
         </div>
       ), document.body)}
+      {selectedProfile && confirmDeleteProfile && (
+        <EventDeleteDialog
+          title={`Delete ${selectedProfile.full_name}?`}
+          description="They will be removed from the roster and event lists, and their personnel account will be suspended."
+          deleting={deletingProfile}
+          error={deleteProfileError ?? undefined}
+          cancelLabel="Keep profile"
+          confirmLabel="Delete profile"
+          pendingLabel="Deleting profile…"
+          onCancel={() => {
+            if (deletingProfile) return;
+            setConfirmDeleteProfile(false);
+            setDeleteProfileError(null);
+          }}
+          onConfirm={() => void handleDeleteProfile()}
+        />
+      )}
 
       {/* Personnel report modal */}
       {portalReady && reportOpen && createPortal((
@@ -694,12 +776,11 @@ export default function PersonnelDirectoryPage() {
 
               <div>
                 <label htmlFor="admin-report-description" className="mb-1 block text-xs font-bold text-on-surface-variant">
-                  Incident Description (Min. 10 characters)
+                  Incident Description
                 </label>
                 <textarea
                   id="admin-report-description"
                   required
-                  minLength={10}
                   maxLength={4000}
                   rows={4}
                   value={reportDescription}
@@ -709,17 +790,30 @@ export default function PersonnelDirectoryPage() {
                 />
               </div>
 
+              <EventNameAutocomplete
+                divisionId={reportTarget?.divisionId ?? null}
+                value={reportEventName}
+                onChange={setReportEventName}
+                onSelect={(event) => setReportEventDate(event.event_date)}
+                inputClassName="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm font-normal text-on-surface"
+                labelClassName="block text-xs font-bold text-on-surface-variant"
+              />
+              <label className="block text-xs font-bold text-on-surface-variant">
+                Event date
+                <input required type="date" value={reportEventDate} onChange={(event) => setReportEventDate(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm font-normal text-on-surface" />
+              </label>
+
               <div>
                 <span className="mb-1 block text-xs font-bold text-on-surface-variant">
-                  Evidence Photo {reportPhoto ? '' : '(optional)'}
+                  Memo photo <span className="text-error">(required)</span>
                 </span>
                 {reportPhoto ? (
                   <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
-                    <img src={reportPhoto} alt="Report evidence" className="h-14 w-20 rounded-md object-cover" />
+                    <img src={reportPhoto} alt="Report memo" className="h-14 w-20 rounded-md object-cover" />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1 text-xs font-bold text-primary">
                         <Icon icon="verified" size={14} className="shrink-0 text-tertiary" />
-                        Evidence attached
+                        Memo attached
                       </p>
                       <button type="button" onClick={() => setReportPhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">
                         Remove photo
@@ -727,11 +821,18 @@ export default function PersonnelDirectoryPage() {
                     </div>
                   </div>
                 ) : (
-                  <label className={`flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                    {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="add_photo_alternate" size={18} />}
-                    {compressingPhoto ? 'Processing photo…' : 'Attach evidence photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
-                  </label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                      {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
+                      {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
+                    </label>
+                    <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                      <Icon icon="add_photo_alternate" size={18} />
+                      Choose from gallery
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
+                    </label>
+                  </div>
                 )}
               </div>
 
@@ -751,7 +852,7 @@ export default function PersonnelDirectoryPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingReport || !reportTarget || reportDescription.trim().length < 10}
+                  disabled={submittingReport || !reportTarget || !reportDescription.trim() || !reportEventName.trim() || !reportEventDate || !reportPhoto}
                   className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50"
                 >
                   {submittingReport ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}
@@ -857,6 +958,28 @@ export default function PersonnelDirectoryPage() {
                     </select>
                   </div>
                   <div>
+                    <label className="font-bold text-on-surface-variant block mb-1">Date of birth</label>
+                    <input
+                      type="date"
+                      required
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={newGuard.date_of_birth}
+                      onChange={(e) => setNewGuard({ ...newGuard, date_of_birth: e.target.value })}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-on-surface-variant block mb-1">Joining date</label>
+                    <input
+                      type="date"
+                      required
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={newGuard.joining_date}
+                      onChange={(e) => setNewGuard({ ...newGuard, joining_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-on-surface"
+                    />
+                  </div>
+                  <div>
                     <label className="font-bold text-on-surface-variant block mb-1">Home Guard code</label>
                     <input
                       type="text"
@@ -924,24 +1047,41 @@ export default function PersonnelDirectoryPage() {
 }
 
 /**
- * Muster-register block inside the profile: Home Guard code and duty counts
- * for the current month, with a "See history" toggle for the months before.
+ * Muster-register block inside the profile: Home Guard code and current
+ * duty count, with a toggle for clickable event dates.
  * The register is looked up lazily when a profile opens, keyed on the mobile
  * number, because `profiles` and the roster have no shared id.
  */
 function DutyHistorySection({ phone }: { phone?: string | null }) {
+  const router = useRouter();
   const [history, setHistory] = useState<GuardDutyHistory | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [showHistory, setShowHistory] = useState(false);
+  const [editingDates, setEditingDates] = useState(false);
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [joiningDate, setJoiningDate] = useState('');
+  const [savingDates, setSavingDates] = useState(false);
+  const [datesError, setDatesError] = useState('');
+
+  async function loadHistory() {
+    const result = await loadGuardDutyHistory(phone);
+    setHistory(result);
+    setDateOfBirth(result?.dateOfBirth ?? '');
+    setJoiningDate(result?.joiningDate ?? '');
+    setState('ready');
+  }
 
   useEffect(() => {
     let live = true;
     setState('loading');
     setShowHistory(false);
+    setEditingDates(false);
     loadGuardDutyHistory(phone)
       .then((result) => {
         if (!live) return;
         setHistory(result);
+        setDateOfBirth(result?.dateOfBirth ?? '');
+        setJoiningDate(result?.joiningDate ?? '');
         setState('ready');
       })
       .catch(() => {
@@ -952,10 +1092,29 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
     };
   }, [phone]);
 
-  const monthLabel = (key: string) => {
-    const [y, m] = key.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-  };
+  async function submitDates(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!history) return;
+    setSavingDates(true);
+    setDatesError('');
+    try {
+      await saveGuardProfileDates(history.guardId, dateOfBirth, joiningDate);
+      await loadHistory();
+      setEditingDates(false);
+    } catch (reason) {
+      setDatesError(reason instanceof Error ? reason.message : 'Could not save Home Guard dates.');
+    } finally {
+      setSavingDates(false);
+    }
+  }
+
+  function closeDateEditor() {
+    if (savingDates) return;
+    setEditingDates(false);
+    setDatesError('');
+    setDateOfBirth(history?.dateOfBirth ?? '');
+    setJoiningDate(history?.joiningDate ?? '');
+  }
 
   return (
     <div className="w-full border border-outline-variant rounded-lg divide-y divide-outline-variant text-left">
@@ -980,6 +1139,21 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
               <span className="font-mono text-sm font-bold text-on-surface">{history.homeGuardCode}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-semibold text-on-surface-variant">Date of birth</span>
+              <span className="text-[13px] font-semibold text-on-surface">{formatProfileDate(history.dateOfBirth)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-semibold text-on-surface-variant">Joining date</span>
+              <span className="text-[13px] font-semibold text-on-surface">{formatProfileDate(history.joiningDate)}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setDatesError(''); setEditingDates(true); }}
+              className="self-end text-xs font-semibold text-primary underline underline-offset-2"
+            >
+              Edit dates
+            </button>
+            <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-semibold text-on-surface-variant">
                 Duties this month{history.divisionName ? ` · ${history.divisionName}` : ''}
               </span>
@@ -988,37 +1162,116 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
               </span>
             </div>
           </div>
-          {showHistory && (
-            <ul className="px-4 py-2 flex flex-col">
-              {history.months.slice(1).map((bucket) => (
-                <li key={bucket.month} className="flex items-center justify-between py-1.5 text-[13px]">
-                  <span className="font-semibold text-on-surface-variant">{monthLabel(bucket.month)}</span>
-                  <span className="tabular-nums">
-                    <strong className="text-primary">{bucket.present}</strong>
-                    <span className="text-outline"> present</span>
-                    {bucket.absent > 0 && (
-                      <>
-                        <span className="text-outline"> · </span>
-                        <strong className="text-on-error-container">{bucket.absent}</strong>
-                        <span className="text-outline"> absent</span>
-                      </>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
           <div className="px-4 py-2.5">
             <button
               type="button"
-              onClick={() => setShowHistory((v) => !v)}
+              onClick={() => setShowHistory(true)}
               className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary font-bold text-sm hover:bg-surface-container-low transition-colors cursor-pointer"
             >
-              <Icon icon={showHistory ? 'expand_less' : 'history'} size={18} />
-              <span>{showHistory ? 'Hide history' : 'See history'}</span>
+              <Icon icon="history" size={18} />
+              <span>View event dates</span>
             </button>
           </div>
         </>
+      )}
+      {showHistory && history && createPortal(
+        <div
+          className="overlay-enter fixed inset-0 z-[90] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setShowHistory(false); }}
+        >
+          <section role="dialog" aria-modal="true" aria-labelledby="profile-event-dates-title" className="overlay-panel flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <header className="flex shrink-0 items-center justify-between bg-primary p-4 text-on-primary">
+              <h2 id="profile-event-dates-title" className="font-bold">Home Guard event dates</h2>
+              <button type="button" onClick={() => setShowHistory(false)} aria-label="Close event dates" className="rounded p-1 hover:bg-white/10">
+                <Icon icon="close" size={20} />
+              </button>
+            </header>
+            {history.events.length ? (
+              <ul className="divide-y divide-outline-variant overflow-y-auto overscroll-contain p-4">
+                {history.events.map((event) => (
+                  <li key={event.date}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHistory(false);
+                        router.push(`/admin/events/${history.divisionId}.${event.date}`);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-md py-3 text-left text-[13px] hover:bg-surface-container-low"
+                    >
+                      <span className="font-semibold text-primary underline underline-offset-2">
+                        {formatProfileDate(event.date)}
+                        {event.eventName ? ` · ${event.eventName}` : ''}
+                      </span>
+                      <span className={event.status === 'present' ? 'shrink-0 text-on-tertiary-container' : 'shrink-0 text-error'}>
+                        {event.status}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="p-4 text-center text-sm text-on-surface-variant">No event dates recorded.</p>
+            )}
+            <footer className="shrink-0 border-t border-outline-variant p-3">
+              <button type="button" onClick={() => setShowHistory(false)} className="min-h-10 w-full rounded-lg bg-surface-container text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high">
+                Close
+              </button>
+            </footer>
+          </section>
+        </div>,
+        document.body,
+      )}
+      {editingDates && history && createPortal(
+        <div
+          className="overlay-enter fixed inset-0 z-[100] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closeDateEditor(); }}
+        >
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-home-guard-dates-title" className="overlay-panel w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <header className="flex items-center justify-between bg-primary p-4 text-on-primary">
+              <h2 id="edit-home-guard-dates-title" className="font-bold">Edit Home Guard dates</h2>
+              <button type="button" onClick={closeDateEditor} disabled={savingDates} aria-label="Close date editor" className="rounded p-1 hover:bg-white/10 disabled:opacity-50">
+                <Icon icon="close" size={20} />
+              </button>
+            </header>
+            <form onSubmit={(event) => void submitDates(event)} className="space-y-4 p-4">
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Date of birth
+                <input
+                  type="date"
+                  required
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={dateOfBirth}
+                  onChange={(event) => setDateOfBirth(event.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Joining date
+                <input
+                  type="date"
+                  required
+                  max={new Date().toISOString().slice(0, 10)}
+                  min={dateOfBirth || undefined}
+                  value={joiningDate}
+                  onChange={(event) => setJoiningDate(event.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+                />
+              </label>
+              {datesError && <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{datesError}</p>}
+              <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
+                <button type="button" onClick={closeDateEditor} disabled={savingDates} className="min-h-10 rounded-lg px-4 text-sm font-semibold text-on-surface-variant hover:bg-surface-container disabled:opacity-50">
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingDates || !dateOfBirth || !joiningDate} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">
+                  {savingDates ? 'Saving dates…' : 'Save dates'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>,
+        document.body,
       )}
     </div>
   );

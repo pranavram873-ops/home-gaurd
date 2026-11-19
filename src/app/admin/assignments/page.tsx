@@ -143,7 +143,7 @@ export default function AssignmentsPage() {
       title="Duty Assignments & Bandobast Rosters"
       subtitle="Tamil Nadu Home Guards • Shift Scheduling"
     >
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+      <div className="max-w-7xl mx-auto flex flex-col gap-6 xl:max-w-none">
         {/* Banner with Add Action */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

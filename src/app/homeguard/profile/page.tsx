@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth/authContext';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { getOwnProfile, updateOwnProfile } from '@/lib/services/personnelService';
+import { loadGuardDutyHistory } from '@/lib/services/simpleAttendanceService';
 import type { Profile } from '@/types';
 import { Icon } from '@/components/ui/Icon';
 
@@ -29,6 +30,9 @@ export default function HomeGuardProfilePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [dutiesThisMonth, setDutiesThisMonth] = useState<number | null>(null);
+  const [dutyCountLoading, setDutyCountLoading] = useState(true);
+  const [dutyCountError, setDutyCountError] = useState('');
 
   // Seed the editable fields from the loaded row instead of from placeholders,
   // so saving without touching anything cannot write a made-up number.
@@ -38,6 +42,34 @@ export default function HomeGuardProfilePage() {
     setEmergency(dossier.emergency_contact || '');
     setAddress(dossier.address || '');
   }, [dossier]);
+
+  useEffect(() => {
+    let active = true;
+    if (!dossier?.phone) {
+      setDutiesThisMonth(null);
+      setDutyCountError('');
+      setDutyCountLoading(false);
+      return () => { active = false; };
+    }
+
+    setDutyCountLoading(true);
+    setDutyCountError('');
+    loadGuardDutyHistory(dossier.phone)
+      .then((history) => {
+        if (!active) return;
+        setDutiesThisMonth(history?.months[0]?.present ?? null);
+      })
+      .catch((cause) => {
+        if (!active) return;
+        setDutiesThisMonth(null);
+        setDutyCountError(cause instanceof Error ? cause.message : 'Could not load this month’s duty count.');
+      })
+      .finally(() => {
+        if (active) setDutyCountLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [dossier?.phone]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +155,17 @@ export default function HomeGuardProfilePage() {
               {dossier?.unit?.name || dossier?.district?.name}
             </span>
           </div>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Duties this month</p>
+          <p className="mt-1 text-2xl font-extrabold text-primary tabular-nums">
+            {dutyCountLoading ? '…' : dutiesThisMonth ?? '—'}
+          </p>
+          {dutyCountError && <p role="alert" className="mt-1 text-xs text-on-error-container">Could not load duty count: {dutyCountError}</p>}
+          {!dutyCountLoading && !dutyCountError && dutiesThisMonth === null && (
+            <p className="mt-1 text-xs text-on-surface-variant">Duty count is unavailable because no attendance roster record is linked.</p>
+          )}
         </div>
 
         {isSaved && (

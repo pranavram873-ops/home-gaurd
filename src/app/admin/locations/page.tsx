@@ -135,7 +135,7 @@ export default function LocationsPage() {
       title="Geofenced Duty Locations & Sector Map"
       subtitle="Tamil Nadu Home Guards • Perimeter Geofencing"
     >
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+      <div className="max-w-7xl mx-auto flex flex-col gap-6 xl:max-w-none">
         {/* Banner */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

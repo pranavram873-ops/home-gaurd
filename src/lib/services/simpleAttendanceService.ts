@@ -28,6 +28,8 @@ export interface RosterGuard {
   phone: string;
   home_guard_code: string;
   is_active: boolean;
+  date_of_birth: string | null;
+  joining_date: string | null;
 }
 
 export interface DailyMark {
@@ -68,7 +70,7 @@ export async function loadAttendancePage(divisionId: string, date: string) {
     divisionId
       ? supabase
           .from('home_guard_roster')
-          .select('id, division_id, full_name, phone, home_guard_code, is_active')
+          .select('id, division_id, full_name, phone, home_guard_code, is_active, date_of_birth, joining_date')
           .eq('division_id', divisionId)
           .eq('is_active', true)
           .order('full_name')
@@ -138,7 +140,7 @@ export async function listDivisionRoster(divisionId: string): Promise<ListResult
     const supabase = createClient();
     const { data, error } = await supabase
       .from('home_guard_roster')
-      .select('id, division_id, full_name, phone, home_guard_code, is_active')
+      .select('id, division_id, full_name, phone, home_guard_code, is_active, date_of_birth, joining_date')
       .eq('division_id', divisionId)
       .eq('is_active', true)
       .order('full_name');
@@ -204,6 +206,44 @@ export async function getMusterEventParticipants(eventId: string): Promise<strin
   const { data, error } = await createClient().from('muster_event_participants').select('guard_id').eq('event_id', eventId);
   if (error) throw new Error(describeQueryError(error) || 'Could not load selected personnel.');
   return (data ?? []).map((row) => row.guard_id as string);
+}
+
+export interface GuardDutyCount {
+  attended: number;
+  notAttended: number;
+}
+
+export async function loadGuardDutyCounts(guardIds: string[]): Promise<Map<string, GuardDutyCount>> {
+  const uniqueGuardIds = [...new Set(guardIds)];
+  const counts = new Map(uniqueGuardIds.map((guardId) => [guardId, { attended: 0, notAttended: 0 }]));
+  const supabase = createClient();
+  const batchSize = 100;
+  const pageSize = 1000;
+
+  for (let start = 0; start < uniqueGuardIds.length; start += batchSize) {
+    const guardIdBatch = uniqueGuardIds.slice(start, start + batchSize);
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('daily_attendance')
+        .select('guard_id, status')
+        .in('guard_id', guardIdBatch)
+        .order('attendance_date', { ascending: true })
+        .order('guard_id', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw new Error(describeQueryError(error) || 'Could not load duty counts.');
+
+      const rows = data ?? [];
+      for (const row of rows) {
+        const count = counts.get(row.guard_id);
+        if (!count) continue;
+        if (row.status === 'present') count.attended += 1;
+        else if (row.status === 'absent') count.notAttended += 1;
+      }
+      if (rows.length < pageSize) break;
+    }
+  }
+
+  return counts;
 }
 
 export async function setMusterEventParticipant(eventId: string, guardId: string, selected: boolean): Promise<void> {
@@ -478,6 +518,8 @@ export async function addRosterGuard(input: {
   phone: string;
   home_guard_code: string;
   division_id: string;
+  date_of_birth: string;
+  joining_date: string;
 }) {
   const supabase = createClient();
   const { error } = await supabase.from('home_guard_roster').insert({
@@ -514,9 +556,18 @@ export interface DutyMonthCount {
 }
 
 export interface GuardDutyHistory {
+  guardId: string;
   homeGuardCode: string;
+  divisionId: string;
   divisionName: string;
+  dateOfBirth: string | null;
+  joiningDate: string | null;
   months: DutyMonthCount[];
+  events: Array<{
+    date: string;
+    eventName: string | null;
+    status: 'present' | 'absent';
+  }>;
 }
 
 /**
@@ -534,12 +585,19 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
   const supabase = createClient();
   const { data: guards, error: guardsError } = await supabase
     .from('home_guard_roster')
-    .select('id, home_guard_code, attendance_divisions(name)')
+    .select('id, division_id, home_guard_code, date_of_birth, joining_date, attendance_divisions(name)')
     .like('phone', `%${tail}%`)
     .eq('is_active', true);
   if (guardsError) throw new Error(guardsError.message);
   const guard = (guards ?? [])[0] as
-    | { id: string; home_guard_code: string; attendance_divisions: { name: string }[] }
+    | {
+        id: string;
+        division_id: string;
+        home_guard_code: string;
+        date_of_birth: string | null;
+        joining_date: string | null;
+        attendance_divisions: { name: string }[];
+      }
     | undefined;
   if (!guard) return null;
 
@@ -550,12 +608,20 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
     const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
     monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
-  const { data: marks, error: marksError } = await supabase
-    .from('daily_attendance')
-    .select('attendance_date, status')
-    .eq('guard_id', guard.id)
-    .gte('attendance_date', `${monthKeys[5]}-01`);
+  const [{ data: marks, error: marksError }, { data: musterEvents, error: eventsError }] = await Promise.all([
+    supabase
+      .from('daily_attendance')
+      .select('attendance_date, status')
+      .eq('guard_id', guard.id)
+      .gte('attendance_date', `${monthKeys[5]}-01`),
+    supabase
+      .from('muster_events')
+      .select('event_date, event_name')
+      .eq('division_id', guard.division_id)
+      .gte('event_date', `${monthKeys[5]}-01`),
+  ]);
   if (marksError) throw new Error(marksError.message);
+  if (eventsError) throw new Error(eventsError.message);
 
   const byMonth = new Map<string, DutyMonthCount>(
     monthKeys.map((month) => [month, { month, present: 0, absent: 0 }]),
@@ -566,11 +632,56 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
     if (mark.status === 'present') bucket.present += 1;
     else bucket.absent += 1;
   }
+  const eventNameByDate = new Map(
+    (musterEvents ?? []).map((event) => [event.event_date, event.event_name]),
+  );
   return {
+    guardId: guard.id,
     homeGuardCode: guard.home_guard_code,
+    divisionId: guard.division_id,
     divisionName: guard.attendance_divisions?.[0]?.name ?? '',
+    dateOfBirth: guard.date_of_birth,
+    joiningDate: guard.joining_date,
     months: monthKeys.map((month) => byMonth.get(month)!),
+    events: ((marks ?? []) as Array<{ attendance_date: string; status: string }>)
+      .map((mark) => ({
+        date: mark.attendance_date,
+        eventName: eventNameByDate.get(mark.attendance_date) ?? null,
+        status: mark.status === 'absent' ? 'absent' as const : 'present' as const,
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date)),
   };
+}
+
+export async function saveGuardProfileDates(
+  guardId: string,
+  dateOfBirth: string,
+  joiningDate: string,
+) {
+  const isValidDate = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    const parsed = new Date(year, month - 1, day);
+    return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+  };
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (!isValidDate(dateOfBirth) || !isValidDate(joiningDate)) {
+    throw new Error('Enter valid birth and joining dates.');
+  }
+  if (dateOfBirth > joiningDate || joiningDate > todayKey) {
+    throw new Error('Joining date must be on or after the date of birth and cannot be in the future.');
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('home_guard_roster')
+    .update({ date_of_birth: dateOfBirth, joining_date: joiningDate })
+    .eq('id', guardId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('The Home Guard dates could not be saved.');
 }
 
 export async function loadAttendanceReport(from: string, to: string) {
@@ -607,8 +718,14 @@ export async function filePersonnelReport(input: {
   divisionId: string;
   category: string;
   description: string;
-  evidencePhoto?: string | null;
+  evidencePhoto: string;
+  eventName: string;
+  eventDate: string;
 }) {
+  if (!input.evidencePhoto) throw new Error('Attach a memo photo before filing the report.');
+  if (!input.eventName.trim()) throw new Error('Enter the event this report is about.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.eventDate)) throw new Error('Enter a valid event date.');
+
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw new Error('Please sign in again to file a report.');
@@ -619,7 +736,9 @@ export async function filePersonnelReport(input: {
     division_id: input.divisionId,
     category: input.category,
     description: input.description.trim(),
-    ...(input.evidencePhoto ? { evidence_photo: input.evidencePhoto } : {}),
+    evidence_photo: input.evidencePhoto,
+    event_name: input.eventName.trim(),
+    event_date: input.eventDate,
   });
 
   if (error) throw new Error(error.message);
@@ -655,6 +774,25 @@ export async function loadGuardMemoCount(guardId: string, phone?: string): Promi
     // Ignore error
   }
   return count;
+}
+
+export interface GuardPersonnelMemo {
+  id: string;
+  division_id: string;
+  event_name: string | null;
+  event_date: string | null;
+  created_at: string;
+}
+
+export async function loadGuardPersonnelMemos(guardId: string): Promise<GuardPersonnelMemo[]> {
+  const { data, error } = await createClient()
+    .from('personnel_reports')
+    .select('id,division_id,event_name,event_date,created_at')
+    .eq('guard_id', guardId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as GuardPersonnelMemo[];
 }
 
 export async function addMusterEventEvidencePhoto(

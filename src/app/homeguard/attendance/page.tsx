@@ -35,7 +35,7 @@ export default function HomeGuardAttendancePage() {
       title="My Attendance & Biometric History"
       subtitle="Tamil Nadu Home Guards • Personnel Muster Register"
     >
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6 lg:max-w-7xl">
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs">
           <h2 className="text-xl font-bold text-on-surface">
             Personal Muster Record {!historyQuery.loading && `(${attendance.length})`}

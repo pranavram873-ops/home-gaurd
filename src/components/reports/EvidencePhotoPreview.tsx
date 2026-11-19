@@ -27,7 +27,7 @@ export function EvidencePhotoPreview({ src, alt }: { src: string; alt: string })
       </button>
       {portalReady && open && createPortal(
         <div className="overlay-enter fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-          <section role="dialog" aria-modal="true" aria-label="Evidence photo" className="overlay-panel relative flex max-h-[95dvh] max-w-[95vw] items-center justify-center">
+          <section role="dialog" aria-modal="true" aria-label="Memo photo" className="overlay-panel relative flex max-h-[95dvh] max-w-[95vw] items-center justify-center">
             <button type="button" onClick={() => setOpen(false)} aria-label="Close enlarged photo" className="absolute -right-2 -top-12 rounded-full bg-white/15 p-2 text-white hover:bg-white/25 sm:right-0 sm:top-0 sm:-translate-y-12">
               <Icon icon="close" size={24} />
             </button>
