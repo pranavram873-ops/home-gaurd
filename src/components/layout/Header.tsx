@@ -25,28 +25,27 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   const roleLabel = role === 'admin' ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Division Incharge';
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[linear-gradient(110deg,#102a43_0%,#24598a_100%)] pt-safe text-on-primary shadow-[0_5px_18px_rgba(16,42,67,.16)] backdrop-blur-xl lg:border-b-[#dbe4eb] lg:bg-white lg:pt-0 lg:text-on-surface lg:shadow-[0_2px_10px_rgba(16,42,67,.04)]">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-primary pt-safe text-on-primary shadow-[0_5px_18px_rgba(16,42,67,.16)] backdrop-blur-xl lg:pt-0">
       <div className="relative mx-auto flex min-h-16 w-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-7 lg:min-h-[76px] lg:max-w-none lg:px-10 xl:px-12 2xl:px-16">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-secondary-container ring-1 ring-white/15 transition-transform duration-300 hover:scale-105 lg:hidden">
             <Icon icon="local_police" size={24} />
           </span>
           <div className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-[16px] font-bold tracking-tight lg:text-[19px]">
-              <span className="lg:hidden">TN Home Guards</span>
-              <span className="hidden lg:inline">{title || 'TN Home Guards'}</span>
-            </span>
-            <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-primary-fixed/70 lg:text-on-surface-variant">
-              <span aria-hidden className="beacon-pulse h-2 w-2 shrink-0 rounded-full bg-tertiary-fixed lg:bg-tertiary" />
-              <span className="truncate">{subtitle || title || roleLabel}</span>
-              <span className="hidden shrink-0 text-[13px] text-primary-fixed/50 sm:inline lg:text-outline">· {todayStr}</span>
+            <h1 className="max-w-full truncate text-lg font-extrabold leading-tight tracking-tight text-on-primary sm:text-xl lg:text-2xl">
+              {title || 'TN Home Guards'}
+            </h1>
+            <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-on-primary/90">
+              <span aria-hidden className="beacon-pulse h-2 w-2 shrink-0 rounded-full bg-tertiary-fixed" />
+              <span className="truncate">{subtitle || roleLabel}</span>
+              <span className="hidden shrink-0 text-[13px] text-on-primary/75 sm:inline">· {todayStr}</span>
             </span>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2.5">
           {user?.personnel_id && (
-            <span className="hidden rounded-lg bg-white/[0.08] px-2.5 py-1 font-mono text-[13px] text-primary-fixed ring-1 ring-white/10 transition-colors hover:bg-white/[0.12] sm:inline lg:bg-surface-container-low lg:text-on-surface-variant lg:ring-0">
+            <span className="hidden rounded-lg bg-white/[0.08] px-2.5 py-1 font-mono text-[13px] text-primary-fixed ring-1 ring-white/10 transition-colors hover:bg-white/[0.12] sm:inline">
               {user.personnel_id}
             </span>
           )}
