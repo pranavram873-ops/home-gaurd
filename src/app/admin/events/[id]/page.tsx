@@ -386,7 +386,7 @@ export default function AdminEventDetailsPage() {
       <div className="mx-auto max-w-2xl pb-10 lg:max-w-6xl xl:max-w-7xl">
       {/* Return link */}
       <div className="flex items-center justify-between rounded bg-surface-container-low px-4 py-2 shadow-sm">
-        <Link href="/admin/dashboard" className="flex items-center gap-1 text-label-md font-bold text-primary active:opacity-75">
+        <Link href="/admin/events" className="flex items-center gap-1 text-label-md font-bold text-primary active:opacity-75">
           <Icon icon="arrow_back" size={18} />
           Back to Events List
         </Link>

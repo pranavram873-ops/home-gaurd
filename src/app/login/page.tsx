@@ -93,11 +93,11 @@ function LoginForm() {
     try {
       const res = await login(username.trim(), password);
       if (res.success && res.role) {
-        // Start each admin/incharge session at the district chooser so their
-        // workspace and personnel list begin in the division they selected.
+        // Start administrators at the overview; district selection is deferred
+        // until they open a division-scoped workspace.
         setDivisionId('');
         const fallback = res.role === 'admin'
-          ? '/admin/divisions'
+          ? '/admin/dashboard'
           : res.role === 'home_guard'
             ? '/homeguard/dashboard'
             : '/incharge/divisions';

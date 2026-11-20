@@ -22,9 +22,8 @@ export function Sidebar() {
   const admin = role === 'admin';
   const primary: Item[] = admin
     ? [
-        // The dashboard is the events list, so the tab doubles as "back from
-        // Profiles" on mobile where there is no rail.
-        { label: 'Events', href: '/admin/dashboard', icon: 'event_note' },
+        { label: 'Dashboard', href: '/admin/dashboard', icon: 'home' },
+        { label: 'Events', href: '/admin/events', icon: 'event_note' },
         { label: 'Profiles', href: '/admin/personnel', icon: 'groups' },
         { label: 'Reports', href: '/admin/reports', icon: 'assignment_late' },
       ]
@@ -45,10 +44,13 @@ export function Sidebar() {
           },
           { label: 'Reports', href: '/incharge/reports', icon: 'assignment_late' },
         ];
+  const mobilePrimary = admin
+    ? primary.filter((item) => item.label !== 'Profiles')
+    : primary;
   const moreItems: Item[] = admin
     ? [
         { label: 'Change district', href: '/admin/divisions', icon: 'domain' },
-        { label: 'Create account', href: '/register', icon: 'person_add' },
+        { label: 'Create user', href: '/register', icon: 'person_add' },
       ]
     : role === 'incharge'
       ? [{ label: 'Change district', href: '/incharge/divisions', icon: 'domain' }]
@@ -134,7 +136,7 @@ export function Sidebar() {
         aria-label="Main navigation"
         className="fixed inset-x-0 bottom-0 z-50 grid h-16 grid-flow-col auto-cols-fr justify-items-stretch border-t border-outline-variant/60 bg-surface-container-lowest/95 pb-safe shadow-[0_-4px_18px_rgba(20,42,58,.09)] backdrop-blur-xl lg:hidden"
       >
-        {primary.slice(0, 4).map(tabLink)}
+        {mobilePrimary.slice(0, 4).map(tabLink)}
         <button
           type="button"
           aria-expanded={moreOpen}

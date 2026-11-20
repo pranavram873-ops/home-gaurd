@@ -5,6 +5,108 @@ import type { AttendanceEvent, AuditLog, DutyAssignment, TaskItem } from '@/type
 import { createClient } from '@/lib/supabase/client';
 import { describeQueryError, describeThrownError, type OneResult } from './queryError';
 import { ASSIGNMENT_SELECT, ATTENDANCE_SELECT, AUDIT_SELECT, TASK_SELECT } from './selects';
+import { loadAttendancePage, loadAttendanceEvents, loadDivisionSummaries } from './simpleAttendanceService';
+
+export interface AdminDivisionDashboard {
+  selectedDivision: { id: string; name: string } | null;
+  openEvents: number;
+  totalGuards: number;
+  presentToday: number;
+  absentToday: number;
+  recentActivity: Array<{
+    id: string;
+    occurredAt: string;
+    title: string;
+    description: string;
+    icon: string;
+    href?: string;
+  }>;
+}
+
+function localDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** Division-scoped figures and activity for the admin home screen. */
+export async function getAdminDivisionDashboard(divisionId: string): Promise<OneResult<AdminDivisionDashboard>> {
+  try {
+    const now = new Date();
+    const today = localDateString(now);
+    const month = today.slice(0, 7);
+    const divisions = await loadDivisionSummaries(today);
+    const selected = divisions.find((division) => division.id === divisionId) ?? null;
+
+    if (!divisionId || !selected) {
+      return {
+        data: {
+          selectedDivision: null,
+          openEvents: 0,
+          totalGuards: 0,
+          presentToday: 0,
+          absentToday: 0,
+          recentActivity: [],
+        },
+        error: null,
+      };
+    }
+
+    const attendanceDays = await loadAttendanceEvents(month, divisionId);
+    const supabase = createClient();
+    const [attendance, reports, rosterCount] = await Promise.all([
+      loadAttendancePage(divisionId, today),
+      supabase
+        .from('personnel_reports')
+        .select('id, guard_name, home_guard_code, category, status, created_at')
+        .eq('division_id', divisionId)
+        .order('created_at', { ascending: false })
+        .limit(8),
+      supabase
+        .from('home_guard_roster')
+        .select('id', { count: 'exact', head: true })
+        .eq('division_id', divisionId),
+    ]);
+    if (reports.error) throw new Error(describeQueryError(reports.error) ?? 'Could not load division reports.');
+    if (rosterCount.error) throw new Error(describeQueryError(rosterCount.error) ?? 'Could not load the division roster.');
+
+    const guardById = new Map(attendance.roster.map((guard) => [guard.id, guard]));
+    const attendanceActivity = attendance.marks.map((mark) => {
+      const guard = guardById.get(mark.guard_id);
+      const present = mark.status === 'present';
+      return {
+        id: `attendance-${mark.id}`,
+        occurredAt: mark.marked_at,
+        title: present ? 'Attendance marked present' : 'Attendance marked absent',
+        description: guard ? `${guard.full_name} · ${guard.home_guard_code}` : 'Home Guard attendance',
+        icon: present ? 'check_circle' : 'cancel',
+        href: `/admin/events/${divisionId}.${mark.attendance_date}`,
+      };
+    });
+    const reportActivity = (reports.data ?? []).map((report) => ({
+      id: `report-${report.id}`,
+      occurredAt: report.created_at,
+      title: 'Personnel report',
+      description: `${report.guard_name} · ${String(report.category).replaceAll('_', ' ')} · ${String(report.status).replaceAll('_', ' ')}`,
+      icon: 'description',
+      href: '/admin/reports',
+    }));
+
+    return {
+      data: {
+        selectedDivision: { id: selected.id, name: selected.name },
+        openEvents: attendanceDays.filter((event) => event.divisionId === divisionId && event.isOpen).length,
+        totalGuards: rosterCount.count ?? 0,
+        presentToday: attendance.marks.filter((mark) => mark.status === 'present').length,
+        absentToday: attendance.marks.filter((mark) => mark.status === 'absent').length,
+        recentActivity: [...attendanceActivity, ...reportActivity]
+          .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+          .slice(0, 5),
+      },
+      error: null,
+    };
+  } catch (err) {
+    return { data: null, error: describeThrownError(err, 'Could not load the division dashboard.') };
+  }
+}
 
 /**
  * Headline figures for the two dashboards.
