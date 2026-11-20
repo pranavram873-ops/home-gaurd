@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/lib/auth/authContext';
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { loadDivisionSummaries, type DivisionSummary } from '@/lib/services/simpleAttendanceService';
 
@@ -74,7 +73,7 @@ function DivisionCard({
 
 export function DivisionChooser() {
   const router = useRouter();
-  const { role } = useAuth();
+  const pathname = usePathname();
   const { divisionId, setDivisionId, resolved } = useDivision();
   const [selectedId, setSelectedId] = useState(divisionId);
   const [divisions, setDivisions] = useState<DivisionSummary[]>([]);
@@ -110,7 +109,7 @@ export function DivisionChooser() {
     setEnteringDivision(division);
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.setTimeout(() => {
-      router.push(role === 'admin' ? '/admin/dashboard' : '/incharge/attendance');
+      router.push(pathname.startsWith('/admin') ? '/admin/dashboard' : '/incharge/attendance');
     }, reduceMotion ? 0 : 580);
   }
 

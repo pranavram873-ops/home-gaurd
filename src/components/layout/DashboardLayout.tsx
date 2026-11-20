@@ -21,7 +21,8 @@ function DashboardFrame({ children, title, subtitle }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { divisionId, resolved } = useDivision();
-  const requiresDivision = pathname === '/admin/personnel'
+  const requiresDivision = pathname === '/admin/dashboard'
+    || pathname === '/admin/personnel'
     || pathname === '/admin/events'
     || pathname === '/incharge/attendance';
   const choosingDivision = pathname === '/admin/divisions' || pathname === '/incharge/divisions';
