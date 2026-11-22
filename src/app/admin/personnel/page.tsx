@@ -375,7 +375,7 @@ export default function PersonnelDirectoryPage() {
 
   async function submitPersonnelReport(event: React.FormEvent) {
     event.preventDefault();
-    if (!reportTarget || !reportDescription.trim() || !reportEventName.trim() || !reportPhoto) return;
+    if (!reportTarget || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError(null);
     try {
@@ -781,6 +781,7 @@ export default function PersonnelDirectoryPage() {
                 <textarea
                   id="admin-report-description"
                   required
+                  minLength={10}
                   maxLength={4000}
                   rows={4}
                   value={reportDescription}
@@ -852,7 +853,7 @@ export default function PersonnelDirectoryPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingReport || !reportTarget || !reportDescription.trim() || !reportEventName.trim() || !reportEventDate || !reportPhoto}
+                  disabled={submittingReport || !reportTarget || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportEventDate || !reportPhoto}
                   className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50"
                 >
                   {submittingReport ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}

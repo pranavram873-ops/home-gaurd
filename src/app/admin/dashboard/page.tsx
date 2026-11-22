@@ -57,6 +57,7 @@ export default function AdminDashboardPage() {
   const [allReports, setAllReports] = useState<AdminDivisionDashboard['recentReports']>([]);
   const [allReportsLoading, setAllReportsLoading] = useState(false);
   const [allReportsError, setAllReportsError] = useState('');
+  const [acknowledgedReportIds, setAcknowledgedReportIds] = useState<Set<string>>(() => new Set());
   const hasOpenReportDialog = showAllReports || Boolean(reportToAcknowledge);
   const statsQuery = useLiveQuery<AdminDivisionDashboard>(
     () => divisionResolved
@@ -74,6 +75,9 @@ export default function AdminDashboardPage() {
   }, [hasOpenReportDialog]);
   const stats = statsQuery.data;
   const divisionStats = stats?.selectedDivision?.id === divisionId ? stats : (divisionId ? null : stats?.selectedDivision ? null : stats);
+  const pendingReports = (divisionStats?.recentReports ?? []).filter(
+    (report) => !report.acknowledgedAt && !acknowledgedReportIds.has(report.id),
+  );
   const reportOverview = divisionStats?.reportOverview[overviewPeriod] ?? [];
   const reportOverviewMax = Math.max(1, ...reportOverview.map((bucket) => bucket.count));
   const firstName = user?.full_name?.trim().split(/\s+/)[0] || 'Administrator';
@@ -136,6 +140,7 @@ export default function AdminDashboardPage() {
         .select('id, action_taken, acknowledged_at, status')
         .single();
       if (error) throw new Error(error.message);
+      setAcknowledgedReportIds((current) => new Set(current).add(data.id));
       setAllReports((current) => current.map((report) => report.id === data.id
         ? { ...report, actionTaken: data.action_taken, acknowledgedAt: data.acknowledged_at, status: data.status }
         : report));
@@ -289,16 +294,18 @@ export default function AdminDashboardPage() {
               {divisionStats.divisionReportComparison.map((division) => {
                 const change = getReportChange(division.currentMonth, division.previousMonth);
                 return (
-                  <li key={division.divisionId} className="min-w-0 px-4 py-4 sm:px-5">
-                    <p className="truncate text-sm font-semibold text-on-surface">{division.divisionName}</p>
-                    <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</p>
-                    <p className="mt-1 text-xs text-on-surface-variant">reports this month</p>
+                  <li key={division.divisionId} className="min-w-0 px-3 py-3 sm:px-4">
+                    <p className="truncate text-xs font-semibold text-on-surface sm:text-sm">{division.divisionName}</p>
+                    <p className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</span>
+                      <span className="text-[10px] text-on-surface-variant">reports this month</span>
+                    </p>
                     <p
-                      className={`mt-2 inline-flex items-center gap-1 text-xs font-bold ${change.tone}`}
+                      className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold sm:text-xs ${change.tone}`}
                       aria-label={`${change.label} compared with ${division.previousMonth} reports last month`}
                       title={`${division.currentMonth} this month; ${division.previousMonth} last month`}
                     >
-                      <Icon icon={change.icon} size={15} />
+                      <Icon icon={change.icon} size={13} />
                       {change.label}
                     </p>
                   </li>
@@ -319,7 +326,7 @@ export default function AdminDashboardPage() {
                 <p className="text-xs text-on-surface-variant">Acknowledge each report and record the action taken.</p>
               </div>
             </div>
-            <button type="button" onClick={() => void openAllReports()} disabled={allReportsLoading} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary hover:bg-surface-container disabled:opacity-60">
+            <button type="button" onClick={() => void openAllReports()} disabled={allReportsLoading || pendingReports.length === 0} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary hover:bg-surface-container disabled:cursor-not-allowed disabled:text-on-surface-variant disabled:hover:bg-transparent disabled:opacity-60">
               View more
               <Icon icon="arrow_forward" size={17} />
             </button>
@@ -328,9 +335,9 @@ export default function AdminDashboardPage() {
             <p role="status" className="px-5 py-8 text-center text-sm text-on-surface-variant">Loading reports…</p>
           ) : statsQuery.error && !stats ? (
             <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Reports are unavailable. Try loading the dashboard again.</p>
-          ) : divisionStats?.recentReports.length ? (
+          ) : pendingReports.length ? (
             <ul className="divide-y divide-outline-variant/50">
-              {divisionStats.recentReports.slice(0, 2).map((report) => (
+              {pendingReports.slice(0, 2).map((report) => (
                 <li key={report.id} className="space-y-3 px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -367,8 +374,8 @@ export default function AdminDashboardPage() {
           ) : (
             <div className="px-5 py-10 text-center">
               <Icon icon="description" size={28} className="text-outline" />
-              <p className="mt-2 text-sm font-semibold text-on-surface">No reports filed</p>
-              <p className="mt-1 text-xs text-on-surface-variant">Reports created for this division will appear here.</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">No pending reports</p>
+              <p className="mt-1 text-xs text-on-surface-variant">New reports awaiting acknowledgement will appear here.</p>
             </div>
           )}
         </section>

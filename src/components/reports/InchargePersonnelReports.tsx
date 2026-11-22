@@ -103,7 +103,7 @@ export function InchargePersonnelReports() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !selectedGuard || !description.trim() || !eventName.trim() || !evidencePhoto) return;
+    if (!user || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -192,7 +192,7 @@ export function InchargePersonnelReports() {
           </div>
           {selectedGuard && <div className="rounded-lg bg-primary-fixed p-3 text-sm text-on-primary-fixed"><strong>{selectedGuard.full_name}</strong><br />{selectedGuard.division_name} · HG code {selectedGuard.home_guard_code}</div>}
           <label className="block text-label-md text-on-surface">Report category<select value={category} onChange={(event) => setCategory(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm"><option value="conduct">Conduct or behaviour</option><option value="attendance">Attendance or duty</option><option value="safety">Safety concern</option><option value="other">Other</option></select></label>
-          <label className="block text-label-md text-on-surface">What happened?<textarea required maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the observed incident, including the relevant date or duty when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" /></label>
+          <label className="block text-label-md text-on-surface">What happened?<textarea required minLength={10} maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the observed incident, including the relevant date or duty when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" /></label>
           <EventNameAutocomplete
             divisionId={selectedGuard?.division_id ?? divisionId}
             value={eventName}
@@ -226,7 +226,7 @@ export function InchargePersonnelReports() {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setEventName(''); setEventDate(new Date().toISOString().slice(0, 10)); setEvidencePhoto(null); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || !selectedGuard || !description.trim() || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setEventName(''); setEventDate(new Date().toISOString().slice(0, 10)); setEvidencePhoto(null); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
         </form>
           </section>
         </div>,

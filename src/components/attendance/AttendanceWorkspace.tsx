@@ -702,7 +702,7 @@ export function AttendanceWorkspace() {
 
   async function submitPersonnelReport(event: React.FormEvent) {
     event.preventDefault();
-    if (!reportGuard || !reportDescription.trim() || !reportEventName.trim() || !reportPhoto) return;
+    if (!reportGuard || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError('');
     try {
@@ -1446,6 +1446,7 @@ export function AttendanceWorkspace() {
                 <textarea
                   id="report-description"
                   required
+                  minLength={10}
                   maxLength={4000}
                   rows={4}
                   value={reportDescription}
@@ -1501,7 +1502,7 @@ export function AttendanceWorkspace() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingReport || !reportDescription.trim() || !reportEventName.trim() || !reportEventDate || !reportPhoto}
+                  disabled={submittingReport || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportEventDate || !reportPhoto}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary/90 cursor-pointer text-sm disabled:opacity-50"
                 >
                   {submittingReport ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}

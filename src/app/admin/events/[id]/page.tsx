@@ -331,7 +331,7 @@ export default function AdminEventDetailsPage() {
 
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reportGuard || !parsed || !reportDescription.trim() || !reportPhoto) return;
+    if (!reportGuard || !parsed || reportDescription.trim().length < 10 || !reportPhoto) return;
     setSubmittingReport(true);
     setReportError('');
     try {
@@ -599,7 +599,7 @@ export default function AdminEventDetailsPage() {
               </label>
               <label htmlFor="admin-event-report-description" className="block text-xs font-bold text-on-surface-variant">
                 Incident description
-                <textarea id="admin-event-report-description" required maxLength={4000} rows={4} value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} placeholder="Describe what happened…" className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm font-normal text-on-surface placeholder:text-outline" />
+                <textarea id="admin-event-report-description" required minLength={10} maxLength={4000} rows={4} value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} placeholder="Describe what happened…" className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm font-normal text-on-surface placeholder:text-outline" />
               </label>
               <div>
                 <p className="mb-1.5 text-xs font-bold text-on-surface-variant">Memo photo <span className="text-error">(required)</span></p>
@@ -624,7 +624,7 @@ export default function AdminEventDetailsPage() {
               {reportError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container">{reportError}</p>}
               <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
                 <button type="button" onClick={() => setReportGuard(null)} className="rounded-lg bg-surface-container px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high">Cancel</button>
-                <button type="submit" disabled={submittingReport || !reportDescription.trim() || !reportPhoto} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50">
+                <button type="submit" disabled={submittingReport || reportDescription.trim().length < 10 || !reportPhoto} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50">
                   {submittingReport && <Icon icon="sync" size={17} className="animate-spin" />}
                   {submittingReport ? 'Filing…' : 'Submit report'}
                 </button>

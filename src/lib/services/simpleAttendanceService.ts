@@ -772,6 +772,11 @@ export async function filePersonnelReport(input: {
   if (!input.evidencePhoto) throw new Error('Attach a memo photo before filing the report.');
   if (!input.eventName.trim()) throw new Error('Enter the event this report is about.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.eventDate)) throw new Error('Enter a valid event date.');
+  const description = input.description.trim();
+  const descriptionLength = Array.from(description).length;
+  if (descriptionLength < 10 || descriptionLength > 4000) {
+    throw new Error('Report description must be between 10 and 4000 characters.');
+  }
 
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -782,7 +787,7 @@ export async function filePersonnelReport(input: {
     guard_id: input.guardId,
     division_id: input.divisionId,
     category: input.category,
-    description: input.description.trim(),
+    description,
     evidence_photo: input.evidencePhoto,
     event_name: input.eventName.trim(),
     event_date: input.eventDate,

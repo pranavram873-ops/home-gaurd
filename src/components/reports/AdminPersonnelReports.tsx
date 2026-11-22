@@ -141,7 +141,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!divisionId || !selectedGuard || !description.trim() || !eventName.trim() || !evidencePhoto) return;
+    if (!divisionId || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -334,7 +334,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
             </label>
             <label className="block text-label-md text-on-surface">
               What happened?
-              <textarea required maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the incident and the relevant duty or date when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" />
+              <textarea required minLength={10} maxLength={4000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the incident and the relevant duty or date when known." className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary" />
             </label>
             <EventNameAutocomplete
               divisionId={divisionId}
@@ -369,7 +369,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
             </div>
             {error && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
             <div className="flex justify-end border-t border-outline-variant pt-3">
-              <button type="submit" disabled={saving || !selectedGuardId || !description.trim() || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
+              <button type="submit" disabled={saving || !selectedGuardId || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
                 {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}
                 {saving ? 'Submitting…' : 'Submit report'}
               </button>
