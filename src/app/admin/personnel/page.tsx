@@ -592,7 +592,7 @@ export default function PersonnelDirectoryPage() {
       {/* Profile modal: identity and assigned division. */}
       {portalReady && selectedProfile && createPortal((
         <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-3 backdrop-blur-xs sm:p-4">
-          <div className="overlay-panel flex h-[100dvh] max-h-[100dvh] w-full max-w-sm flex-col overflow-hidden rounded-none border border-outline-variant bg-surface-container-lowest shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:rounded-xl">
+          <div className="overlay-panel flex h-auto max-h-[92dvh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Icon icon="shield" size={20} className="text-on-primary" />
@@ -606,25 +606,25 @@ export default function PersonnelDirectoryPage() {
               </button>
             </div>
 
-            <div className="flex flex-col items-center gap-4 overflow-y-auto p-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-primary text-on-primary font-extrabold text-2xl flex items-center justify-center">
-                {selectedProfile.full_name.charAt(0)}
+            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4 text-left sm:p-5">
+              <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">
+                  {selectedProfile.full_name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold text-on-surface">{selectedProfile.full_name}</p>
+                  <p className="font-mono text-xs font-bold text-primary">{selectedProfile.personnel_id || 'Badge not yet issued'}</p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard code</span>
-                <span className="font-mono text-xl font-extrabold text-primary">
-                  {selectedProfile.personnel_id || 'Badge not yet issued'}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Name</span>
-                <span className="text-lg font-bold text-on-surface">{selectedProfile.full_name}</span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Division</span>
-                <span className="text-lg font-bold text-primary">
-                  {selectedProfile.district?.name || 'Not assigned'}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Mobile Number</span>
-                <span className="text-lg font-semibold text-on-surface">
-                  {selectedProfile.phone || 'Not provided'}
-                </span>
+              <div className="grid w-full grid-cols-2 gap-2">
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-primary">{selectedProfile.district?.name || 'Not assigned'}</p>
+                </div>
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{selectedProfile.phone || 'Not provided'}</p>
+                </div>
               </div>
 
               <DutyHistorySection phone={selectedProfile.phone} />
@@ -1047,8 +1047,7 @@ export default function PersonnelDirectoryPage() {
 }
 
 /**
- * Muster-register block inside the profile: Home Guard code and current
- * duty count, with a toggle for clickable event dates.
+ * Muster-register block inside the profile: current duty count and clickable event dates.
  * The register is looked up lazily when a profile opens, keyed on the mobile
  * number, because `profiles` and the roster have no shared id.
  */
@@ -1134,10 +1133,6 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
       {state === 'ready' && history && (
         <>
           <div className="px-4 py-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard Code</span>
-              <span className="font-mono text-sm font-bold text-on-surface">{history.homeGuardCode}</span>
-            </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-semibold text-on-surface-variant">Date of birth</span>
               <span className="text-[13px] font-semibold text-on-surface">{formatProfileDate(history.dateOfBirth)}</span>

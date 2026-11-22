@@ -127,7 +127,7 @@ export default function HomeGuardProfilePage() {
       title="My Guard Dossier & Service Profile"
       subtitle="Tamil Nadu Home Guards • Personnel Record"
     >
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
         {dossierQuery.error && (
           <div className="p-4 rounded-xl bg-secondary-fixed border border-secondary-fixed text-on-secondary-fixed-variant text-xs flex items-start gap-3">
             <Icon icon="warning" size={20} className="text-secondary shrink-0 mt-0.5" />
@@ -182,7 +182,7 @@ export default function HomeGuardProfilePage() {
           </div>
         )}
 
-        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-6">
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-4">
           <h3 className="text-sm font-bold text-on-surface mb-4 pb-2 border-b border-outline-variant">
             Authorized Personnel Information
           </h3>
@@ -282,7 +282,7 @@ export default function HomeGuardProfilePage() {
               administrator, because those columns are enforced by database policy against self-editing.
             </p>
 
-            <div className="pt-3 border-t border-outline-variant">
+            <div className="pt-2 border-t border-outline-variant">
               <button
                 type="submit"
                 disabled={isSaving || !dossier}

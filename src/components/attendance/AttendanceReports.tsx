@@ -139,9 +139,16 @@ function DossierCard({ report, historyCount }: { report: GuardReport; historyCou
   );
 }
 
-export function AttendanceReports({ children }: { children?: React.ReactNode }) {
+export function AttendanceReports({
+  children,
+  search,
+  onSearchChange,
+}: {
+  children?: React.ReactNode;
+  search: string;
+  onSearchChange: (value: string) => void;
+}) {
   const [reports, setReports] = useState<GuardReport[]>([]);
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -185,7 +192,7 @@ export function AttendanceReports({ children }: { children?: React.ReactNode }) 
     const term = search.trim().toLowerCase();
     if (!term) return reports;
     return reports.filter((report) =>
-      `${report.subject_name} ${report.subject_personnel_id ?? ''} ${report.reporter_name ?? ''}`.toLowerCase().includes(term),
+      `${report.subject_name} ${report.subject_personnel_id ?? ''}`.toLowerCase().includes(term),
     );
   }, [reports, search]);
 
@@ -211,9 +218,9 @@ export function AttendanceReports({ children }: { children?: React.ReactNode }) 
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search guard name, HG code, or incharge..."
-            aria-label="Search disciplinary reports"
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search by name or HG code..."
+            aria-label="Search reports by guard name or HG code"
             className="h-11 w-full rounded bg-surface-container-lowest pl-10 pr-3 text-body-md text-on-surface shadow-sm ring-primary/20 placeholder:text-outline focus:outline-none focus:ring-2"
           />
         </div>
@@ -246,11 +253,6 @@ export function AttendanceReports({ children }: { children?: React.ReactNode }) 
             />
           ))
         )}
-
-        <div className="flex items-center justify-center gap-2 py-3 text-center text-on-surface-variant/80">
-          <Icon icon="gavel" size={16} className="text-secondary" />
-          <span className="text-label-sm">Official record under Tamil Nadu Home Guard Act • For Incharge Reference Only</span>
-        </div>
       </section>
     </div>
   );

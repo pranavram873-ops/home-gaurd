@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/authContext';
@@ -14,17 +14,22 @@ type Item = { label: string; href: string; icon: string; matches?: string[] };
  * are built around, and - from `lg` up - a rail that also exposes the admin
  * modules that never fit in two tabs.
  */
-export function Sidebar() {
+export function Sidebar({
+  moreOpen,
+  onMoreClose,
+}: {
+  moreOpen: boolean;
+  onMoreClose: () => void;
+}) {
   const pathname = usePathname();
   const { user, role, logout } = useAuth();
-  const [moreOpen, setMoreOpen] = useState(false);
   const moreMenu = usePresence(moreOpen, 320);
   const admin = role === 'admin';
   const primary: Item[] = admin
     ? [
         { label: 'Dashboard', href: '/admin/dashboard', icon: 'home' },
         { label: 'Events', href: '/admin/events', icon: 'event_note' },
-        { label: 'Profiles', href: '/admin/personnel', icon: 'groups' },
+        { label: 'Guards', href: '/admin/personnel', icon: 'groups' },
         { label: 'Reports', href: '/admin/reports', icon: 'assignment_late' },
       ]
     : role === 'home_guard'
@@ -44,9 +49,7 @@ export function Sidebar() {
           },
           { label: 'Reports', href: '/incharge/reports', icon: 'assignment_late' },
         ];
-  const mobilePrimary = admin
-    ? primary.filter((item) => item.label !== 'Profiles')
-    : primary;
+  const mobilePrimary = primary;
   const moreItems: Item[] = admin
     ? [
         { label: 'Change district', href: '/admin/divisions', icon: 'domain' },
@@ -118,18 +121,6 @@ export function Sidebar() {
           <p className="px-3 pb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Workspace</p>
           <nav className="flex flex-col gap-1.5">{primary.map(railLink)}</nav>
         </div>
-        <div className="mt-auto border-t border-outline-variant/70 p-4">
-          <button
-            type="button"
-            aria-expanded={moreOpen}
-            aria-label="More options"
-            onClick={() => setMoreOpen((value) => !value)}
-            className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-label-md transition-colors ${moreOpen ? 'bg-primary-container text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'}`}
-          >
-            <Icon icon={moreOpen ? 'close' : 'menu'} size={20} />
-            More
-          </button>
-        </div>
       </aside>
 
       {pathname !== '/admin/divisions' && pathname !== '/incharge/divisions' && <nav
@@ -137,73 +128,61 @@ export function Sidebar() {
         className="fixed inset-x-0 bottom-0 z-50 grid h-16 grid-flow-col auto-cols-fr justify-items-stretch border-t border-outline-variant/60 bg-surface-container-lowest/95 pb-safe shadow-[0_-4px_18px_rgba(20,42,58,.09)] backdrop-blur-xl lg:hidden"
       >
         {mobilePrimary.slice(0, 4).map(tabLink)}
-        <button
-          type="button"
-          aria-expanded={moreOpen}
-          aria-label={moreOpen ? 'Close menu' : 'More'}
-          title="More"
-          onClick={() => setMoreOpen((value) => !value)}
-          className={`flex min-h-[44px] w-full min-w-0 flex-col items-center justify-center gap-0.5 py-1 transition-colors ${
-            moreOpen ? 'text-primary-container' : 'text-on-surface-variant hover:text-on-surface'
-          }`}
-        >
-          <Icon icon={moreOpen ? 'close' : 'menu'} size={24} />
-          <span className={`text-[11px] leading-3 ${moreOpen ? 'font-bold' : 'font-medium'}`}>More</span>
-        </button>
       </nav>}
 
       {moreMenu.mounted && (
         <div className="fixed inset-0 z-[60]">
-          <button aria-label="Close navigation" data-open={moreMenu.visible} onClick={() => setMoreOpen(false)} className="sheet-scrim" />
+          <button aria-label="Close navigation" data-open={moreMenu.visible} onClick={onMoreClose} className="sheet-scrim" />
           <section
             role="dialog"
             aria-modal="true"
             aria-label="More"
             data-open={moreMenu.visible}
-            className="sheet-panel sheet-from-bottom absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest px-5 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-2xl sm:max-w-none lg:inset-x-auto lg:bottom-5 lg:left-[280px] lg:max-h-[min(82vh,680px)] lg:w-[340px] lg:rounded-2xl lg:px-5 lg:pb-5"
+            className="overlay-panel absolute right-4 top-[calc(env(safe-area-inset-top)+4rem)] flex max-h-[calc(100dvh-env(safe-area-inset-top)-5rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-surface-container-lowest px-5 py-4 shadow-2xl lg:right-10 lg:top-24 lg:max-h-[calc(100dvh-7rem)] xl:right-12 2xl:right-16"
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-outline-variant" aria-hidden />
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <p className="text-headline-md text-on-surface">More</p>
                 <p className="text-body-md text-sm text-on-surface-variant">{admin ? 'Command and administration' : 'Your field workspace'}</p>
               </div>
               <button
-                onClick={() => setMoreOpen(false)}
+                onClick={onMoreClose}
                 aria-label="Close"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface-variant"
               >
                 <Icon icon="close" size={20} />
               </button>
             </div>
-            <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-container text-lg font-bold text-on-primary shadow-xs">
-                {user?.full_name?.charAt(0).toUpperCase() || <Icon icon="person" size={20} />}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-label-lg text-on-surface">{user?.full_name || 'Signed in'}</p>
-                <p className="truncate text-xs text-on-surface-variant">
-                  {admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}
-                  {user?.personnel_id ? ` · ${user.personnel_id}` : ''}
-                </p>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="mb-4 flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-container text-lg font-bold text-on-primary shadow-xs">
+                  {user?.full_name?.charAt(0).toUpperCase() || <Icon icon="person" size={20} />}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-label-lg text-on-surface">{user?.full_name || 'Signed in'}</p>
+                  <p className="truncate text-xs text-on-surface-variant">
+                    {admin ? 'Administrator' : role === 'home_guard' ? 'Home Guard' : 'Incharge'}
+                    {user?.personnel_id ? ` · ${user.personnel_id}` : ''}
+                  </p>
+                </div>
               </div>
-            </div>
-            <nav aria-label="More options" className="mb-4 flex flex-col gap-1">
-              {moreItems.map((item) => (
-                <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-label-md text-on-surface transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary">
-                  <Icon icon={item.icon} size={20} className="text-primary" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-            <div className="border-t border-outline-variant/60 pt-4">
-              <button
-                onClick={() => void logout()}
-                className="flex h-11 w-full items-center gap-2 rounded-xl px-3 text-label-md text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <Icon icon="logout" size={20} />
-                Sign out
-              </button>
+              <nav aria-label="More options" className="mb-4 flex flex-col gap-1">
+                {moreItems.map((item) => (
+                  <Link key={item.href} href={item.href} onClick={onMoreClose} className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-label-md text-on-surface transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary">
+                    <Icon icon={item.icon} size={20} className="text-primary" />
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </nav>
+              <div className="border-t border-outline-variant/60 pt-4">
+                <button
+                  onClick={() => { onMoreClose(); void logout(); }}
+                  className="flex h-11 w-full items-center gap-2 rounded-xl px-3 text-label-md text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <Icon icon="logout" size={20} />
+                  Sign out
+                </button>
+              </div>
             </div>
           </section>
         </div>

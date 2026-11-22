@@ -11,7 +11,17 @@ import { Icon } from '@/components/ui/Icon';
  * always knows "this is the top of the app" and can spot their own name and
  * role.
  */
-export function Header({ title, subtitle }: { title?: string; subtitle?: string }) {
+export function Header({
+  title,
+  subtitle,
+  moreOpen,
+  onMoreToggle,
+}: {
+  title?: string;
+  subtitle?: string;
+  moreOpen: boolean;
+  onMoreToggle: () => void;
+}) {
   const { user, role } = useAuth();
 
   const todayStr = new Intl.DateTimeFormat('en-IN', {
@@ -49,13 +59,17 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
               {user.personnel_id}
             </span>
           )}
-          <span
+          <button
+            type="button"
+            onClick={onMoreToggle}
+            aria-expanded={moreOpen}
+            aria-label={moreOpen ? 'Close more options' : 'Open more options'}
+            aria-haspopup="dialog"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary-container text-[16px] font-bold text-on-secondary-container shadow-[0_0_12px_rgba(189,39,53,.16)] transition-transform duration-200 hover:scale-105 lg:h-10 lg:w-10 lg:bg-primary-container lg:text-on-primary lg:shadow-none"
-            aria-label={`${user?.full_name || 'Account'} — ${roleLabel}`}
             title={user?.full_name || 'Account'}
           >
             {initials || <Icon icon="person" size={20} />}
-          </span>
+          </button>
         </div>
       </div>
     </header>

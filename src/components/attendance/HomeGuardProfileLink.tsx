@@ -127,22 +127,30 @@ function HomeGuardProfileDialog({ profile, onClose }: { profile: GuardProfile; o
           <div className="flex items-center gap-2"><Icon icon="badge" size={20} /><h2 id="home-guard-profile-title" className="font-bold">Home Guard Profile</h2></div>
           <button type="button" onClick={onClose} aria-label="Close profile" className="rounded p-1 hover:bg-white/10"><Icon icon="close" size={20} /></button>
         </header>
-        <div className="flex flex-col items-center gap-4 overflow-y-auto p-5 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-extrabold text-on-primary">{profile.full_name.charAt(0)}</div>
-          <div className="flex flex-col gap-1">
-            <h3 className="text-lg font-bold text-on-surface">{profile.full_name}</h3>
-            <p className="font-mono text-sm font-bold text-primary">{profile.home_guard_code}</p>
-            <p className="mt-1 text-sm text-on-surface-variant">{profile.division_name} Division</p>
-            <p className="text-sm text-on-surface-variant">{profile.phone}</p>
-          </div>
-          <div className="w-full rounded-xl bg-surface-container-low p-3 text-left">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-on-surface-variant">Date of birth</span>
-              <span className="font-semibold text-on-surface">{formatProfileDate(profile.date_of_birth)}</span>
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
+          <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">{profile.full_name.charAt(0)}</div>
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-bold text-on-surface">{profile.full_name}</h3>
+              <p className="font-mono text-xs font-bold text-primary">{profile.home_guard_code}</p>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-              <span className="text-on-surface-variant">Joining date</span>
-              <span className="font-semibold text-on-surface">{formatProfileDate(profile.joining_date)}</span>
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2">
+            <div className="rounded-lg bg-surface-container-low p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-primary">{profile.division_name} Division</p>
+            </div>
+            <div className="rounded-lg bg-surface-container-low p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{profile.phone || 'Not provided'}</p>
+            </div>
+            <div className="rounded-lg bg-surface-container-low p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Date of birth</p>
+              <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.date_of_birth)}</p>
+            </div>
+            <div className="rounded-lg bg-surface-container-low p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Joining date</p>
+              <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.joining_date)}</p>
             </div>
           </div>
           <div className="grid w-full grid-cols-2 gap-3">

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/lib/auth/authContext';
@@ -23,7 +24,7 @@ function formatActivityTime(value: string) {
   }).format(date);
 }
 
-function getComplaintChange(current: number, previous: number) {
+function getReportChange(current: number, previous: number) {
   if (previous === 0) {
     return current === 0
       ? { icon: 'remove', label: '0% no change', tone: 'text-on-surface-variant' }
@@ -40,9 +41,15 @@ function getComplaintChange(current: number, previous: number) {
   return { icon: 'arrow_downward', label: `${Math.abs(percent)}% less`, tone: 'text-error' };
 }
 
+const reportOverviewPeriods = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+] as const;
+
 export default function AdminDashboardPage() {
   const { user, role } = useAuth();
   const { divisionId, resolved: divisionResolved } = useDivision();
+  const [overviewPeriod, setOverviewPeriod] = useState<'weekly' | 'monthly'>('weekly');
   const [reportToAcknowledge, setReportToAcknowledge] = useState<AdminDivisionDashboard['recentReports'][number] | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
   const [acknowledgementError, setAcknowledgementError] = useState('');
@@ -56,8 +63,18 @@ export default function AdminDashboardPage() {
       : Promise.resolve({ data: null, error: null }),
     `${divisionResolved}:${divisionId}`,
   );
+  useEffect(() => {
+    if (!showAllReports) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showAllReports]);
   const stats = statsQuery.data;
   const divisionStats = stats?.selectedDivision?.id === divisionId ? stats : (divisionId ? null : stats?.selectedDivision ? null : stats);
+  const reportOverview = divisionStats?.reportOverview[overviewPeriod] ?? [];
+  const reportOverviewMax = Math.max(1, ...reportOverview.map((bucket) => bucket.count));
   const firstName = user?.full_name?.trim().split(/\s+/)[0] || 'Administrator';
   const shortcuts = [
     { label: 'Open events', value: divisionStats?.openEvents, href: '/admin/events', icon: 'event_note', tone: 'bg-primary-container text-on-primary-container' },
@@ -189,6 +206,112 @@ export default function AdminDashboardPage() {
         <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
           <div className="flex items-center justify-between gap-3 border-b border-outline-variant/60 px-4 py-4 sm:px-5">
             <div className="flex min-w-0 items-center gap-2.5">
+              <Icon icon="bar_chart" size={22} className="shrink-0 text-primary" />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-on-surface sm:text-lg">Reports Overview</h2>
+                <p className="text-xs text-on-surface-variant">Reports submitted during the selected period.</p>
+              </div>
+            </div>
+            <Link href="/admin/reports" className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary hover:bg-surface-container">
+              View all
+              <Icon icon="arrow_forward" size={17} />
+            </Link>
+          </div>
+          <div role="tablist" aria-label="Report overview period" className="mx-4 mt-4 grid grid-cols-2 rounded-xl bg-surface-container-low p-1 sm:mx-5">
+            {reportOverviewPeriods.map((period) => (
+              <button
+                key={period.value}
+                type="button"
+                role="tab"
+                aria-selected={overviewPeriod === period.value}
+                aria-controls="report-overview-chart"
+                onClick={() => setOverviewPeriod(period.value)}
+                className={`min-h-10 rounded-lg px-2 text-sm font-bold transition-colors ${overviewPeriod === period.value ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+          {statsQuery.loading ? (
+            <p role="status" className="px-5 py-10 text-center text-sm text-on-surface-variant">Loading report overview…</p>
+          ) : statsQuery.error && !stats ? (
+            <p className="px-5 py-10 text-center text-sm text-on-surface-variant">Report overview is unavailable.</p>
+          ) : reportOverview.length ? (
+            <div id="report-overview-chart" role="tabpanel" aria-label={`${overviewPeriod} report counts`} className="px-4 pb-4 pt-3 sm:px-5">
+              <div className="overflow-x-auto pb-2">
+                <ol className="flex h-40 min-w-full items-end gap-2 border-b border-outline-variant/60">
+                  {reportOverview.map((bucket) => (
+                    <li
+                      key={`${overviewPeriod}-${bucket.label}`}
+                      aria-label={`${bucket.count} reports at ${bucket.label}`}
+                      title={`${bucket.count} reports · ${bucket.label}`}
+                      className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                    >
+                      <span className="h-4 text-[10px] font-semibold leading-4 tabular-nums text-on-surface-variant">
+                        {bucket.count}
+                      </span>
+                      <div className="flex h-24 w-full items-end justify-center">
+                        <span
+                          aria-hidden="true"
+                          className="w-full max-w-12 rounded-t bg-primary/80 transition-[height] duration-300"
+                          style={{ height: `${bucket.count ? Math.max(5, (bucket.count / reportOverviewMax) * 100) : 2}%` }}
+                        />
+                      </div>
+                      <span className="h-4 text-[10px] leading-4 text-on-surface-variant sm:text-xs">
+                        {bucket.label}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              {!reportOverview.some((bucket) => bucket.count > 0) && (
+                <p className="mt-2 text-center text-xs text-on-surface-variant">No reports in this period yet.</p>
+              )}
+            </div>
+          ) : (
+            <p className="px-5 py-10 text-center text-sm text-on-surface-variant">No report data available.</p>
+          )}
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
+          <div className="border-b border-outline-variant/60 px-4 py-4 sm:px-5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Icon icon="location_on" size={21} className="shrink-0 text-primary" />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-on-surface sm:text-lg">Division-wise report</h2>
+                <p className="text-xs text-on-surface-variant">This month compared with the previous month.</p>
+              </div>
+            </div>
+          </div>
+          {divisionStats?.divisionReportComparison.length ? (
+            <ul className="grid grid-cols-2 divide-x divide-y divide-outline-variant/50 sm:grid-cols-4">
+              {divisionStats.divisionReportComparison.map((division) => {
+                const change = getReportChange(division.currentMonth, division.previousMonth);
+                return (
+                  <li key={division.divisionId} className="min-w-0 px-4 py-4 sm:px-5">
+                    <p className="truncate text-sm font-semibold text-on-surface">{division.divisionName}</p>
+                    <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</p>
+                    <p className="mt-1 text-xs text-on-surface-variant">reports this month</p>
+                    <p
+                      className={`mt-2 inline-flex items-center gap-1 text-xs font-bold ${change.tone}`}
+                      aria-label={`${change.label} compared with ${division.previousMonth} reports last month`}
+                      title={`${division.currentMonth} this month; ${division.previousMonth} last month`}
+                    >
+                      <Icon icon={change.icon} size={15} />
+                      {change.label}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Division report counts are unavailable.</p>
+          )}
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
+          <div className="flex items-center justify-between gap-3 border-b border-outline-variant/60 px-4 py-4 sm:px-5">
+            <div className="flex min-w-0 items-center gap-2.5">
               <Icon icon="description" size={21} className="shrink-0 text-primary" />
               <div className="min-w-0">
                 <h2 className="text-base font-bold text-on-surface sm:text-lg">Created reports</h2>
@@ -215,25 +338,28 @@ export default function AdminDashboardPage() {
                       <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
                       {(report.eventName || report.eventDate) && <p className="mt-1 text-xs text-on-surface-variant">{report.eventName ?? 'Event'}{report.eventDate ? ` · ${report.eventDate}` : ''}</p>}
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
-                      {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
+                        {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
+                      </span>
+                      {!report.acknowledgedAt && role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-bold text-on-primary hover:bg-primary/90"
+                        >
+                          <Icon icon="task_alt" size={16} />
+                          Acknowledge
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {report.acknowledgedAt ? (
+                  {report.acknowledgedAt && (
                     <div className="rounded-lg bg-surface-container-low p-3 text-sm">
                       <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
                       <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.actionTaken}</p>
                     </div>
-                  ) : role === 'admin' ? (
-                    <button
-                      type="button"
-                      onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
-                    >
-                      <Icon icon="task_alt" size={18} />
-                      Acknowledge
-                    </button>
-                  ) : null}
+                  )}
                 </li>
               ))}
             </ul>
@@ -246,13 +372,13 @@ export default function AdminDashboardPage() {
           )}
         </section>
 
-        {showAllReports && (
+        {showAllReports && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-surface-container/60 p-3 backdrop-blur-xs sm:p-4"
+            className="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden bg-surface-container/60 p-3 backdrop-blur-xs sm:p-4"
             role="presentation"
             onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAllReports(false); }}
           >
-            <section role="dialog" aria-modal="true" aria-labelledby="all-reports-title" className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+            <section role="dialog" aria-modal="true" aria-labelledby="all-reports-title" className="h-[88dvh] max-h-[48rem] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
               <header className="flex shrink-0 items-center justify-between gap-3 border-b border-outline-variant/60 p-4 sm:px-5">
                 <div>
                   <h2 id="all-reports-title" className="text-lg font-bold text-on-surface">All reports</h2>
@@ -270,75 +396,49 @@ export default function AdminDashboardPage() {
                   <button type="button" onClick={() => void openAllReports()} className="mt-3 text-sm font-bold text-primary underline">Try again</button>
                 </div>
               ) : allReports.length ? (
-                <ul className="divide-y divide-outline-variant/50 overflow-y-auto overscroll-contain">
-                  {allReports.map((report) => (
-                    <li key={report.id} className="space-y-3 p-4 sm:px-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-on-surface">{report.guardName} <span className="font-mono text-xs font-medium text-on-surface-variant">{report.homeGuardCode}</span></p>
-                          <p className="mt-0.5 text-xs text-on-surface-variant">{report.divisionName} · {report.category.replaceAll('_', ' ')} · {formatActivityTime(report.createdAt)}</p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
-                          {(report.eventName || report.eventDate) && <p className="mt-1 text-xs text-on-surface-variant">{report.eventName ?? 'Event'}{report.eventDate ? ` · ${report.eventDate}` : ''}</p>}
+                <ul className="divide-y divide-outline-variant/50">
+                    {allReports.map((report) => (
+                      <li key={report.id} className="space-y-3 p-4 sm:px-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-on-surface">{report.guardName} <span className="font-mono text-xs font-medium text-on-surface-variant">{report.homeGuardCode}</span></p>
+                            <p className="mt-0.5 text-xs text-on-surface-variant">{report.divisionName} · {report.category.replaceAll('_', ' ')} · {formatActivityTime(report.createdAt)}</p>
+                            <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
+                            {(report.eventName || report.eventDate) && <p className="mt-1 text-xs text-on-surface-variant">{report.eventName ?? 'Event'}{report.eventDate ? ` · ${report.eventDate}` : ''}</p>}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
+                              {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
+                            </span>
+                            {!report.acknowledgedAt && role === 'admin' && (
+                              <button
+                                type="button"
+                                onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-bold text-on-primary hover:bg-primary/90"
+                              >
+                                <Icon icon="task_alt" size={16} />
+                                Acknowledge
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
-                          {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
-                        </span>
-                      </div>
-                      {report.acknowledgedAt ? (
-                        <div className="rounded-lg bg-surface-container-low p-3 text-sm">
-                          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
-                          <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.actionTaken}</p>
-                        </div>
-                      ) : role === 'admin' ? (
-                        <button
-                          type="button"
-                          onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
-                        >
-                          <Icon icon="task_alt" size={18} />
-                          Acknowledge
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
+                        {report.acknowledgedAt && (
+                          <div className="rounded-lg bg-surface-container-low p-3 text-sm">
+                            <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
+                            <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.actionTaken}</p>
+                          </div>
+                        )}
+                      </li>
+                    ))}
                 </ul>
               ) : (
                 <p className="p-8 text-center text-sm text-on-surface-variant">No reports filed.</p>
               )}
             </section>
-          </div>
+          </div>,
+          document.body,
         )}
 
-        <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
-          <div className="border-b border-outline-variant/60 px-4 py-4 sm:px-5">
-            <h2 className="text-base font-bold text-on-surface sm:text-lg">Division-wise complaints</h2>
-            <p className="text-xs text-on-surface-variant">Reports filed this month compared with the previous month.</p>
-          </div>
-          {divisionStats?.divisionComplaintComparison.length ? (
-            <ul className="grid grid-cols-2 divide-x divide-y divide-outline-variant/50 sm:grid-cols-3 lg:grid-cols-4">
-              {divisionStats.divisionComplaintComparison.map((division) => {
-                const change = getComplaintChange(division.currentMonth, division.previousMonth);
-                return (
-                <li key={division.divisionId} className="min-w-0 px-4 py-4 sm:px-5">
-                  <p className="truncate text-sm font-semibold text-on-surface">{division.divisionName}</p>
-                  <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</p>
-                  <p className="mt-1 text-xs text-on-surface-variant">complaints this month</p>
-                  <p
-                    className={`mt-2 inline-flex items-center gap-1 text-xs font-bold ${change.tone}`}
-                    aria-label={`${change.label} compared with ${division.previousMonth} complaints last month`}
-                    title={`${division.currentMonth} this month; ${division.previousMonth} last month`}
-                  >
-                    <Icon icon={change.icon} size={15} />
-                    {change.label}
-                  </p>
-                </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Complaint counts are unavailable.</p>
-          )}
-        </section>
       </div>
 
       <ReportAcknowledgementDialog

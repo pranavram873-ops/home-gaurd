@@ -193,7 +193,7 @@ export function BottomSheet({
         aria-modal="true"
         aria-label={title}
         data-open={visible}
-        className={`sheet-panel w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-surface-container-lowest p-5 shadow-2xl sm:rounded-xl`}
+        className={`sheet-panel flex max-h-[88dvh] w-full flex-col overflow-hidden ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} rounded-t-2xl bg-surface-container-lowest p-5 shadow-2xl sm:rounded-xl`}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-outline-variant sm:hidden" aria-hidden />
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -210,7 +210,7 @@ export function BottomSheet({
             <Icon icon="close" size={20} />
           </button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </div>
   );

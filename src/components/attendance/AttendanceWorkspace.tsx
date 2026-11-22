@@ -75,7 +75,7 @@ function formatProfileDate(date: string | null | undefined) {
 type AttendanceFilter = 'all' | 'present' | 'absent';
 
 /**
- * Duty history register inside the profile modal: Home Guard code and duty counts.
+ * Duty history register inside the profile modal: current-month duty count and event dates.
  */
 function DutyHistorySection({ phone }: { phone?: string | null }) {
   const router = useRouter();
@@ -120,10 +120,6 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
       {state === 'ready' && history && (
         <>
           <div className="px-4 py-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard Code</span>
-              <span className="font-mono text-sm font-bold text-on-surface">{history.homeGuardCode}</span>
-            </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-semibold text-on-surface-variant">
                 Duties this month{history.divisionName ? ` · ${history.divisionName}` : ''}
@@ -381,6 +377,7 @@ export function AttendanceWorkspace() {
             marked_at: new Date().toISOString(),
           }];
         });
+        updateDutyCount(guard.id, priorStatus, want);
       }
     }
     catch (reason) {
@@ -552,6 +549,22 @@ export function AttendanceWorkspace() {
   }, [date]);
 
   const markByGuard = useMemo(() => new Map(marks.map((mark) => [mark.guard_id, mark])), [marks]);
+  function updateDutyCount(guardId: string, previous: DailyMark['status'] | undefined, next: DailyMark['status']) {
+    if (previous === next) return;
+    setDutyCounts((current) => {
+      if (!current) return current;
+      const counts = current.get(guardId) ?? { attended: 0, notAttended: 0 };
+      const attendedDelta = Number(next === 'present') - Number(previous === 'present');
+      const notAttendedDelta = Number(next === 'absent') - Number(previous === 'absent');
+      const updated = new Map(current);
+      updated.set(guardId, {
+        attended: Math.max(0, counts.attended + attendedDelta),
+        notAttended: Math.max(0, counts.notAttended + notAttendedDelta),
+      });
+      return updated;
+    });
+  }
+
   const filteredRoster = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return roster;
@@ -578,6 +591,7 @@ export function AttendanceWorkspace() {
   }, [bandobast, selectedDivision]);
 
   async function changeStatus(guard: RosterGuard, status: 'present' | 'absent') {
+    const priorStatus = markByGuard.get(guard.id)?.status;
     setSavingId(guard.id);
     setError('');
     setNotice('');
@@ -597,6 +611,7 @@ export function AttendanceWorkspace() {
           marked_at: new Date().toISOString(),
         }];
       });
+      updateDutyCount(guard.id, priorStatus, status);
       setNotice(`${guard.full_name} marked ${status}. Attendance saved.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not save this attendance mark.');
@@ -773,11 +788,11 @@ export function AttendanceWorkspace() {
       {/* Event creation and edit modal */}
       {showEventForm && (
         <div
-          className="overlay-enter fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface-container/40 p-3 pb-6 pt-[8vh] backdrop-blur-xs sm:p-4 sm:pt-[10vh]"
+          className="overlay-enter fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-surface-container/40 p-3 backdrop-blur-xs sm:p-4"
           role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setShowEventForm(false); }}
         >
-        <Card className="max-h-[90dvh] w-full max-w-lg overflow-y-auto p-4 sm:p-5">
+        <Card className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden p-4 sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-2 border-b border-outline-variant/50 pb-3">
             <div>
               <h2 className="text-headline-sm font-bold text-on-surface">
@@ -802,7 +817,7 @@ export function AttendanceWorkspace() {
             </button>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); void createOrUpdateEvent(); }} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); void createOrUpdateEvent(); }} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="muster-event-name" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1">
@@ -1284,7 +1299,7 @@ export function AttendanceWorkspace() {
       {/* Personnel Profile Modal */}
       {selectedProfileGuard && (
         <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-4 backdrop-blur-xs">
-          <div className="overlay-panel flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+          <div className="overlay-panel flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <div className="p-4 bg-primary text-on-primary flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Icon icon="shield" size={20} className="text-on-primary" />
@@ -1300,35 +1315,37 @@ export function AttendanceWorkspace() {
               </button>
             </div>
 
-            <div className="p-6 flex flex-col items-center gap-4 text-center overflow-y-auto">
-              <div className="w-16 h-16 rounded-full bg-primary text-on-primary font-extrabold text-2xl flex items-center justify-center">
-                {initials(selectedProfileGuard.full_name)}
+            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
+              <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">
+                  {initials(selectedProfileGuard.full_name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold text-on-surface">{selectedProfileGuard.full_name}</p>
+                  <p className="font-mono text-xs font-bold text-primary">{selectedProfileGuard.home_guard_code}</p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 w-full">
-                <span className="text-outline font-bold uppercase tracking-wider text-xs">Home Guard code</span>
-                <span className="font-mono text-xl font-extrabold text-primary">
-                  {selectedProfileGuard.home_guard_code}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Name</span>
-                <span className="text-lg font-bold text-on-surface">{selectedProfileGuard.full_name}</span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Division Command</span>
-                <span className="text-lg font-bold text-primary">
-                  {divisions.find((d) => d.id === selectedProfileGuard.division_id)?.name || selectedDivision?.name || 'Home Guards'} Division
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Mobile Number</span>
-                <span className="text-lg font-semibold text-on-surface">
-                  {selectedProfileGuard.phone || 'Not provided'}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Date of birth</span>
-                <span className="text-sm font-semibold text-on-surface">
-                  {formatProfileDate(selectedProfileGuard.date_of_birth)}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Joining date</span>
-                <span className="text-sm font-semibold text-on-surface">
-                  {formatProfileDate(selectedProfileGuard.joining_date)}
-                </span>
-                <span className="text-outline font-bold uppercase tracking-wider text-xs mt-2">Rank / Designation</span>
-                <span className="text-sm font-semibold text-on-surface">Home Guard Volunteer</span>
+              <div className="grid w-full grid-cols-2 gap-2 text-left">
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-primary">{divisions.find((d) => d.id === selectedProfileGuard.division_id)?.name || selectedDivision?.name || 'Home Guards'}</p>
+                </div>
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{selectedProfileGuard.phone || 'Not provided'}</p>
+                </div>
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Date of birth</p>
+                  <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(selectedProfileGuard.date_of_birth)}</p>
+                </div>
+                <div className="rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Joining date</p>
+                  <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(selectedProfileGuard.joining_date)}</p>
+                </div>
+                <div className="col-span-2 rounded-lg bg-surface-container-low p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Rank / Designation</p>
+                  <p className="mt-0.5 text-sm font-semibold text-on-surface">Home Guard Volunteer</p>
+                </div>
               </div>
 
               <DutyHistorySection phone={selectedProfileGuard.phone} />

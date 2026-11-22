@@ -13,6 +13,7 @@ export interface AdminDivisionDashboard {
   totalGuards: number;
   presentToday: number;
   absentToday: number;
+  reportOverview: Record<'weekly' | 'monthly', Array<{ label: string; count: number }>>;
   recentReports: Array<{
     id: string;
     divisionId: string;
@@ -28,7 +29,7 @@ export interface AdminDivisionDashboard {
     actionTaken: string | null;
     acknowledgedAt: string | null;
   }>;
-  divisionComplaintComparison: Array<{
+  divisionReportComparison: Array<{
     divisionId: string;
     divisionName: string;
     currentMonth: number;
@@ -40,6 +41,54 @@ function localDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function localMonthString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function buildReportOverview(reports: Array<{ created_at: string }>, now: Date): AdminDivisionDashboard['reportOverview'] {
+  const dailyCounts = new Map<string, number>();
+  const monthlyCounts = new Map<string, number>();
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7);
+  const firstMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const weekDayKeys = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index);
+    return localDateString(date);
+  });
+  const monthKeys = Array.from({ length: 12 }, (_, index) => (
+    localMonthString(new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1))
+  ));
+
+  for (const report of reports) {
+    const createdAt = new Date(report.created_at);
+    if (Number.isNaN(createdAt.getTime())) continue;
+
+    const monthKey = localMonthString(createdAt);
+    if (createdAt >= weekStart && createdAt < weekEnd) {
+      const dateKey = localDateString(createdAt);
+      dailyCounts.set(dateKey, (dailyCounts.get(dateKey) ?? 0) + 1);
+    }
+    if (monthKey >= monthKeys[0] && monthKey <= monthKeys[monthKeys.length - 1]) {
+      monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) ?? 0) + 1);
+    }
+  }
+
+  return {
+    weekly: weekDayKeys.map((key, index) => ({
+      label: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(
+        new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index),
+      ),
+      count: dailyCounts.get(key) ?? 0,
+    })),
+    monthly: monthKeys.map((key, index) => ({
+      label: new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
+        new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1),
+      ),
+      count: monthlyCounts.get(key) ?? 0,
+    })),
+  };
+}
+
 /** Division-scoped figures and activity for the admin home screen. */
 export async function getAdminDivisionDashboard(divisionId: string): Promise<OneResult<AdminDivisionDashboard>> {
   try {
@@ -48,10 +97,12 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const reportHistoryStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const currentMonth = today.slice(0, 7);
     const currentMonthStartKey = currentMonthStart.toISOString();
     const nextMonthStartKey = nextMonthStart.toISOString();
     const previousMonthStartKey = previousMonthStart.toISOString();
+    const reportHistoryStartKey = reportHistoryStart.toISOString();
     const divisions = await loadDivisionSummaries(today);
     const selected = divisions.find((division) => division.id === divisionId) ?? null;
     const supabase = createClient();
@@ -59,7 +110,7 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
       .from('personnel_reports')
       .select('id, division_id, division_name, guard_name, home_guard_code, category, description, event_name, event_date, status, created_at, action_taken, acknowledged_at');
     if (divisionId) recentReportsQuery = recentReportsQuery.eq('division_id', divisionId);
-    const [attendanceEvents, reports, monthlyReports, rosterCount] = await Promise.all([
+    const [attendanceEvents, reports, monthlyReports, rosterCount, reportHistory] = await Promise.all([
       divisionId ? loadAttendanceEvents(currentMonth, divisionId) : Promise.resolve([]),
       recentReportsQuery
         .or(`acknowledged_at.is.null,created_at.gte.${previousMonthStartKey}`)
@@ -74,6 +125,24 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
         .from('home_guard_roster')
         .select('id', { count: 'exact', head: true })
         .eq('division_id', divisionId) : Promise.resolve({ count: 0, error: null }),
+      (async () => {
+        const history: Array<{ created_at: string }> = [];
+        for (let offset = 0; ; offset += 1000) {
+          let query = supabase
+            .from('personnel_reports')
+            .select('created_at')
+            .gte('created_at', reportHistoryStartKey)
+            .lt('created_at', nextMonthStartKey)
+            .order('created_at', { ascending: true });
+          if (divisionId) query = query.eq('division_id', divisionId);
+          const { data, error } = await query.range(offset, offset + 999);
+          if (error) throw new Error(describeQueryError(error) ?? 'Could not load report overview counts.');
+          const page = data ?? [];
+          history.push(...page);
+          if (page.length < 1000) break;
+        }
+        return history;
+      })(),
     ]);
     if (reports.error) throw new Error(describeQueryError(reports.error) ?? 'Could not load division reports.');
     if (monthlyReports.error) throw new Error(describeQueryError(monthlyReports.error) ?? 'Could not load monthly division reports.');
@@ -103,7 +172,7 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
       actionTaken: report.action_taken,
       acknowledgedAt: report.acknowledged_at,
     }));
-    const divisionComplaintComparison = divisions.map((division) => {
+    const divisionReportComparison = divisions.map((division) => {
       const counts = countsByDivision.get(division.id);
       return {
         divisionId: division.id,
@@ -121,8 +190,9 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
         totalGuards: rosterCount.count ?? 0,
         presentToday: todayEvents.reduce((total, event) => total + event.presentCount, 0),
         absentToday: todayEvents.reduce((total, event) => total + event.absentCount, 0),
+        reportOverview: buildReportOverview(reportHistory, now),
         recentReports,
-        divisionComplaintComparison,
+        divisionReportComparison,
       },
       error: null,
     };

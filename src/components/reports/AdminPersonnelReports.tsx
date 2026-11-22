@@ -9,11 +9,9 @@ import { Icon } from '@/components/ui/Icon';
 import { createClient } from '@/lib/supabase/client';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import { useDivision } from '@/lib/attendance/divisionContext';
-import { useAuth } from '@/lib/auth/authContext';
 import { compressImage, filePersonnelReport } from '@/lib/services/simpleAttendanceService';
 import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
-import { ReportAcknowledgementDialog } from '@/components/reports/ReportAcknowledgementDialog';
 
 type PersonnelReport = {
   id: string;
@@ -42,9 +40,8 @@ const categoryOptions = [
   { value: 'other', label: 'Other' },
 ];
 
-export function AdminPersonnelReports() {
+export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string }) {
   const { divisionId, resolved } = useDivision();
-  const { role } = useAuth();
   const [reports, setReports] = useState<PersonnelReport[]>([]);
   const [guards, setGuards] = useState<GuardOption[]>([]);
   const [selectedGuardId, setSelectedGuardId] = useState('');
@@ -58,15 +55,20 @@ export function AdminPersonnelReports() {
   const [saving, setSaving] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [reportToDelete, setReportToDelete] = useState<PersonnelReport | null>(null);
-  const [reportToAcknowledge, setReportToAcknowledge] = useState<PersonnelReport | null>(null);
-  const [acknowledgingReport, setAcknowledgingReport] = useState(false);
-  const [acknowledgementError, setAcknowledgementError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   const selectedGuard = guards.find((guard) => guard.id === selectedGuardId);
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const visibleReports = normalizedSearch
+    ? reports.filter((report) => (
+      `${report.guard_name} ${report.home_guard_code}`
+        .toLowerCase()
+        .includes(normalizedSearch)
+    ))
+    : reports;
   const matchingGuards = guards
     .filter((guard) => `${guard.full_name} ${guard.home_guard_code}`.toLowerCase().includes(guardSearch.trim().toLowerCase()))
     .slice(0, 8);
@@ -197,30 +199,6 @@ export function AdminPersonnelReports() {
     }
   }
 
-  async function submitAcknowledgement(actionTaken: string) {
-    if (!reportToAcknowledge || role !== 'admin') return;
-    setAcknowledgingReport(true);
-    setAcknowledgementError('');
-    try {
-      const { data, error: updateError } = await createClient()
-        .from('personnel_reports')
-        .update({ action_taken: actionTaken })
-        .eq('id', reportToAcknowledge.id)
-        .select('id,action_taken,acknowledged_at,status')
-        .single();
-      if (updateError) throw new Error(updateError.message);
-      setReports((current) => current.map((report) => report.id === data.id
-        ? { ...report, action_taken: data.action_taken, acknowledged_at: data.acknowledged_at, status: data.status }
-        : report));
-      setReportToAcknowledge(null);
-      await load();
-    } catch (cause) {
-      setAcknowledgementError(cause instanceof Error ? cause.message : 'Could not acknowledge this report.');
-    } finally {
-      setAcknowledgingReport(false);
-    }
-  }
-
   return (
     <>
       <Card className="mt-5 overflow-hidden">
@@ -244,9 +222,9 @@ export function AdminPersonnelReports() {
         {notice && <p role="status" className="mx-4 mt-4 rounded-lg bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant">{notice}</p>}
         {loading ? (
           <p className="flex items-center justify-center gap-2 p-8 text-sm text-on-surface-variant"><Icon icon="sync" size={18} className="animate-spin" />Loading reports…</p>
-        ) : error && !showForm ? null : reports.length ? (
+        ) : error && !showForm ? null : visibleReports.length ? (
           <ul className="divide-y divide-outline-variant/60">
-            {reports.map((report) => (
+            {visibleReports.map((report) => (
               <li key={report.id} className="space-y-2 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -285,32 +263,27 @@ export function AdminPersonnelReports() {
                 <p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
                 {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Memo photo for report on ${report.guard_name}`} />}
                 <p className="text-xs text-on-surface-variant">Filed by {report.reporter_name}{report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''}</p>
-                {report.acknowledged_at ? (
+                {report.acknowledged_at && (
                   <div className="rounded-lg bg-surface-container-low p-3 text-sm">
                     <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
                     <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.action_taken}</p>
                   </div>
-                ) : role === 'admin' ? (
-                  <button
-                    type="button"
-                    onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
-                  >
-                    <Icon icon="task_alt" size={18} />
-                    Acknowledge
-                  </button>
-                ) : null}
+                )}
               </li>
             ))}
           </ul>
         ) : !error ? (
-          <EmptyState icon="inbox" title="No reports in this division" body="Use Submit report to file a report about a Home Guard." />
+          <EmptyState
+            icon="inbox"
+            title={normalizedSearch ? 'No matching reports' : 'No reports in this division'}
+            body={normalizedSearch ? 'Try another guard name, code, category, event, or keyword.' : 'Use Submit report to file a report about a Home Guard.'}
+          />
         ) : null}
       </Card>
 
       {portalReady && showForm && createPortal(
         <div className="overlay-enter fixed inset-0 z-[90] flex items-center justify-center bg-primary/35 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowForm(false); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="admin-submit-report-title" className="overlay-panel max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-4 shadow-2xl sm:p-5">
+          <section role="dialog" aria-modal="true" aria-labelledby="admin-submit-report-title" className="overlay-panel flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-4 shadow-2xl sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 id="admin-submit-report-title" className="text-headline-sm text-on-surface">Submit a report</h2>
@@ -320,7 +293,7 @@ export function AdminPersonnelReports() {
                 <Icon icon="close" size={20} />
               </button>
             </div>
-          <form onSubmit={(event) => void submitReport(event)} className="space-y-4">
+          <form onSubmit={(event) => void submitReport(event)} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
             <div className="text-label-md text-on-surface">
               <label htmlFor="admin-report-guard-search">Home Guard</label>
               <div className="relative mt-1.5">
@@ -457,14 +430,6 @@ export function AdminPersonnelReports() {
         document.body,
       )}
 
-      <ReportAcknowledgementDialog
-        open={Boolean(reportToAcknowledge)}
-        guardName={reportToAcknowledge?.guard_name ?? ''}
-        submitting={acknowledgingReport}
-        error={acknowledgementError}
-        onCancel={() => setReportToAcknowledge(null)}
-        onSubmit={submitAcknowledgement}
-      />
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
 import { deleteMusterEvent, loadAttendanceEvents, saveMusterEvent, type AttendanceEventSummary } from '@/lib/services/simpleAttendanceService';
 import { useDivision } from '@/lib/attendance/divisionContext';
@@ -112,6 +113,15 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!showCreate) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showCreate]);
+
   async function createEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!divisionId || !eventName.trim()) return;
@@ -194,14 +204,14 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
           <span className="text-sm text-on-surface-variant"><strong className="font-semibold tabular-nums text-on-surface">{events.length}</strong> {events.length === 1 ? 'event' : 'events'}</span>
       </section>
 
-      {showCreate && canCreate && (
+      {showCreate && canCreate && typeof document !== 'undefined' && createPortal(
         <div
-          className="overlay-enter fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-surface-container/40 p-3 pb-6 pt-[8vh] backdrop-blur-xs sm:p-4 sm:pt-[10vh]"
+          className="overlay-enter fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-surface-container/40 p-3 backdrop-blur-xs sm:p-4"
           role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreate(false); }}
         >
-          <div className="overlay-panel flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
-            <form onSubmit={(event) => void createEvent(event)} className="flex flex-col gap-3 overflow-y-auto p-4 sm:p-5">
+          <div className="overlay-panel flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl sm:max-h-[92dvh]">
+            <form onSubmit={(event) => void createEvent(event)} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-headline-sm text-primary">New event</h2>
                 <button type="button" onClick={() => setShowCreate(false)} aria-label="Close event form" className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
@@ -215,7 +225,8 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
               <button type="submit" disabled={saving || !divisionId} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">{saving ? 'Saving…' : 'Save event'}</button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <section className="flex flex-col gap-3.5">
