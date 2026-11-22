@@ -57,6 +57,7 @@ export default function AdminDashboardPage() {
   const [allReports, setAllReports] = useState<AdminDivisionDashboard['recentReports']>([]);
   const [allReportsLoading, setAllReportsLoading] = useState(false);
   const [allReportsError, setAllReportsError] = useState('');
+  const hasOpenReportDialog = showAllReports || Boolean(reportToAcknowledge);
   const statsQuery = useLiveQuery<AdminDivisionDashboard>(
     () => divisionResolved
       ? getAdminDivisionDashboard(divisionId)
@@ -64,13 +65,13 @@ export default function AdminDashboardPage() {
     `${divisionResolved}:${divisionId}`,
   );
   useEffect(() => {
-    if (!showAllReports) return;
+    if (!hasOpenReportDialog) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [showAllReports]);
+  }, [hasOpenReportDialog]);
   const stats = statsQuery.data;
   const divisionStats = stats?.selectedDivision?.id === divisionId ? stats : (divisionId ? null : stats?.selectedDivision ? null : stats);
   const reportOverview = divisionStats?.reportOverview[overviewPeriod] ?? [];

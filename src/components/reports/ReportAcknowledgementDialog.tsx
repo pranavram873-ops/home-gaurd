@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
 
 export function ReportAcknowledgementDialog({
@@ -24,7 +25,7 @@ export function ReportAcknowledgementDialog({
     if (open) setActionTaken('');
   }, [open, guardName]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,7 +34,7 @@ export function ReportAcknowledgementDialog({
     void onSubmit(action);
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-surface-container/60 p-4 backdrop-blur-xs"
       role="presentation"
@@ -77,6 +78,7 @@ export function ReportAcknowledgementDialog({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
