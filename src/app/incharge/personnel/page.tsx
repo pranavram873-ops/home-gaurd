@@ -9,6 +9,7 @@ function PersonnelPickerInner() {
   const searchParams = useSearchParams();
   const divisionId = searchParams.get('division') ?? '';
   const date = searchParams.get('date') ?? '';
+  const eventId = searchParams.get('eventId');
   const requestedBack = searchParams.get('back') ?? '';
 
   if (!divisionId || !date) {
@@ -17,7 +18,7 @@ function PersonnelPickerInner() {
   const backHref = requestedBack.startsWith('/incharge/attendance?date=')
     ? requestedBack
     : `/incharge/attendance?date=${encodeURIComponent(date)}`;
-  return <EventPersonnelPicker divisionId={divisionId} date={date} backHref={backHref} />;
+  return <EventPersonnelPicker divisionId={divisionId} date={date} eventId={eventId} backHref={backHref} />;
 }
 
 export default function InchargePersonnelPage() {

@@ -1,5 +1,6 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getAuthCookieOptions } from './cookies';
 import { getSupabaseUrl, getSupabasePublishableKey } from './env';
 
 // Standard server client for RSC/route handlers acting on behalf of a
@@ -21,10 +22,10 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+      setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, getAuthCookieOptions(options, value))
           );
         } catch {
           // The `setAll` method was called from a Server Component.

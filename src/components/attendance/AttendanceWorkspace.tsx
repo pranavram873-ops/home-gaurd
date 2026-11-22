@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   addMusterEventEvidencePhoto,
+  attendanceEventId,
+  deleteLegacyAttendanceDay,
   deleteMusterEvent,
   getMusterEventParticipants,
   setMusterEventParticipant,
@@ -160,14 +162,14 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
             {history.events.length ? (
               <ul className="divide-y divide-outline-variant overflow-y-auto overscroll-contain p-4">
                 {history.events.map((event) => (
-                  <li key={event.date}>
+                  <li key={`${event.date}-${event.eventId ?? 'legacy'}`}>
                     <button
                       type="button"
                       onClick={() => {
                         setShowHistory(false);
                         router.push(role === 'admin'
-                          ? `/admin/events/${history.divisionId}.${event.date}`
-                          : `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(history.divisionId)}&event=${encodeURIComponent(event.eventName ?? '')}`);
+                          ? `/admin/events/${attendanceEventId(history.divisionId, event.date, event.eventId)}`
+                          : `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(history.divisionId)}${event.eventId ? `&eventId=${encodeURIComponent(event.eventId)}` : `&event=${encodeURIComponent(event.eventName ?? '')}`}`);
                       }}
                       className="flex w-full items-center justify-between gap-2 rounded-md py-3 text-left text-[13px] hover:bg-surface-container-low"
                     >
@@ -205,6 +207,7 @@ export function AttendanceWorkspace() {
   const { role } = useAuth();
   const requestedDate = searchParams.get('date');
   const requestedEventName = searchParams.get('event');
+  const requestedEventId = searchParams.get('eventId');
   const [divisions, setDivisions] = useState<AttendanceDivision[]>([]);
   const [date, setDate] = useState(() => requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayLocal());
   const [eventMonth, setEventMonth] = useState(() => todayLocal().slice(0, 7));
@@ -216,6 +219,8 @@ export function AttendanceWorkspace() {
   const [eventName, setEventName] = useState('');
   const [eventAddress, setEventAddress] = useState('');
   const [musterEvent, setMusterEvent] = useState<MusterEvent | null>(null);
+  const [dayEvents, setDayEvents] = useState<MusterEvent[]>([]);
+  const [isCreatingAnother, setIsCreatingAnother] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showDeleteEventDialog, setShowDeleteEventDialog] = useState(false);
@@ -262,36 +267,52 @@ export function AttendanceWorkspace() {
     let live = true;
     setLoading(true);
     setError('');
-    loadAttendancePage(divisionId, date)
-      .then((data) => {
+    const activeRequestedEventId = requestedDate === date ? requestedEventId : null;
+    loadAttendancePage(divisionId, date, activeRequestedEventId || undefined)
+      .then(async (data) => {
         if (!live) return;
         setDivisions(data.divisions);
         if (!divisionId && data.divisions[0]) setDivisionId(data.divisions[0].id);
         setRoster(data.roster);
         setMarks(data.marks);
+        setDayEvents(data.musterEvents);
+        let selectedMarks = data.marks;
 
         // A direct link from the event list must open the selected event rather
         // than landing on the date's event list again. Legacy attendance days
         // may not have a muster_events row, so build the same fallback record
         // used when selecting one from the in-page list.
         if (role === 'incharge' && requestedDate === date) {
-          const selectedEvent: MusterEvent = data.musterEvent ?? {
-            id: `muster-${divisionId}-${date}`,
-            division_id: divisionId,
-            event_date: date,
-            event_name: requestedEventName || `${formatDay(date)} Muster`,
-            created_by: '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
+          const namedEvent = !requestedEventId && requestedEventName
+            ? data.musterEvents.find((event) => event.event_name === requestedEventName)
+            : null;
+          const namedEventData = namedEvent
+            ? await loadAttendancePage(divisionId, date, namedEvent.id)
+            : null;
+          if (!live) return;
+          selectedMarks = namedEventData?.marks ?? data.marks;
+          const selectedEvent: MusterEvent | null = data.musterEvent ?? namedEvent ?? (
+            data.musterEvents.length === 0 && data.marks.length > 0
+              ? {
+                  id: `muster-${divisionId}-${date}`,
+                  division_id: divisionId,
+                  event_date: date,
+                  event_name: requestedEventName || `${formatDay(date)} Muster`,
+                  created_by: '',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                }
+              : null
+          );
           setMusterEvent(selectedEvent);
-          setEventName(selectedEvent.event_name);
-          setEventAddress(selectedEvent.address ?? '');
+          setEventName(selectedEvent?.event_name ?? '');
+          setEventAddress(selectedEvent?.address ?? '');
+          if (namedEventData) setMarks(namedEventData.marks);
         }
 
         // Restore guard photos from database marks
         const photosFromDb: Record<string, { name: string; dataUrl: string }> = {};
-        for (const mark of data.marks) {
+        for (const mark of selectedMarks) {
           if (mark.photo_url) {
             photosFromDb[mark.guard_id] = { name: 'Saved Attendance Photo', dataUrl: mark.photo_url };
           }
@@ -301,7 +322,7 @@ export function AttendanceWorkspace() {
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load attendance.'))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [divisionId, date, requestedDate, requestedEventName, role, setDivisionId]);
+  }, [divisionId, date, requestedDate, requestedEventName, requestedEventId, role, setDivisionId]);
 
   useEffect(() => {
     let live = true;
@@ -320,22 +341,25 @@ export function AttendanceWorkspace() {
     setSelectedGuardIds([]);
     setEventName('');
     setEventAddress('');
+    setDayEvents([]);
+    setIsCreatingAnother(false);
     setShowEventForm(false);
   }, [divisionId]);
 
+  const selectedMusterEventId = musterEvent?.id;
   useEffect(() => {
     let live = true;
-    if (!musterEvent) { setSelectedGuardIds([]); return; }
-    if (musterEvent.id === `muster-${divisionId}-${date}`) {
+    if (!selectedMusterEventId) { setSelectedGuardIds([]); return; }
+    if (selectedMusterEventId.startsWith('muster-')) {
       setSelectedGuardIds(marks.map((mark) => mark.guard_id));
       return () => { live = false; };
     }
-    getMusterEventParticipants(musterEvent.id).then((ids) => { if (live) setSelectedGuardIds(ids); }).catch((reason) => { if (live) setError(reason instanceof Error ? reason.message : 'Could not load event personnel.'); });
+    getMusterEventParticipants(selectedMusterEventId).then((ids) => { if (live) setSelectedGuardIds(ids); }).catch((reason) => { if (live) setError(reason instanceof Error ? reason.message : 'Could not load event personnel.'); });
     return () => { live = false; };
-  }, [musterEvent?.id, divisionId, date, marks]);
+  }, [selectedMusterEventId, divisionId, date, marks]);
 
   async function toggleEventGuard(guard: RosterGuard) {
-    if (!musterEvent) return;
+    if (!musterEvent || musterEvent.id.startsWith('muster-')) return;
     const selected = !selectedGuardIds.includes(guard.id);
     const want = selected ? 'present' : 'absent';
     const priorStatus = markByGuard.get(guard.id)?.status;
@@ -343,7 +367,7 @@ export function AttendanceWorkspace() {
     try {
       await setMusterEventParticipant(musterEvent.id, guard.id, selected);
       if (priorStatus !== want) {
-        await saveDailyMark(guard.id, divisionId, date, want);
+        await saveDailyMark(guard.id, divisionId, date, musterEvent.id, want);
         setMarks((current) => {
           const prior = current.find((mark) => mark.guard_id === guard.id);
           if (prior) return current.map((mark) => (mark.guard_id === guard.id ? { ...mark, status: want } : mark));
@@ -351,6 +375,7 @@ export function AttendanceWorkspace() {
             id: `${guard.id}-${date}`,
             guard_id: guard.id,
             division_id: divisionId,
+            event_id: musterEvent.id,
             attendance_date: date,
             status: want,
             marked_at: new Date().toISOString(),
@@ -365,13 +390,13 @@ export function AttendanceWorkspace() {
   }
 
   function openParticipantPicker() {
-    if (!divisionId || !musterEvent) return;
+    if (!divisionId || !musterEvent || musterEvent.id.startsWith('muster-')) return;
     if (role === 'admin') {
-      router.push(`/admin/events/${encodeURIComponent(`${divisionId}.${date}`)}/personnel`);
+      router.push(`/admin/events/${encodeURIComponent(`${divisionId}.${date}.${musterEvent.id}`)}/personnel`);
       return;
     }
-    const backHref = encodeURIComponent(`/incharge/attendance?date=${encodeURIComponent(date)}`);
-    router.push(`/incharge/personnel?division=${encodeURIComponent(divisionId)}&date=${encodeURIComponent(date)}&back=${backHref}`);
+    const backHref = encodeURIComponent(`/incharge/attendance?date=${encodeURIComponent(date)}&division=${encodeURIComponent(divisionId)}&eventId=${encodeURIComponent(musterEvent.id)}`);
+    router.push(`/incharge/personnel?division=${encodeURIComponent(divisionId)}&date=${encodeURIComponent(date)}&eventId=${encodeURIComponent(musterEvent.id)}&back=${backHref}`);
   }
 
   useEffect(() => {
@@ -394,17 +419,67 @@ export function AttendanceWorkspace() {
     setSavingEvent(true);
     setError('');
     setNotice('');
+    const previousEventId = musterEvent?.id;
     try {
-      const saved = await saveMusterEvent(divisionId, date, eventName, eventAddress);
+      const saved = await saveMusterEvent(
+        divisionId,
+        date,
+        eventName,
+        eventAddress,
+        isCreatingAnother ? undefined : musterEvent?.id.startsWith('muster-') ? undefined : musterEvent?.id,
+      );
       setMusterEvent(saved);
+      setDayEvents((current) => [...current.filter((event) => event.id !== saved.id), saved]);
+      if (saved.id !== previousEventId) {
+        setMarks([]);
+        setSelectedGuardIds([]);
+        setEvidenceByGuard({});
+      }
       setEventName(saved.event_name);
       setEventAddress(saved.address ?? '');
+      setIsCreatingAnother(false);
       setShowEventForm(false);
       setNotice(`“${saved.event_name}” event created. Upload evidence photos or mark personnel below.`);
+      void loadAttendanceEvents(eventMonth, divisionId)
+        .then(setMonthEvents)
+        .catch((cause: unknown) => setEventsError(cause instanceof Error ? cause.message : 'Could not refresh this month’s events.'));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not save this event.');
     } finally {
       setSavingEvent(false);
+    }
+  }
+
+  async function selectDayEvent(event: AttendanceEventSummary) {
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const data = await loadAttendancePage(divisionId, event.date, event.eventId ?? undefined);
+      setDate(event.date);
+      setDayEvents(data.musterEvents);
+      setRoster(data.roster);
+      setMarks(data.marks);
+      setMusterEvent(data.musterEvent ?? (event.eventId ? null : {
+        id: `muster-${divisionId}-${event.date}`,
+        division_id: divisionId,
+        event_date: event.date,
+        event_name: event.eventName || `${formatDay(event.date)} Muster`,
+        created_by: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      setEventName(data.musterEvent?.event_name ?? event.eventName ?? '');
+      setEventAddress(data.musterEvent?.address ?? '');
+      const photos: Record<string, { name: string; dataUrl: string }> = {};
+      for (const mark of data.marks) {
+        if (mark.photo_url) photos[mark.guard_id] = { name: 'Saved Attendance Photo', dataUrl: mark.photo_url };
+      }
+      setEvidenceByGuard(photos);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not load this event.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -413,9 +488,15 @@ export function AttendanceWorkspace() {
     setSavingEvent(true);
     setError('');
     try {
-      await deleteMusterEvent(divisionId, date);
+      if (musterEvent.id.startsWith('muster-')) {
+        await deleteLegacyAttendanceDay(divisionId, date);
+      } else {
+        await deleteMusterEvent(musterEvent.id);
+      }
       setShowDeleteEventDialog(false);
       setMusterEvent(null);
+      setDayEvents((current) => current.filter((event) => event.id !== musterEvent.id));
+      setMonthEvents((current) => current.filter((event) => event.eventId !== musterEvent.id));
       setEventName('');
       setEventAddress('');
       setShowEventForm(false);
@@ -437,7 +518,8 @@ export function AttendanceWorkspace() {
     setNotice('');
     try {
       const compressed = await compressImage(file, 1200, 1200, 0.8);
-      const updatedPhotos = await addMusterEventEvidencePhoto(divisionId, date, compressed);
+      if (!musterEvent || musterEvent.id.startsWith('muster-')) throw new Error('Create an event before attaching evidence.');
+      const updatedPhotos = await addMusterEventEvidencePhoto(musterEvent.id, compressed);
       setMusterEvent((prev) => (prev ? { ...prev, evidence_photos: updatedPhotos } : null));
       setNotice('Event photo evidence uploaded and saved. Visible to admins.');
     } catch (cause) {
@@ -452,7 +534,8 @@ export function AttendanceWorkspace() {
     setError('');
     setNotice('');
     try {
-      const updatedPhotos = await removeMusterEventEvidencePhoto(divisionId, date, index);
+      if (!musterEvent || musterEvent.id.startsWith('muster-')) throw new Error('Create an event before removing evidence.');
+      const updatedPhotos = await removeMusterEventEvidencePhoto(musterEvent.id, index);
       setMusterEvent((prev) => (prev ? { ...prev, evidence_photos: updatedPhotos } : null));
       setNotice('Event photo evidence removed.');
     } catch (cause) {
@@ -499,7 +582,8 @@ export function AttendanceWorkspace() {
     setError('');
     setNotice('');
     try {
-      await saveDailyMark(guard.id, divisionId, date, status);
+      if (!musterEvent || musterEvent.id.startsWith('muster-')) throw new Error('Choose a saved event before recording attendance.');
+      await saveDailyMark(guard.id, divisionId, date, musterEvent.id, status);
       setMarks((current) => {
         const prior = current.find((mark) => mark.guard_id === guard.id);
         if (prior) return current.map((mark) => mark.guard_id === guard.id ? { ...mark, status } : mark);
@@ -507,6 +591,7 @@ export function AttendanceWorkspace() {
           id: `${guard.id}-${date}`,
           guard_id: guard.id,
           division_id: divisionId,
+          event_id: musterEvent.id,
           attendance_date: date,
           status,
           marked_at: new Date().toISOString(),
@@ -535,7 +620,8 @@ export function AttendanceWorkspace() {
     setNotice('');
     try {
       const compressed = await compressImage(file, 1200, 1200, 0.8);
-      await saveGuardPhotoEvidence(guard.id, divisionId, date, compressed);
+      if (!musterEvent || musterEvent.id.startsWith('muster-')) throw new Error('Choose a saved event before attaching attendance evidence.');
+      await saveGuardPhotoEvidence(guard.id, divisionId, date, musterEvent.id, compressed);
       setEvidenceByGuard((current) => ({
         ...current,
         [guard.id]: { name: file.name, dataUrl: compressed },
@@ -547,6 +633,7 @@ export function AttendanceWorkspace() {
           id: `${guard.id}-${date}`,
           guard_id: guard.id,
           division_id: divisionId,
+          event_id: musterEvent.id,
           attendance_date: date,
           status: 'present',
           photo_url: compressed,
@@ -651,6 +738,8 @@ export function AttendanceWorkspace() {
               onChange={(event) => {
                 if (!event.target.value) return;
                 setMusterEvent(null);
+                setDayEvents([]);
+                setIsCreatingAnother(false);
                 setShowEventForm(false);
                 setEventName('');
                 setEventAddress('');
@@ -692,7 +781,7 @@ export function AttendanceWorkspace() {
           <div className="mb-4 flex items-start justify-between gap-2 border-b border-outline-variant/50 pb-3">
             <div>
               <h2 className="text-headline-sm font-bold text-on-surface">
-                {musterEvent ? 'Edit Event Details' : 'Create New Event'}
+                {musterEvent && !isCreatingAnother ? 'Edit Event Details' : 'Create New Event'}
               </h2>
               <p className="text-sm text-on-surface-variant">
                 Fill in event details to open muster roll and attach photo evidence.
@@ -702,6 +791,7 @@ export function AttendanceWorkspace() {
               type="button"
               onClick={() => {
                 setShowEventForm(false);
+                setIsCreatingAnother(false);
                 setEventName(musterEvent?.event_name ?? '');
                 setEventAddress(musterEvent?.address ?? '');
               }}
@@ -739,6 +829,7 @@ export function AttendanceWorkspace() {
                   type="date"
                   required
                   value={date}
+                  disabled={Boolean(musterEvent && !musterEvent.id.startsWith('muster-') && !isCreatingAnother)}
                   onChange={(event) => setDate(event.target.value)}
                   className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -782,7 +873,12 @@ export function AttendanceWorkspace() {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setShowEventForm(false)}
+                onClick={() => {
+                  setShowEventForm(false);
+                  setIsCreatingAnother(false);
+                  setEventName(musterEvent?.event_name ?? '');
+                  setEventAddress(musterEvent?.address ?? '');
+                }}
                 className="h-11 rounded-lg px-4 text-sm font-semibold text-on-surface-variant hover:bg-surface-container"
               >
                 Cancel
@@ -793,26 +889,80 @@ export function AttendanceWorkspace() {
                 className="flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:opacity-60 cursor-pointer"
               >
                 {savingEvent ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="event_available" size={18} />}
-                {savingEvent ? 'Saving Event…' : musterEvent ? 'Update Event Details' : 'Create & Show Personnel'}
+                {savingEvent ? 'Saving Event…' : musterEvent && !isCreatingAnother ? 'Update Event Details' : 'Create & Show Personnel'}
               </button>
             </div>
           </form>
         </Card>
         </div>
       )}
+      {dayEvents.length > 1 && (
+        <Card className="space-y-2 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+            Select an event for {formatDay(date)}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {dayEvents.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                onClick={() => void selectDayEvent({
+                  id: attendanceEventId(event.division_id, event.event_date, event.id),
+                  eventId: event.id,
+                  divisionId: event.division_id,
+                  divisionName: selectedDivision?.name ?? 'Division',
+                  date: event.event_date,
+                  eventName: event.event_name,
+                  presentCount: 0,
+                  absentCount: 0,
+                  sanctionedCount: 0,
+                  markedCount: 0,
+                  isOpen: true,
+                })}
+                className={`min-h-10 rounded-lg border px-3 text-sm font-semibold ${musterEvent?.id === event.id ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container'}`}
+              >
+                {event.event_name}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
       {musterEvent && (
         <Card className="p-4 flex flex-col gap-3">
+          {musterEvent.id.startsWith('muster-') && (
+            <p className="rounded-lg bg-secondary-container px-3 py-2 text-sm text-on-secondary-container">
+              This is legacy attendance without a named event. Create an event before recording or editing attendance.
+            </p>
+          )}
           <div className="flex flex-col gap-3 border-b border-outline-variant/40 pb-3">
             <div className="grid w-full grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex sm:flex-wrap sm:justify-end">
               <button
                 type="button"
-                onClick={() => setShowEventForm(true)}
+                onClick={() => {
+                  setIsCreatingAnother(false);
+                  setEventName(musterEvent.event_name);
+                  setEventAddress(musterEvent.address ?? '');
+                  setShowEventForm(true);
+                }}
                 className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-outline-variant px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-surface-container sm:px-3"
               >
                 <Icon icon="edit" size={18} />
                 <span className="truncate">Edit event</span>
               </button>
-              <button type="button" onClick={openParticipantPicker} className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-primary-container px-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary sm:px-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingAnother(true);
+                  setEventName('');
+                  setEventAddress('');
+                  setShowEventForm(true);
+                }}
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-outline-variant px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-surface-container sm:px-3"
+              >
+                <Icon icon="add" size={18} />
+                <span className="truncate">Create another</span>
+              </button>
+              <button type="button" onClick={openParticipantPicker} disabled={musterEvent.id.startsWith('muster-')} className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-primary-container px-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50 sm:px-3">
                 <Icon icon="person_add" size={18} />
                 <span className="truncate">Add personnel</span>
               </button>
@@ -858,7 +1008,7 @@ export function AttendanceWorkspace() {
                 <input
                   type="file"
                   accept="image/*"
-                  disabled={uploadingEventPhoto}
+                  disabled={uploadingEventPhoto || musterEvent.id.startsWith('muster-')}
                   className="hidden"
                   onChange={(e) => void uploadEventEvidencePhoto(e)}
                 />
@@ -1036,8 +1186,8 @@ export function AttendanceWorkspace() {
                     </button>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <span className="sr-only">Attendance status for {guard.full_name}</span>
-                      <button type="button" disabled={isSaving || !musterEvent} onClick={() => void changeStatus(guard, 'present')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'present' ? 'bg-on-tertiary-container text-on-tertiary shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'present' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} className={mark?.status === 'present' ? 'animate-check-pop' : ''} />} Present</button>
-                      <button type="button" disabled={isSaving || !musterEvent} onClick={() => void changeStatus(guard, 'absent')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'absent' ? 'bg-error text-on-error shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'absent' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="close" size={18} className={mark?.status === 'absent' ? 'animate-check-pop' : ''} />} Absent</button>
+                      <button type="button" disabled={isSaving || !musterEvent || musterEvent.id.startsWith('muster-')} onClick={() => void changeStatus(guard, 'present')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'present' ? 'bg-on-tertiary-container text-on-tertiary shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'present' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} className={mark?.status === 'present' ? 'animate-check-pop' : ''} />} Present</button>
+                      <button type="button" disabled={isSaving || !musterEvent || musterEvent.id.startsWith('muster-')} onClick={() => void changeStatus(guard, 'absent')} className={`flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 ${mark?.status === 'absent' ? 'bg-error text-on-error shadow-sm' : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}`}>{isSaving && mark?.status !== 'absent' ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="close" size={18} className={mark?.status === 'absent' ? 'animate-check-pop' : ''} />} Absent</button>
                     </div></>
 
                     <div className="mt-3 rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-2">
@@ -1050,6 +1200,7 @@ export function AttendanceWorkspace() {
                           type="file"
                           accept="image/*"
                           className="hidden"
+                        disabled={musterEvent.id.startsWith('muster-')}
                           onChange={(event) => void attachEvidence(guard, event)}
                         />
                         <Icon icon="upload_file" size={18} />
@@ -1094,7 +1245,13 @@ export function AttendanceWorkspace() {
               </label>
               <button
                 type="button"
-                onClick={() => { setError(''); setShowEventForm(true); }}
+                onClick={() => {
+                  setError('');
+                  setIsCreatingAnother(false);
+                  setEventName('');
+                  setEventAddress('');
+                  setShowEventForm(true);
+                }}
                 disabled={loading || !divisionId}
                 className="flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-label-md font-bold text-on-primary hover:bg-primary/90 disabled:opacity-60"
               >
@@ -1109,33 +1266,8 @@ export function AttendanceWorkspace() {
                 key={event.id}
                 type="button"
                 onClick={() => {
-                  setDate(event.date);
                   setShowEventForm(false);
-                  setLoading(true);
-                  loadAttendancePage(divisionId, event.date)
-                    .then((data) => {
-                      let evt = data.musterEvent;
-                      if (!evt) {
-                        evt = {
-                          id: `muster-${divisionId}-${event.date}`,
-                          division_id: divisionId,
-                          event_date: event.date,
-                          event_name: event.eventName || `${formatDay(event.date)} Muster`,
-                          created_by: '',
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString(),
-                        };
-                      }
-                      setMusterEvent(evt);
-                      setEventName(evt.event_name);
-                      setEventAddress(evt.address ?? '');
-                      setRoster(data.roster);
-                      setMarks(data.marks);
-                    })
-                    .catch((cause) => {
-                      setError(cause instanceof Error ? cause.message : 'Could not load event.');
-                    })
-                    .finally(() => setLoading(false));
+                  void selectDayEvent(event);
                 }}
                 className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-surface-container ${event.date === date ? 'bg-primary-fixed/60 ring-1 ring-primary/30' : 'bg-surface-container-low'}`}
               >

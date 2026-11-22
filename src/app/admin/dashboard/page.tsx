@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/lib/auth/authContext';
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
+import { createClient } from '@/lib/supabase/client';
 import { getAdminDivisionDashboard, type AdminDivisionDashboard } from '@/lib/services/statsService';
+import { ReportAcknowledgementDialog } from '@/components/reports/ReportAcknowledgementDialog';
 
 function formatActivityTime(value: string) {
   const date = new Date(value);
@@ -20,9 +23,33 @@ function formatActivityTime(value: string) {
   }).format(date);
 }
 
+function getComplaintChange(current: number, previous: number) {
+  if (previous === 0) {
+    return current === 0
+      ? { icon: 'remove', label: '0% no change', tone: 'text-on-surface-variant' }
+      : { icon: 'arrow_upward', label: 'New this month', tone: 'text-tertiary' };
+  }
+
+  const percent = Math.round(((current - previous) / previous) * 100);
+  if (percent === 0) {
+    return { icon: 'remove', label: '0% no change', tone: 'text-on-surface-variant' };
+  }
+  if (percent > 0) {
+    return { icon: 'arrow_upward', label: `${percent}% more`, tone: 'text-tertiary' };
+  }
+  return { icon: 'arrow_downward', label: `${Math.abs(percent)}% less`, tone: 'text-error' };
+}
+
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { divisionId, resolved: divisionResolved } = useDivision();
+  const [reportToAcknowledge, setReportToAcknowledge] = useState<AdminDivisionDashboard['recentReports'][number] | null>(null);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [acknowledgementError, setAcknowledgementError] = useState('');
+  const [showAllReports, setShowAllReports] = useState(false);
+  const [allReports, setAllReports] = useState<AdminDivisionDashboard['recentReports']>([]);
+  const [allReportsLoading, setAllReportsLoading] = useState(false);
+  const [allReportsError, setAllReportsError] = useState('');
   const statsQuery = useLiveQuery<AdminDivisionDashboard>(
     () => divisionResolved
       ? getAdminDivisionDashboard(divisionId)
@@ -35,9 +62,73 @@ export default function AdminDashboardPage() {
   const shortcuts = [
     { label: 'Open events', value: divisionStats?.openEvents, href: '/admin/events', icon: 'event_note', tone: 'bg-primary-container text-on-primary-container' },
     { label: 'Total guards', value: divisionStats?.totalGuards, href: '/admin/personnel', icon: 'groups', tone: 'bg-secondary-container text-on-secondary-container' },
-    { label: 'Present today', value: divisionStats?.presentToday, href: '/admin/events', icon: 'check_circle', tone: 'bg-tertiary-container text-on-tertiary-container' },
-    { label: 'Absent today', value: divisionStats?.absentToday, href: '/admin/events', icon: 'cancel', tone: 'bg-error-container text-on-error-container' },
   ];
+
+  async function openAllReports() {
+    setShowAllReports(true);
+    setAllReportsLoading(true);
+    setAllReportsError('');
+    try {
+      const supabase = createClient();
+      const pageSize = 100;
+      const reports: AdminDivisionDashboard['recentReports'] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        let query = supabase
+          .from('personnel_reports')
+          .select('id, division_id, division_name, guard_name, home_guard_code, category, description, event_name, event_date, status, created_at, action_taken, acknowledged_at')
+          .order('created_at', { ascending: false });
+        if (divisionId) query = query.eq('division_id', divisionId);
+        const { data, error } = await query.range(offset, offset + pageSize - 1);
+        if (error) throw new Error(error.message);
+        const page = (data ?? []).map((report) => ({
+          id: report.id,
+          divisionId: report.division_id,
+          divisionName: report.division_name,
+          guardName: report.guard_name,
+          homeGuardCode: report.home_guard_code,
+          category: report.category,
+          description: report.description,
+          eventName: report.event_name,
+          eventDate: report.event_date,
+          status: report.status,
+          createdAt: report.created_at,
+          actionTaken: report.action_taken,
+          acknowledgedAt: report.acknowledged_at,
+        }));
+        reports.push(...page);
+        if (page.length < pageSize) break;
+      }
+      setAllReports(reports);
+    } catch (reason) {
+      setAllReportsError(reason instanceof Error ? reason.message : 'Could not load reports.');
+    } finally {
+      setAllReportsLoading(false);
+    }
+  }
+
+  async function submitAcknowledgement(actionTaken: string) {
+    if (!reportToAcknowledge || !actionTaken.trim()) return;
+    setAcknowledging(true);
+    setAcknowledgementError('');
+    try {
+      const { data, error } = await createClient()
+        .from('personnel_reports')
+        .update({ action_taken: actionTaken })
+        .eq('id', reportToAcknowledge.id)
+        .select('id, action_taken, acknowledged_at, status')
+        .single();
+      if (error) throw new Error(error.message);
+      setAllReports((current) => current.map((report) => report.id === data.id
+        ? { ...report, actionTaken: data.action_taken, acknowledgedAt: data.acknowledged_at, status: data.status }
+        : report));
+      setReportToAcknowledge(null);
+      await statsQuery.refresh();
+    } catch (reason) {
+      setAcknowledgementError(reason instanceof Error ? reason.message : 'Could not acknowledge this report.');
+    } finally {
+      setAcknowledging(false);
+    }
+  }
 
   return (
     <DashboardLayout title="Dashboard" subtitle={divisionStats?.selectedDivision ? `${divisionStats.selectedDivision.name} Division` : 'Division overview'}>
@@ -73,7 +164,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        <section aria-label="Division operational summary" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <section aria-label="Division operational summary" className="grid grid-cols-2 gap-3 sm:gap-4">
           {shortcuts.map((shortcut) => (
             <Link
               key={shortcut.label}
@@ -96,71 +187,168 @@ export default function AdminDashboardPage() {
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
-          <div className="flex items-center gap-2.5 border-b border-outline-variant/60 px-4 py-4 sm:px-5">
-            <Icon icon="history" size={21} className="text-primary" />
-            <h2 className="text-base font-bold text-on-surface sm:text-lg">Recent activity</h2>
+          <div className="flex items-center justify-between gap-3 border-b border-outline-variant/60 px-4 py-4 sm:px-5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Icon icon="description" size={21} className="shrink-0 text-primary" />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-on-surface sm:text-lg">Created reports</h2>
+                <p className="text-xs text-on-surface-variant">Acknowledge each report and record the action taken.</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => void openAllReports()} disabled={allReportsLoading} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary hover:bg-surface-container disabled:opacity-60">
+              View more
+              <Icon icon="arrow_forward" size={17} />
+            </button>
           </div>
-
           {statsQuery.loading ? (
-            <div role="status" aria-label="Loading recent activity" className="divide-y divide-outline-variant/50">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="flex items-center gap-3 px-4 py-4 sm:px-5">
-                  <span className="h-10 w-10 animate-pulse rounded-full bg-surface-container-high" />
-                  <span className="flex-1 space-y-2">
-                    <span className="block h-3 w-36 animate-pulse rounded bg-surface-container-high" />
-                    <span className="block h-3 w-52 max-w-full animate-pulse rounded bg-surface-container" />
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p role="status" className="px-5 py-8 text-center text-sm text-on-surface-variant">Loading reports…</p>
           ) : statsQuery.error && !stats ? (
-            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Activity is unavailable. Try loading the dashboard again.</p>
-          ) : !divisionStats?.selectedDivision ? (
-            <div className="flex flex-col items-center px-5 py-10 text-center">
-              <Icon icon="domain" size={28} className="text-outline" />
-              <p className="mt-2 text-sm font-semibold text-on-surface">Select a division</p>
-              <p className="mt-1 text-xs text-on-surface-variant">The summary and activity will update to match your selection.</p>
-            </div>
-          ) : divisionStats.recentActivity.length ? (
+            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Reports are unavailable. Try loading the dashboard again.</p>
+          ) : divisionStats?.recentReports.length ? (
             <ul className="divide-y divide-outline-variant/50">
-              {divisionStats.recentActivity.map((activity) => {
-                const content = (
-                  <>
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
-                      <Icon icon={activity.icon} size={20} />
+              {divisionStats.recentReports.slice(0, 2).map((report) => (
+                <li key={report.id} className="space-y-3 px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-on-surface">{report.guardName} <span className="font-mono text-xs font-medium text-on-surface-variant">{report.homeGuardCode}</span></p>
+                      <p className="mt-0.5 text-xs text-on-surface-variant">{report.divisionName} · {report.category.replaceAll('_', ' ')} · {formatActivityTime(report.createdAt)}</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
+                      {(report.eventName || report.eventDate) && <p className="mt-1 text-xs text-on-surface-variant">{report.eventName ?? 'Event'}{report.eventDate ? ` · ${report.eventDate}` : ''}</p>}
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
+                      {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-on-surface">{activity.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-on-surface-variant sm:text-sm">{activity.description}</span>
-                    </span>
-                    <time dateTime={activity.occurredAt} className="shrink-0 text-right text-xs text-on-surface-variant">
-                      {formatActivityTime(activity.occurredAt)}
-                    </time>
-                    {activity.href && <Icon icon="arrow_forward" size={18} className="shrink-0 text-primary" />}
-                  </>
-                );
+                  </div>
+                  {report.acknowledgedAt ? (
+                    <div className="rounded-lg bg-surface-container-low p-3 text-sm">
+                      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
+                      <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.actionTaken}</p>
+                    </div>
+                  ) : role === 'admin' ? (
+                    <button
+                      type="button"
+                      onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
+                    >
+                      <Icon icon="task_alt" size={18} />
+                      Acknowledge
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="px-5 py-10 text-center">
+              <Icon icon="description" size={28} className="text-outline" />
+              <p className="mt-2 text-sm font-semibold text-on-surface">No reports filed</p>
+              <p className="mt-1 text-xs text-on-surface-variant">Reports created for this division will appear here.</p>
+            </div>
+          )}
+        </section>
+
+        {showAllReports && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-surface-container/60 p-3 backdrop-blur-xs sm:p-4"
+            role="presentation"
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAllReports(false); }}
+          >
+            <section role="dialog" aria-modal="true" aria-labelledby="all-reports-title" className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+              <header className="flex shrink-0 items-center justify-between gap-3 border-b border-outline-variant/60 p-4 sm:px-5">
+                <div>
+                  <h2 id="all-reports-title" className="text-lg font-bold text-on-surface">All reports</h2>
+                  <p className="text-xs text-on-surface-variant">{divisionStats?.selectedDivision?.name ?? 'All divisions'}</p>
+                </div>
+                <button type="button" onClick={() => setShowAllReports(false)} aria-label="Close all reports" className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container">
+                  <Icon icon="close" size={20} />
+                </button>
+              </header>
+              {allReportsLoading ? (
+                <p role="status" className="p-8 text-center text-sm text-on-surface-variant">Loading reports…</p>
+              ) : allReportsError ? (
+                <div className="p-5">
+                  <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{allReportsError}</p>
+                  <button type="button" onClick={() => void openAllReports()} className="mt-3 text-sm font-bold text-primary underline">Try again</button>
+                </div>
+              ) : allReports.length ? (
+                <ul className="divide-y divide-outline-variant/50 overflow-y-auto overscroll-contain">
+                  {allReports.map((report) => (
+                    <li key={report.id} className="space-y-3 p-4 sm:px-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-on-surface">{report.guardName} <span className="font-mono text-xs font-medium text-on-surface-variant">{report.homeGuardCode}</span></p>
+                          <p className="mt-0.5 text-xs text-on-surface-variant">{report.divisionName} · {report.category.replaceAll('_', ' ')} · {formatActivityTime(report.createdAt)}</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
+                          {(report.eventName || report.eventDate) && <p className="mt-1 text-xs text-on-surface-variant">{report.eventName ?? 'Event'}{report.eventDate ? ` · ${report.eventDate}` : ''}</p>}
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${report.acknowledgedAt ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-secondary-container text-on-secondary-container'}`}>
+                          {report.acknowledgedAt ? 'Acknowledged' : report.status.replaceAll('_', ' ')}
+                        </span>
+                      </div>
+                      {report.acknowledgedAt ? (
+                        <div className="rounded-lg bg-surface-container-low p-3 text-sm">
+                          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
+                          <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.actionTaken}</p>
+                        </div>
+                      ) : role === 'admin' ? (
+                        <button
+                          type="button"
+                          onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
+                          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
+                        >
+                          <Icon icon="task_alt" size={18} />
+                          Acknowledge
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="p-8 text-center text-sm text-on-surface-variant">No reports filed.</p>
+              )}
+            </section>
+          </div>
+        )}
+
+        <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
+          <div className="border-b border-outline-variant/60 px-4 py-4 sm:px-5">
+            <h2 className="text-base font-bold text-on-surface sm:text-lg">Division-wise complaints</h2>
+            <p className="text-xs text-on-surface-variant">Reports filed this month compared with the previous month.</p>
+          </div>
+          {divisionStats?.divisionComplaintComparison.length ? (
+            <ul className="grid grid-cols-2 divide-x divide-y divide-outline-variant/50 sm:grid-cols-3 lg:grid-cols-4">
+              {divisionStats.divisionComplaintComparison.map((division) => {
+                const change = getComplaintChange(division.currentMonth, division.previousMonth);
                 return (
-                  <li key={activity.id}>
-                    {activity.href ? (
-                      <Link href={activity.href} className="group flex min-h-16 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-5">
-                        {content}
-                      </Link>
-                    ) : (
-                      <div className="flex min-h-16 items-center gap-3 px-4 py-3.5 sm:px-5">{content}</div>
-                    )}
-                  </li>
+                <li key={division.divisionId} className="min-w-0 px-4 py-4 sm:px-5">
+                  <p className="truncate text-sm font-semibold text-on-surface">{division.divisionName}</p>
+                  <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">complaints this month</p>
+                  <p
+                    className={`mt-2 inline-flex items-center gap-1 text-xs font-bold ${change.tone}`}
+                    aria-label={`${change.label} compared with ${division.previousMonth} complaints last month`}
+                    title={`${division.currentMonth} this month; ${division.previousMonth} last month`}
+                  >
+                    <Icon icon={change.icon} size={15} />
+                    {change.label}
+                  </p>
+                </li>
                 );
               })}
             </ul>
           ) : (
-            <div className="flex flex-col items-center px-5 py-10 text-center">
-              <Icon icon="history" size={28} className="text-outline" />
-              <p className="mt-2 text-sm font-semibold text-on-surface">No recent activity</p>
-              <p className="mt-1 text-xs text-on-surface-variant">Attendance and personnel reports for this division will appear here.</p>
-            </div>
+            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Complaint counts are unavailable.</p>
           )}
         </section>
       </div>
+
+      <ReportAcknowledgementDialog
+        open={Boolean(reportToAcknowledge)}
+        guardName={reportToAcknowledge?.guardName ?? ''}
+        submitting={acknowledging}
+        error={acknowledgementError}
+        onCancel={() => setReportToAcknowledge(null)}
+        onSubmit={submitAcknowledgement}
+      />
     </DashboardLayout>
   );
 }

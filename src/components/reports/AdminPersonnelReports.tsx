@@ -9,9 +9,11 @@ import { Icon } from '@/components/ui/Icon';
 import { createClient } from '@/lib/supabase/client';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import { useDivision } from '@/lib/attendance/divisionContext';
+import { useAuth } from '@/lib/auth/authContext';
 import { compressImage, filePersonnelReport } from '@/lib/services/simpleAttendanceService';
 import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
+import { ReportAcknowledgementDialog } from '@/components/reports/ReportAcknowledgementDialog';
 
 type PersonnelReport = {
   id: string;
@@ -28,6 +30,8 @@ type PersonnelReport = {
   status: string;
   created_at: string;
   evidence_photo: string | null;
+  action_taken: string | null;
+  acknowledged_at: string | null;
 };
 
 type GuardOption = { id: string; full_name: string; home_guard_code: string };
@@ -40,6 +44,7 @@ const categoryOptions = [
 
 export function AdminPersonnelReports() {
   const { divisionId, resolved } = useDivision();
+  const { role } = useAuth();
   const [reports, setReports] = useState<PersonnelReport[]>([]);
   const [guards, setGuards] = useState<GuardOption[]>([]);
   const [selectedGuardId, setSelectedGuardId] = useState('');
@@ -53,6 +58,9 @@ export function AdminPersonnelReports() {
   const [saving, setSaving] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [reportToDelete, setReportToDelete] = useState<PersonnelReport | null>(null);
+  const [reportToAcknowledge, setReportToAcknowledge] = useState<PersonnelReport | null>(null);
+  const [acknowledgingReport, setAcknowledgingReport] = useState(false);
+  const [acknowledgementError, setAcknowledgementError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [error, setError] = useState('');
@@ -77,7 +85,7 @@ export function AdminPersonnelReports() {
     const [reportResult, rosterResult] = await Promise.all([
       supabase
         .from('personnel_reports')
-        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo')
+        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo,action_taken,acknowledged_at')
         .eq('division_id', divisionId)
         .order('created_at', { ascending: false }),
       supabase
@@ -189,6 +197,30 @@ export function AdminPersonnelReports() {
     }
   }
 
+  async function submitAcknowledgement(actionTaken: string) {
+    if (!reportToAcknowledge || role !== 'admin') return;
+    setAcknowledgingReport(true);
+    setAcknowledgementError('');
+    try {
+      const { data, error: updateError } = await createClient()
+        .from('personnel_reports')
+        .update({ action_taken: actionTaken })
+        .eq('id', reportToAcknowledge.id)
+        .select('id,action_taken,acknowledged_at,status')
+        .single();
+      if (updateError) throw new Error(updateError.message);
+      setReports((current) => current.map((report) => report.id === data.id
+        ? { ...report, action_taken: data.action_taken, acknowledged_at: data.acknowledged_at, status: data.status }
+        : report));
+      setReportToAcknowledge(null);
+      await load();
+    } catch (cause) {
+      setAcknowledgementError(cause instanceof Error ? cause.message : 'Could not acknowledge this report.');
+    } finally {
+      setAcknowledgingReport(false);
+    }
+  }
+
   return (
     <>
       <Card className="mt-5 overflow-hidden">
@@ -225,7 +257,7 @@ export function AdminPersonnelReports() {
                     <p className="text-xs text-on-surface-variant">{report.division_name} · {new Date(report.created_at).toLocaleString('en-IN')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Chip tone={report.status === 'resolved' ? 'present' : 'live'}>{report.status === 'under_review' ? 'Under review' : report.status}</Chip>
+                    <Chip tone={report.acknowledged_at || report.status === 'resolved' ? 'present' : 'live'}>{report.acknowledged_at ? 'Acknowledged' : report.status === 'under_review' ? 'Under review' : report.status}</Chip>
                     <button
                       type="button"
                       onClick={() => setReportToDelete(report)}
@@ -253,6 +285,21 @@ export function AdminPersonnelReports() {
                 <p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
                 {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Memo photo for report on ${report.guard_name}`} />}
                 <p className="text-xs text-on-surface-variant">Filed by {report.reporter_name}{report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''}</p>
+                {report.acknowledged_at ? (
+                  <div className="rounded-lg bg-surface-container-low p-3 text-sm">
+                    <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Action taken</p>
+                    <p className="mt-1 whitespace-pre-wrap text-on-surface">{report.action_taken}</p>
+                  </div>
+                ) : role === 'admin' ? (
+                  <button
+                    type="button"
+                    onClick={() => { setReportToAcknowledge(report); setAcknowledgementError(''); }}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-on-primary hover:bg-primary/90"
+                  >
+                    <Icon icon="task_alt" size={18} />
+                    Acknowledge
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -409,6 +456,15 @@ export function AdminPersonnelReports() {
         </div>,
         document.body,
       )}
+
+      <ReportAcknowledgementDialog
+        open={Boolean(reportToAcknowledge)}
+        guardName={reportToAcknowledge?.guard_name ?? ''}
+        submitting={acknowledgingReport}
+        error={acknowledgementError}
+        onCancel={() => setReportToAcknowledge(null)}
+        onSubmit={submitAcknowledgement}
+      />
     </>
   );
 }

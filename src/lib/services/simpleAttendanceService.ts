@@ -36,6 +36,7 @@ export interface DailyMark {
   id: string;
   guard_id: string;
   division_id: string;
+  event_id: string | null;
   attendance_date: string;
   status: 'present' | 'absent';
   photo_url?: string | null;
@@ -54,18 +55,9 @@ export interface MusterEvent {
   updated_at: string;
 }
 
-export async function loadAttendancePage(divisionId: string, date: string) {
+export async function loadAttendancePage(divisionId: string, date: string, eventId?: string) {
   const supabase = createClient();
-  const musterEventQuery = divisionId
-    ? supabase
-        .from('muster_events')
-        .select('id, division_id, event_date, event_name, address, evidence_photos, created_by, created_at, updated_at')
-        .eq('division_id', divisionId)
-        .eq('event_date', date)
-        .maybeSingle()
-    : Promise.resolve({ data: null, error: null });
-
-  const [divisions, roster, initialMarks, initialMusterEvent] = await Promise.all([
+  const [divisions, roster, initialMusterEvents] = await Promise.all([
     supabase.from('attendance_divisions').select('id, code, name').order('name'),
     divisionId
       ? supabase
@@ -77,30 +69,19 @@ export async function loadAttendancePage(divisionId: string, date: string) {
       : Promise.resolve({ data: [], error: null }),
     divisionId
       ? supabase
-          .from('daily_attendance')
-          .select('id, guard_id, division_id, attendance_date, status, photo_url, marked_at')
+          .from('muster_events')
+          .select('id, division_id, event_date, event_name, address, evidence_photos, created_by, created_at, updated_at')
           .eq('division_id', divisionId)
-          .eq('attendance_date', date)
+          .eq('event_date', date)
+          .order('created_at', { ascending: true })
       : Promise.resolve({ data: [], error: null }),
-    musterEventQuery,
   ]);
 
-  let marks = initialMarks;
-  let musterEvent = initialMusterEvent;
-
-  if (marks.error && marks.error.message.includes('photo_url')) {
-    const fallbackMarks = await supabase
-      .from('daily_attendance')
-      .select('id, guard_id, division_id, attendance_date, status, marked_at')
-      .eq('division_id', divisionId)
-      .eq('attendance_date', date);
-    marks = fallbackMarks as typeof marks;
-  }
-
-  if (musterEvent.error && (musterEvent.error.message.includes('address') || musterEvent.error.message.includes('evidence_photos'))) {
+  let musterEventsResult = initialMusterEvents;
+  if (musterEventsResult.error && (musterEventsResult.error.message.includes('address') || musterEventsResult.error.message.includes('evidence_photos'))) {
     const optionalColumns = ['address', 'evidence_photos'];
     let selectedOptionalColumns = [...optionalColumns];
-    let fallbackMuster;
+    let fallbackMusterEvents;
 
     for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
       const columns = [
@@ -108,30 +89,53 @@ export async function loadAttendancePage(divisionId: string, date: string) {
         ...selectedOptionalColumns,
         'created_by', 'created_at', 'updated_at',
       ].join(', ');
-      fallbackMuster = await supabase
+      fallbackMusterEvents = await supabase
         .from('muster_events')
         .select(columns)
         .eq('division_id', divisionId)
         .eq('event_date', date)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
-      if (!fallbackMuster.error) break;
-      const message = fallbackMuster.error.message.toLowerCase();
+      if (!fallbackMusterEvents.error) break;
+      const message = fallbackMusterEvents.error.message.toLowerCase();
       const unavailableColumns = selectedOptionalColumns.filter((column) => message.includes(column));
       if (unavailableColumns.length === 0) break;
       selectedOptionalColumns = selectedOptionalColumns.filter((column) => !unavailableColumns.includes(column));
     }
 
-    if (fallbackMuster) musterEvent = fallbackMuster as typeof musterEvent;
+    if (fallbackMusterEvents) musterEventsResult = fallbackMusterEvents as typeof musterEventsResult;
   }
 
-  const error = divisions.error || roster.error || marks.error || musterEvent.error;
+  const error = divisions.error || roster.error || musterEventsResult.error;
   if (error) throw new Error(error.message);
+
+  const musterEvents = (musterEventsResult.data ?? []) as MusterEvent[];
+  const musterEvent = eventId
+    ? musterEvents.find((event) => event.id === eventId) ?? null
+    : musterEvents.length === 1 ? musterEvents[0] : null;
+  if (eventId && !musterEvent) throw new Error('This event could not be found for the selected division and date.');
+
+  const loadMarks = (includePhoto: boolean) => {
+    let query = supabase
+      .from('daily_attendance')
+      .select(includePhoto
+        ? 'id, guard_id, division_id, event_id, attendance_date, status, photo_url, marked_at'
+        : 'id, guard_id, division_id, event_id, attendance_date, status, marked_at')
+      .eq('division_id', divisionId)
+      .eq('attendance_date', date);
+    query = musterEvent ? query.eq('event_id', musterEvent.id) : query.is('event_id', null);
+    return query;
+  };
+  let marks = divisionId ? await loadMarks(true) : { data: [], error: null };
+  if (marks.error && marks.error.message.includes('photo_url')) marks = await loadMarks(false) as typeof marks;
+  if (marks.error) throw new Error(marks.error.message);
+
   return {
     divisions: (divisions.data ?? []) as AttendanceDivision[],
     roster: (roster.data ?? []) as RosterGuard[],
     marks: (marks.data ?? []) as DailyMark[],
-    musterEvent: (musterEvent.data ?? null) as MusterEvent | null,
+    musterEvent,
+    musterEvents,
   };
 }
 
@@ -156,6 +160,7 @@ export async function saveMusterEvent(
   date: string,
   eventName: string,
   address?: string,
+  eventId?: string,
 ): Promise<MusterEvent> {
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -165,25 +170,24 @@ export async function saveMusterEvent(
     division_id: divisionId,
     event_date: date,
     event_name: eventName.trim(),
-    created_by: authData.user.id,
     updated_at: new Date().toISOString(),
   };
+  if (!eventId) payload.created_by = authData.user.id;
   if (address !== undefined && address.trim()) {
     payload.address = address.trim();
   }
 
-  const { data, error } = await supabase
-    .from('muster_events')
-    .upsert(payload, { onConflict: 'division_id,event_date' })
-    .select('id, division_id, event_date, event_name, address, created_by, created_at, updated_at')
+  const save = () => eventId
+    ? supabase.from('muster_events').update(payload).eq('id', eventId)
+    : supabase.from('muster_events').insert(payload);
+  const { data, error } = await save()
+    .select('id, division_id, event_date, event_name, address, evidence_photos, created_by, created_at, updated_at')
     .single();
 
   if (error) {
     if (error.message.includes('address')) {
       delete payload.address;
-      const fallback = await supabase
-        .from('muster_events')
-        .upsert(payload, { onConflict: 'division_id,event_date' })
+      const fallback = await save()
         .select('id, division_id, event_date, event_name, created_by, created_at, updated_at')
         .single();
       if (fallback.error) throw new Error(fallback.error.message);
@@ -194,12 +198,23 @@ export async function saveMusterEvent(
   return data as MusterEvent;
 }
 
-export async function deleteMusterEvent(divisionId: string, date: string): Promise<void> {
+export async function deleteMusterEvent(eventId: string): Promise<void> {
+  const { data, error } = await createClient()
+    .from('muster_events')
+    .delete()
+    .eq('id', eventId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(describeQueryError(error) || 'Could not delete this event.');
+  if (!data) throw new Error('This event was not found or you do not have permission to delete it.');
+}
+
+export async function deleteLegacyAttendanceDay(divisionId: string, date: string): Promise<void> {
   const { error } = await createClient().rpc('delete_muster_event_and_attendance', {
     p_division_id: divisionId,
     p_event_date: date,
   });
-  if (error) throw new Error(describeQueryError(error) || 'Could not delete this event.');
+  if (error) throw new Error(describeQueryError(error) || 'Could not delete this legacy attendance day.');
 }
 
 export async function getMusterEventParticipants(eventId: string): Promise<string[]> {
@@ -364,8 +379,9 @@ export async function loadBandobastForDate(date: string): Promise<BandobastEvent
  * that division/date has a named event or attendance activity in the month.
  */
 export interface AttendanceEventSummary {
-  /** Composite key `${divisionId}.${date}` used to route to the detail screen. */
+  /** Composite route key; named events include their database id. */
   id: string;
+  eventId: string | null;
   divisionId: string;
   divisionName: string;
   date: string;
@@ -378,23 +394,22 @@ export interface AttendanceEventSummary {
   isOpen: boolean;
 }
 
-export function attendanceEventId(divisionId: string, date: string) {
-  return `${divisionId}.${date}`;
+export function attendanceEventId(divisionId: string, date: string, eventId?: string | null) {
+  return eventId ? `${divisionId}.${date}.${eventId}` : `${divisionId}.${date}`;
 }
 
-export function parseAttendanceEventId(id: string): { divisionId: string; date: string } | null {
-  const separator = id.lastIndexOf('.');
-  if (separator === -1) return null;
-  const divisionId = id.slice(0, separator);
-  const date = id.slice(separator + 1);
+export function parseAttendanceEventId(id: string): { divisionId: string; date: string; eventId: string | null } | null {
+  const parts = id.split('.');
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  const [divisionId, date, eventId] = parts;
   if (!divisionId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return { divisionId, date };
+  if (eventId && !/^[0-9a-f-]{36}$/i.test(eventId)) return null;
+  return { divisionId, date, eventId: eventId ?? null };
 }
 
 /**
- * Every division-day with at least one mark in the given month (`YYYY-MM`),
- * narrowed to one division when `divisionId` is supplied. Sanctioned strength
- * is the division's active roster, the same number the incharge works against.
+ * Every named event and legacy attendance-only day in the given month,
+ * narrowed to one division when `divisionId` is supplied.
  */
 export async function loadAttendanceEvents(
   month: string,
@@ -405,22 +420,28 @@ export async function loadAttendanceEvents(
   const [y, m] = month.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
   const to = `${month}-${String(lastDay).padStart(2, '0')}`;
+  let marksQuery = supabase
+    .from('daily_attendance')
+    .select('guard_id, division_id, event_id, attendance_date, status')
+    .gte('attendance_date', from)
+    .lte('attendance_date', to)
+    .order('attendance_date', { ascending: false });
+  let musterEventsQuery = supabase
+    .from('muster_events')
+    .select('id, division_id, event_date, event_name')
+    .gte('event_date', from)
+    .lte('event_date', to)
+    .order('event_date', { ascending: false });
+  if (divisionId) {
+    marksQuery = marksQuery.eq('division_id', divisionId);
+    musterEventsQuery = musterEventsQuery.eq('division_id', divisionId);
+  }
 
   const [divisions, roster, marks, musterEvents] = await Promise.all([
     supabase.from('attendance_divisions').select('id, code, name').order('name'),
     supabase.from('home_guard_roster').select('id, division_id').eq('is_active', true),
-    supabase
-      .from('daily_attendance')
-      .select('guard_id, division_id, attendance_date, status')
-      .gte('attendance_date', from)
-      .lte('attendance_date', to)
-      .order('attendance_date', { ascending: false }),
-    supabase
-      .from('muster_events')
-      .select('division_id, event_date, event_name')
-      .gte('event_date', from)
-      .lte('event_date', to)
-      .order('event_date', { ascending: false }),
+    marksQuery,
+    musterEventsQuery,
   ]);
   const error = divisions.error || roster.error || marks.error || musterEvents.error;
   if (error) throw new Error(error.message);
@@ -435,37 +456,56 @@ export async function loadAttendanceEvents(
   }
 
   const today = todayISO();
-  const buckets = new Map<string, { present: number; absent: number; eventName: string | null }>();
-  for (const mark of (marks.data ?? []) as Array<{ division_id: string; attendance_date: string; status: string }>) {
+  const marksByEvent = new Map<string, { present: number; absent: number }>();
+  const legacyMarksByDay = new Map<string, { present: number; absent: number }>();
+  for (const mark of (marks.data ?? []) as Array<{
+    division_id: string;
+    event_id: string | null;
+    attendance_date: string;
+    status: string;
+  }>) {
     if (divisionId && mark.division_id !== divisionId) continue;
-    const key = attendanceEventId(mark.division_id, mark.attendance_date);
-    const bucket = buckets.get(key) ?? { present: 0, absent: 0, eventName: null };
+    const key = mark.event_id ?? attendanceEventId(mark.division_id, mark.attendance_date);
+    const buckets = mark.event_id ? marksByEvent : legacyMarksByDay;
+    const bucket = buckets.get(key) ?? { present: 0, absent: 0 };
     if (mark.status === 'present') bucket.present += 1;
     else bucket.absent += 1;
     buckets.set(key, bucket);
   }
 
-  for (const event of (musterEvents.data ?? []) as Array<{ division_id: string; event_date: string; event_name: string }>) {
-    if (divisionId && event.division_id !== divisionId) continue;
-    const key = attendanceEventId(event.division_id, event.event_date);
-    const bucket = buckets.get(key) ?? { present: 0, absent: 0, eventName: null };
-    bucket.eventName = event.event_name;
-    buckets.set(key, bucket);
-  }
+  const summaries: AttendanceEventSummary[] = (
+    (musterEvents.data ?? []) as Array<{ id: string; division_id: string; event_date: string; event_name: string }>
+  ).filter((event) => !divisionId || event.division_id === divisionId).map((event) => {
+    const counts = marksByEvent.get(event.id) ?? { present: 0, absent: 0 };
+    const markedCount = counts.present + counts.absent;
+    return {
+      id: attendanceEventId(event.division_id, event.event_date, event.id),
+      eventId: event.id,
+      divisionId: event.division_id,
+      divisionName: nameById.get(event.division_id) ?? 'Unknown division',
+      date: event.event_date,
+      eventName: event.event_name,
+      presentCount: counts.present,
+      absentCount: counts.absent,
+      sanctionedCount: sanctionedByDivision.get(event.division_id) ?? markedCount,
+      markedCount,
+      isOpen: event.event_date >= today,
+    };
+  });
 
-  const summaries: AttendanceEventSummary[] = [];
-  for (const [id, bucket] of buckets) {
-    const parsed = parseAttendanceEventId(id);
+  for (const [key, counts] of legacyMarksByDay) {
+    const parsed = parseAttendanceEventId(key);
     if (!parsed) continue;
-    const markedCount = bucket.present + bucket.absent;
+    const markedCount = counts.present + counts.absent;
     summaries.push({
-      id,
+      id: key,
+      eventId: null,
       divisionId: parsed.divisionId,
       divisionName: nameById.get(parsed.divisionId) ?? 'Unknown division',
       date: parsed.date,
-      eventName: bucket.eventName,
-      presentCount: bucket.present,
-      absentCount: bucket.absent,
+      eventName: null,
+      presentCount: counts.present,
+      absentCount: counts.absent,
       sanctionedCount: sanctionedByDivision.get(parsed.divisionId) ?? markedCount,
       markedCount,
       isOpen: parsed.date >= today,
@@ -484,32 +524,37 @@ export async function saveDailyMark(
   guardId: string,
   divisionId: string,
   date: string,
+  eventId: string,
   status: 'present' | 'absent',
 ) {
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw new Error('Please sign in again to save attendance.');
+  if (!eventId) throw new Error('Choose an event before saving attendance.');
   const { error } = await supabase.from('daily_attendance').upsert(
     {
       guard_id: guardId,
       division_id: divisionId,
+      event_id: eventId,
       attendance_date: date,
       status,
       marked_by: authData.user.id,
       marked_at: new Date().toISOString(),
     },
-    { onConflict: 'guard_id,attendance_date' },
+    { onConflict: 'guard_id,event_id' },
   );
   if (error) throw new Error(error.message);
 }
 
-export async function clearDailyMark(guardId: string, divisionId: string, date: string): Promise<void> {
+export async function clearDailyMark(guardId: string, divisionId: string, date: string, eventId: string): Promise<void> {
+  if (!eventId) throw new Error('Choose an event before clearing attendance.');
   const { error } = await createClient()
     .from('daily_attendance')
     .delete()
     .eq('guard_id', guardId)
     .eq('division_id', divisionId)
-    .eq('attendance_date', date);
+    .eq('attendance_date', date)
+    .eq('event_id', eventId);
   if (error) throw new Error(describeQueryError(error) || 'Could not clear attendance for this event.');
 }
 
@@ -565,6 +610,7 @@ export interface GuardDutyHistory {
   months: DutyMonthCount[];
   events: Array<{
     date: string;
+    eventId: string | null;
     eventName: string | null;
     status: 'present' | 'absent';
   }>;
@@ -611,12 +657,12 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
   const [{ data: marks, error: marksError }, { data: musterEvents, error: eventsError }] = await Promise.all([
     supabase
       .from('daily_attendance')
-      .select('attendance_date, status')
+      .select('event_id, attendance_date, status')
       .eq('guard_id', guard.id)
       .gte('attendance_date', `${monthKeys[5]}-01`),
     supabase
       .from('muster_events')
-      .select('event_date, event_name')
+      .select('id, event_date, event_name')
       .eq('division_id', guard.division_id)
       .gte('event_date', `${monthKeys[5]}-01`),
   ]);
@@ -632,8 +678,8 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
     if (mark.status === 'present') bucket.present += 1;
     else bucket.absent += 1;
   }
-  const eventNameByDate = new Map(
-    (musterEvents ?? []).map((event) => [event.event_date, event.event_name]),
+  const eventNameById = new Map(
+    (musterEvents ?? []).map((event) => [event.id, event.event_name]),
   );
   return {
     guardId: guard.id,
@@ -643,13 +689,14 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
     dateOfBirth: guard.date_of_birth,
     joiningDate: guard.joining_date,
     months: monthKeys.map((month) => byMonth.get(month)!),
-    events: ((marks ?? []) as Array<{ attendance_date: string; status: string }>)
+    events: ((marks ?? []) as Array<{ event_id: string | null; attendance_date: string; status: string }>)
       .map((mark) => ({
         date: mark.attendance_date,
-        eventName: eventNameByDate.get(mark.attendance_date) ?? null,
+        eventId: mark.event_id,
+        eventName: mark.event_id ? eventNameById.get(mark.event_id) ?? null : null,
         status: mark.status === 'absent' ? 'absent' as const : 'present' as const,
       }))
-      .sort((a, b) => b.date.localeCompare(a.date)),
+      .sort((a, b) => b.date.localeCompare(a.date) || (a.eventName ?? '').localeCompare(b.eventName ?? '')),
   };
 }
 
@@ -796,17 +843,16 @@ export async function loadGuardPersonnelMemos(guardId: string): Promise<GuardPer
 }
 
 export async function addMusterEventEvidencePhoto(
-  divisionId: string,
-  date: string,
+  eventId: string,
   photoUrl: string,
 ): Promise<string[]> {
   const supabase = createClient();
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('muster_events')
     .select('evidence_photos')
-    .eq('division_id', divisionId)
-    .eq('event_date', date)
-    .maybeSingle();
+    .eq('id', eventId)
+    .single();
+  if (existingError) throw new Error(describeEvidencePhotoError(existingError));
 
   const currentPhotos = ((existing?.evidence_photos as string[] | null) ?? []);
   const updatedPhotos = [...currentPhotos, photoUrl];
@@ -814,25 +860,23 @@ export async function addMusterEventEvidencePhoto(
   const { error } = await supabase
     .from('muster_events')
     .update({ evidence_photos: updatedPhotos, updated_at: new Date().toISOString() })
-    .eq('division_id', divisionId)
-    .eq('event_date', date);
+    .eq('id', eventId);
 
   if (error) throw new Error(describeEvidencePhotoError(error));
   return updatedPhotos;
 }
 
 export async function removeMusterEventEvidencePhoto(
-  divisionId: string,
-  date: string,
+  eventId: string,
   index: number,
 ): Promise<string[]> {
   const supabase = createClient();
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('muster_events')
     .select('evidence_photos')
-    .eq('division_id', divisionId)
-    .eq('event_date', date)
-    .maybeSingle();
+    .eq('id', eventId)
+    .single();
+  if (existingError) throw new Error(describeEvidencePhotoError(existingError));
 
   const currentPhotos = ((existing?.evidence_photos as string[] | null) ?? []);
   const updatedPhotos = currentPhotos.filter((_, i) => i !== index);
@@ -840,8 +884,7 @@ export async function removeMusterEventEvidencePhoto(
   const { error } = await supabase
     .from('muster_events')
     .update({ evidence_photos: updatedPhotos, updated_at: new Date().toISOString() })
-    .eq('division_id', divisionId)
-    .eq('event_date', date);
+    .eq('id', eventId);
 
   if (error) throw new Error(describeEvidencePhotoError(error));
   return updatedPhotos;
@@ -858,6 +901,7 @@ export async function saveGuardPhotoEvidence(
   guardId: string,
   divisionId: string,
   date: string,
+  eventId: string,
   photoUrl: string,
 ) {
   const supabase = createClient();
@@ -868,13 +912,14 @@ export async function saveGuardPhotoEvidence(
     {
       guard_id: guardId,
       division_id: divisionId,
+      event_id: eventId,
       attendance_date: date,
       status: 'present',
       photo_url: photoUrl,
       marked_by: authData.user.id,
       marked_at: new Date().toISOString(),
     },
-    { onConflict: 'guard_id,attendance_date' },
+    { onConflict: 'guard_id,event_id' },
   );
   if (error) throw new Error(error.message);
 }

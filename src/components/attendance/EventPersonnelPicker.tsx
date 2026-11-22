@@ -38,10 +38,12 @@ function initials(name: string) {
 export function EventPersonnelPicker({
   divisionId,
   date,
+  eventId,
   backHref,
 }: {
   divisionId: string;
   date: string;
+  eventId?: string | null;
   backHref: string;
 }) {
   const router = useRouter();
@@ -63,7 +65,7 @@ export function EventPersonnelPicker({
     setLoading(true);
     setError('');
     setDutyCounts(null);
-    loadAttendancePage(divisionId, date)
+    loadAttendancePage(divisionId, date, eventId ?? undefined)
       .then(async (data) => {
         if (!live) return;
         setRoster(data.roster);
@@ -89,7 +91,7 @@ export function EventPersonnelPicker({
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : 'Could not load this event.'))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [divisionId, date]);
+  }, [divisionId, date, eventId]);
 
   const markByGuard = useMemo(() => new Map(marks.map((mark) => [mark.guard_id, mark])), [marks]);
 
@@ -126,7 +128,7 @@ export function EventPersonnelPicker({
       await Promise.all(
         affected
           .filter((guard) => markByGuard.get(guard.id)?.status !== (desired.has(guard.id) ? 'present' : 'absent'))
-          .map((guard) => saveDailyMark(guard.id, divisionId, date, desired.has(guard.id) ? 'present' : 'absent')),
+          .map((guard) => saveDailyMark(guard.id, divisionId, date, musterEvent.id, desired.has(guard.id) ? 'present' : 'absent')),
       );
 
       setParticipantIds([...desired]);
@@ -140,6 +142,7 @@ export function EventPersonnelPicker({
             id: prior?.id ?? `${guard.id}-${date}`,
             guard_id: guard.id,
             division_id: divisionId,
+            event_id: musterEvent.id,
             attendance_date: date,
             status: want,
             photo_url: prior?.photo_url ?? null,

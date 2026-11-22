@@ -14,7 +14,7 @@ export default function AdminEventPersonnelPage() {
   return (
     <DashboardLayout title="Event personnel" subtitle="Select Home Guards for this muster">
       {parsed ? (
-        <EventPersonnelPicker divisionId={parsed.divisionId} date={parsed.date} backHref={`/admin/events/${rawId}`} />
+        <EventPersonnelPicker divisionId={parsed.divisionId} date={parsed.date} eventId={parsed.eventId} backHref={`/admin/events/${rawId}`} />
       ) : (
         <p className="rounded-xl bg-error-container p-4 text-sm text-on-error-container">This muster record link is not valid.</p>
       )}

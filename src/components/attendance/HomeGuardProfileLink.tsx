@@ -191,13 +191,13 @@ function HomeGuardProfileDialog({ profile, onClose }: { profile: GuardProfile; o
                   {eventsThisMonth.map((event) => {
                     const eventName = event.eventName || 'Muster event';
                     const href = role === 'admin'
-                      ? `/admin/events/${history.divisionId}.${event.date}`
+                      ? `/admin/events/${history.divisionId}.${event.date}${event.eventId ? `.${event.eventId}` : ''}`
                       : role === 'incharge'
-                        ? `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(history.divisionId)}&event=${encodeURIComponent(eventName)}`
+                        ? `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(history.divisionId)}${event.eventId ? `&eventId=${encodeURIComponent(event.eventId)}` : `&event=${encodeURIComponent(eventName)}`}`
                         : null;
 
                     return (
-                      <li key={event.date} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <li key={`${event.date}-${event.eventId ?? 'legacy'}`} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                         <div className="min-w-0">
                           {href ? (
                             <Link href={href} onClick={onClose} className="block truncate text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">

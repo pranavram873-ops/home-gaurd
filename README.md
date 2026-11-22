@@ -136,6 +136,8 @@ home-guard-supervision/
 Sign-in is real Supabase Auth (`signInWithPassword`) against `auth.users`; the
 personnel row in `public.profiles` decides the role and the redirect, and the
 session travels in SSR cookies refreshed by `src/middleware.ts` on each request.
+The desktop browser keeps the auth cookies persistent and enforces a 30-day
+remembered-session deadline.
 
 There are **no built-in logins**. Every operational account must exist in
 Supabase Auth with an `active` profile row. Create the first administrator with
@@ -289,6 +291,10 @@ To provision the initial State Administrator without exposing credentials:
    receives a badge number. Apply each file once; only the badge migration is
    written to be safe to repeat (`CREATE OR REPLACE` plus
    `DROP TRIGGER IF EXISTS`).
+   On existing attendance deployments, apply the later migrations in timestamp
+   order too. `20261121000000_multiple_daily_events_and_report_acknowledgements.sql`
+   enables separate events and attendance per division/date and adds the
+   administrator report acknowledgement fields and policy.
 4. Verify from the terminal (read-only, prints no secrets):
    ```bash
    npm run check:supabase

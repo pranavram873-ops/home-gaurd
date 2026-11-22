@@ -194,7 +194,7 @@ export default function AdminEventDetailsPage() {
     setError('');
     setDutyCounts(null);
     setDutyCountError('');
-    loadAttendancePage(parsed.divisionId, parsed.date)
+    loadAttendancePage(parsed.divisionId, parsed.date, parsed.eventId ?? undefined)
       .then(async (data) => {
         if (!live) return;
         setRoster(data.roster);
@@ -231,7 +231,7 @@ export default function AdminEventDetailsPage() {
     try {
       await setMusterEventParticipant(musterEvent.id, guard.id, add);
       if (priorStatus !== want) {
-        await saveDailyMark(guard.id, parsed.divisionId, parsed.date, want);
+        await saveDailyMark(guard.id, parsed.divisionId, parsed.date, musterEvent.id, want);
         const markedAt = new Date().toISOString();
         setMarks((current) => {
           const prior = current.find((mark) => mark.guard_id === guard.id);
@@ -244,6 +244,7 @@ export default function AdminEventDetailsPage() {
               id: `${guard.id}-${parsed.date}`,
               guard_id: guard.id,
               division_id: parsed.divisionId,
+              event_id: musterEvent.id,
               attendance_date: parsed.date,
               status: want,
               marked_at: markedAt,
@@ -263,7 +264,8 @@ export default function AdminEventDetailsPage() {
     if (!parsed) return;
     setSavingId(guard.id);
     try {
-      await saveDailyMark(guard.id, parsed.divisionId, parsed.date, status);
+      if (!musterEvent) throw new Error('This event is no longer available.');
+      await saveDailyMark(guard.id, parsed.divisionId, parsed.date, musterEvent.id, status);
       setMarks((current) => {
         const prior = current.find((m) => m.guard_id === guard.id);
         if (prior) return current.map((m) => (m.guard_id === guard.id ? { ...m, status } : m));
@@ -273,6 +275,7 @@ export default function AdminEventDetailsPage() {
             id: `${guard.id}-${parsed.date}`,
             guard_id: guard.id,
             division_id: parsed.divisionId,
+            event_id: musterEvent.id,
             attendance_date: parsed.date,
             status,
             marked_at: new Date().toISOString(),
@@ -315,7 +318,8 @@ export default function AdminEventDetailsPage() {
     setEventPhotoNotice('');
     try {
       const compressed = await compressImage(file, 1200, 1200, 0.8);
-      const photos = await addMusterEventEvidencePhoto(parsed.divisionId, parsed.date, compressed);
+      if (!musterEvent) throw new Error('This event is no longer available.');
+      const photos = await addMusterEventEvidencePhoto(musterEvent.id, compressed);
       setMusterEvent((current) => current ? { ...current, evidence_photos: photos } : current);
       setEventPhotoNotice('Event photo added.');
     } catch (cause) {

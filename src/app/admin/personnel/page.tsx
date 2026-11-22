@@ -10,7 +10,7 @@ import {
   setAccountStatus,
 } from '@/lib/services/personnelService';
 import { listDistricts } from '@/lib/services/referenceService';
-import { addRosterGuard, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, saveGuardProfileDates, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
+import { addRosterGuard, attendanceEventId, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, saveGuardProfileDates, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { District, Profile } from '@/types';
 import { Icon } from '@/components/ui/Icon';
@@ -1190,12 +1190,12 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
             {history.events.length ? (
               <ul className="divide-y divide-outline-variant overflow-y-auto overscroll-contain p-4">
                 {history.events.map((event) => (
-                  <li key={event.date}>
+                  <li key={`${event.date}-${event.eventId ?? 'legacy'}`}>
                     <button
                       type="button"
                       onClick={() => {
                         setShowHistory(false);
-                        router.push(`/admin/events/${history.divisionId}.${event.date}`);
+                        router.push(`/admin/events/${attendanceEventId(history.divisionId, event.date, event.eventId)}`);
                       }}
                       className="flex w-full items-center justify-between gap-2 rounded-md py-3 text-left text-[13px] hover:bg-surface-container-low"
                     >

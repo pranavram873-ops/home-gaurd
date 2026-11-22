@@ -5,7 +5,7 @@ import type { AttendanceEvent, AuditLog, DutyAssignment, TaskItem } from '@/type
 import { createClient } from '@/lib/supabase/client';
 import { describeQueryError, describeThrownError, type OneResult } from './queryError';
 import { ASSIGNMENT_SELECT, ATTENDANCE_SELECT, AUDIT_SELECT, TASK_SELECT } from './selects';
-import { loadAttendancePage, loadAttendanceEvents, loadDivisionSummaries } from './simpleAttendanceService';
+import { loadAttendanceEvents, loadDivisionSummaries } from './simpleAttendanceService';
 
 export interface AdminDivisionDashboard {
   selectedDivision: { id: string; name: string } | null;
@@ -13,13 +13,26 @@ export interface AdminDivisionDashboard {
   totalGuards: number;
   presentToday: number;
   absentToday: number;
-  recentActivity: Array<{
+  recentReports: Array<{
     id: string;
-    occurredAt: string;
-    title: string;
+    divisionId: string;
+    divisionName: string;
+    guardName: string;
+    homeGuardCode: string;
+    category: string;
     description: string;
-    icon: string;
-    href?: string;
+    eventName: string | null;
+    eventDate: string | null;
+    status: string;
+    createdAt: string;
+    actionTaken: string | null;
+    acknowledgedAt: string | null;
+  }>;
+  divisionComplaintComparison: Array<{
+    divisionId: string;
+    divisionName: string;
+    currentMonth: number;
+    previousMonth: number;
   }>;
 }
 
@@ -32,74 +45,84 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
   try {
     const now = new Date();
     const today = localDateString(now);
-    const month = today.slice(0, 7);
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const currentMonth = today.slice(0, 7);
+    const currentMonthStartKey = currentMonthStart.toISOString();
+    const nextMonthStartKey = nextMonthStart.toISOString();
+    const previousMonthStartKey = previousMonthStart.toISOString();
     const divisions = await loadDivisionSummaries(today);
     const selected = divisions.find((division) => division.id === divisionId) ?? null;
-
-    if (!divisionId || !selected) {
-      return {
-        data: {
-          selectedDivision: null,
-          openEvents: 0,
-          totalGuards: 0,
-          presentToday: 0,
-          absentToday: 0,
-          recentActivity: [],
-        },
-        error: null,
-      };
-    }
-
-    const attendanceDays = await loadAttendanceEvents(month, divisionId);
     const supabase = createClient();
-    const [attendance, reports, rosterCount] = await Promise.all([
-      loadAttendancePage(divisionId, today),
+    let recentReportsQuery = supabase
+      .from('personnel_reports')
+      .select('id, division_id, division_name, guard_name, home_guard_code, category, description, event_name, event_date, status, created_at, action_taken, acknowledged_at');
+    if (divisionId) recentReportsQuery = recentReportsQuery.eq('division_id', divisionId);
+    const [attendanceEvents, reports, monthlyReports, rosterCount] = await Promise.all([
+      divisionId ? loadAttendanceEvents(currentMonth, divisionId) : Promise.resolve([]),
+      recentReportsQuery
+        .or(`acknowledged_at.is.null,created_at.gte.${previousMonthStartKey}`)
+        .order('created_at', { ascending: false })
+        .limit(100),
       supabase
         .from('personnel_reports')
-        .select('id, guard_name, home_guard_code, category, status, created_at')
-        .eq('division_id', divisionId)
-        .order('created_at', { ascending: false })
-        .limit(8),
-      supabase
+        .select('division_id, created_at')
+        .gte('created_at', previousMonthStartKey)
+        .lt('created_at', nextMonthStartKey),
+      divisionId ? supabase
         .from('home_guard_roster')
         .select('id', { count: 'exact', head: true })
-        .eq('division_id', divisionId),
+        .eq('division_id', divisionId) : Promise.resolve({ count: 0, error: null }),
     ]);
     if (reports.error) throw new Error(describeQueryError(reports.error) ?? 'Could not load division reports.');
+    if (monthlyReports.error) throw new Error(describeQueryError(monthlyReports.error) ?? 'Could not load monthly division reports.');
     if (rosterCount.error) throw new Error(describeQueryError(rosterCount.error) ?? 'Could not load the division roster.');
 
-    const guardById = new Map(attendance.roster.map((guard) => [guard.id, guard]));
-    const attendanceActivity = attendance.marks.map((mark) => {
-      const guard = guardById.get(mark.guard_id);
-      const present = mark.status === 'present';
-      return {
-        id: `attendance-${mark.id}`,
-        occurredAt: mark.marked_at,
-        title: present ? 'Attendance marked present' : 'Attendance marked absent',
-        description: guard ? `${guard.full_name} · ${guard.home_guard_code}` : 'Home Guard attendance',
-        icon: present ? 'check_circle' : 'cancel',
-        href: `/admin/events/${divisionId}.${mark.attendance_date}`,
-      };
-    });
-    const reportActivity = (reports.data ?? []).map((report) => ({
-      id: `report-${report.id}`,
-      occurredAt: report.created_at,
-      title: 'Personnel report',
-      description: `${report.guard_name} · ${String(report.category).replaceAll('_', ' ')} · ${String(report.status).replaceAll('_', ' ')}`,
-      icon: 'description',
-      href: '/admin/reports',
+    const countsByDivision = new Map<string, { currentMonth: number; previousMonth: number }>();
+    for (const report of monthlyReports.data ?? []) {
+      const counts = countsByDivision.get(report.division_id) ?? { currentMonth: 0, previousMonth: 0 };
+      if (report.created_at >= currentMonthStartKey && report.created_at < nextMonthStartKey) counts.currentMonth += 1;
+      else if (report.created_at >= previousMonthStartKey && report.created_at < currentMonthStartKey) counts.previousMonth += 1;
+      countsByDivision.set(report.division_id, counts);
+    }
+
+    const reportRows = (reports.data ?? []).filter((report) => !divisionId || report.division_id === divisionId);
+    const recentReports = reportRows.slice(0, 8).map((report) => ({
+      id: report.id,
+      divisionId: report.division_id,
+      divisionName: report.division_name,
+      guardName: report.guard_name,
+      homeGuardCode: report.home_guard_code,
+      category: report.category,
+      description: report.description,
+      eventName: report.event_name,
+      eventDate: report.event_date,
+      status: report.status,
+      createdAt: report.created_at,
+      actionTaken: report.action_taken,
+      acknowledgedAt: report.acknowledged_at,
     }));
+    const divisionComplaintComparison = divisions.map((division) => {
+      const counts = countsByDivision.get(division.id);
+      return {
+        divisionId: division.id,
+        divisionName: division.name,
+        currentMonth: counts?.currentMonth ?? 0,
+        previousMonth: counts?.previousMonth ?? 0,
+      };
+    }).sort((a, b) => a.divisionName.localeCompare(b.divisionName));
+    const todayEvents = attendanceEvents.filter((event) => event.date === today);
 
     return {
       data: {
-        selectedDivision: { id: selected.id, name: selected.name },
-        openEvents: attendanceDays.filter((event) => event.divisionId === divisionId && event.isOpen).length,
+        selectedDivision: selected ? { id: selected.id, name: selected.name } : null,
+        openEvents: attendanceEvents.filter((event) => event.isOpen).length,
         totalGuards: rosterCount.count ?? 0,
-        presentToday: attendance.marks.filter((mark) => mark.status === 'present').length,
-        absentToday: attendance.marks.filter((mark) => mark.status === 'absent').length,
-        recentActivity: [...attendanceActivity, ...reportActivity]
-          .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
-          .slice(0, 5),
+        presentToday: todayEvents.reduce((total, event) => total + event.presentCount, 0),
+        absentToday: todayEvents.reduce((total, event) => total + event.absentCount, 0),
+        recentReports,
+        divisionComplaintComparison,
       },
       error: null,
     };

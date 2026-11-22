@@ -59,7 +59,9 @@ function EventCard({ event, canDelete, forIncharge, onDelete }: { event: Attenda
       </div>
 
       <Link
-        href={forIncharge ? `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(event.divisionId)}&event=${encodeURIComponent(event.eventName ?? '')}` : `/admin/events/${event.id}`}
+        href={forIncharge
+          ? `/incharge/attendance?date=${encodeURIComponent(event.date)}&division=${encodeURIComponent(event.divisionId)}${event.eventId ? `&eventId=${encodeURIComponent(event.eventId)}` : `&event=${encodeURIComponent(event.eventName ?? '')}`}`
+          : `/admin/events/${event.id}`}
         className="group flex min-h-11 items-center justify-between rounded-lg bg-primary px-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
       >
         <span className="flex items-center gap-2">
@@ -68,7 +70,7 @@ function EventCard({ event, canDelete, forIncharge, onDelete }: { event: Attenda
         </span>
         <Icon icon="arrow_forward" size={20} className="transition-transform duration-200 group-hover:translate-x-0.5" />
       </Link>
-      {canDelete && (
+      {canDelete && event.eventId && (
         <button type="button" onClick={() => onDelete(event)} className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-error-container px-3 text-sm font-bold text-on-error-container hover:bg-error-container/80">
           <Icon icon="delete" size={18} /> Delete event
         </button>
@@ -139,7 +141,8 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
     setDeletingId(event.id);
     setError('');
     try {
-      await deleteMusterEvent(event.divisionId, event.date);
+      if (event.eventId) await deleteMusterEvent(event.eventId);
+      else throw new Error('Legacy attendance records cannot be deleted from this event list.');
       setEvents((current) => current.filter((item) => item.id !== event.id));
       setEventToDelete(null);
       await load();
@@ -247,7 +250,7 @@ export function AttendanceEvents({ forIncharge = false }: { forIncharge?: boolea
       </section>
       {eventToDelete && <EventDeleteDialog
         title={`Delete “${eventToDelete.eventName || `${formatDay(eventToDelete.date)} Muster`}”?`}
-        description={`This will permanently remove the event in ${eventToDelete.divisionName}, its selected personnel, and all attendance recorded for that division and date.`}
+        description={`This will permanently remove ${eventToDelete.eventName || 'this event'} in ${eventToDelete.divisionName}, its selected personnel, and its attendance records.`}
         deleting={deletingId === eventToDelete.id}
         error={error || undefined}
         onCancel={() => setEventToDelete(null)}
