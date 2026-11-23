@@ -700,11 +700,24 @@ export async function loadGuardDutyHistory(phone: string | null | undefined): Pr
   };
 }
 
-export async function saveGuardProfileDates(
-  guardId: string,
-  dateOfBirth: string,
-  joiningDate: string,
-) {
+export async function saveGuardProfileDetails(input: {
+  guardId: string;
+  profileId: string | null;
+  fullName: string;
+  phone: string;
+  homeGuardCode: string;
+  divisionId: string;
+  districtId: string;
+  dateOfBirth: string;
+  joiningDate: string;
+}) {
+  const fullName = input.fullName.trim();
+  const phone = input.phone.trim();
+  const homeGuardCode = input.homeGuardCode.trim().toUpperCase();
+  if (fullName.length < 3) throw new Error('Enter the Home Guard’s full name.');
+  if (!/^\d{10}$/.test(phone)) throw new Error('Enter a valid 10-digit mobile number.');
+  if (!/^(HG|WHG)[A-Z0-9-]+$/.test(homeGuardCode)) throw new Error('Enter a valid Home Guard code.');
+
   const isValidDate = (value: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const [year, month, day] = value.split('-').map(Number);
@@ -713,22 +726,49 @@ export async function saveGuardProfileDates(
   };
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  if (!isValidDate(dateOfBirth) || !isValidDate(joiningDate)) {
+  if (!isValidDate(input.dateOfBirth) || !isValidDate(input.joiningDate)) {
     throw new Error('Enter valid birth and joining dates.');
   }
-  if (dateOfBirth > joiningDate || joiningDate > todayKey) {
+  if (input.dateOfBirth > input.joiningDate || input.joiningDate > todayKey) {
     throw new Error('Joining date must be on or after the date of birth and cannot be in the future.');
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data: roster, error: rosterError } = await supabase
     .from('home_guard_roster')
-    .update({ date_of_birth: dateOfBirth, joining_date: joiningDate })
-    .eq('id', guardId)
+    .update({
+      full_name: fullName,
+      phone,
+      home_guard_code: homeGuardCode,
+      division_id: input.divisionId,
+      date_of_birth: input.dateOfBirth,
+      joining_date: input.joiningDate,
+    })
+    .eq('id', input.guardId)
     .select('id')
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error('The Home Guard dates could not be saved.');
+  if (rosterError) throw new Error(rosterError.message);
+  if (!roster) throw new Error('The Home Guard roster details could not be saved.');
+
+  if (input.profileId) {
+    const { data: updatedProfile, error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: fullName,
+        phone,
+        personnel_id: homeGuardCode,
+        district_id: input.districtId,
+      })
+      .eq('id', input.profileId)
+      .select('id')
+      .maybeSingle();
+    if (profileError) {
+      throw new Error(`Roster details were saved, but the account profile could not be updated: ${profileError.message}`);
+    }
+    if (!updatedProfile) {
+      throw new Error('Roster details were saved, but the account profile could not be found.');
+    }
+  }
 }
 
 export async function loadAttendanceReport(from: string, to: string) {
@@ -834,12 +874,20 @@ export interface GuardPersonnelMemo {
   event_name: string | null;
   event_date: string | null;
   created_at: string;
+  category: string;
+  description: string;
+  status: string;
+  reporter_name: string | null;
+  reporter_personnel_id: string | null;
+  evidence_photo: string | null;
+  action_taken: string | null;
+  acknowledged_at: string | null;
 }
 
 export async function loadGuardPersonnelMemos(guardId: string): Promise<GuardPersonnelMemo[]> {
   const { data, error } = await createClient()
     .from('personnel_reports')
-    .select('id,division_id,event_name,event_date,created_at')
+    .select('id,division_id,event_name,event_date,created_at,category,description,status,reporter_name,reporter_personnel_id,evidence_photo,action_taken,acknowledged_at')
     .eq('guard_id', guardId)
     .order('created_at', { ascending: false });
 

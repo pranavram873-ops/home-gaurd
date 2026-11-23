@@ -122,35 +122,37 @@ function HomeGuardProfileDialog({ profile, onClose }: { profile: GuardProfile; o
 
   return (
     <div className="overlay-enter fixed inset-0 z-[70] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="home-guard-profile-title" className="overlay-panel flex max-h-[92dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+      <section role="dialog" aria-modal="true" aria-labelledby="home-guard-profile-title" className="overlay-panel flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
         <header className="flex shrink-0 items-center justify-between bg-primary p-4 text-on-primary">
           <div className="flex items-center gap-2"><Icon icon="badge" size={20} /><h2 id="home-guard-profile-title" className="font-bold">Home Guard Profile</h2></div>
           <button type="button" onClick={onClose} aria-label="Close profile" className="rounded p-1 hover:bg-white/10"><Icon icon="close" size={20} /></button>
         </header>
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">{profile.full_name.charAt(0)}</div>
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-bold text-on-surface">{profile.full_name}</h3>
-              <p className="font-mono text-xs font-bold text-primary">{profile.home_guard_code}</p>
+          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">{profile.full_name.charAt(0)}</div>
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-bold text-on-surface">{profile.full_name}</h3>
+                <p className="font-mono text-xs font-bold text-primary">Home Guard code · {profile.home_guard_code}</p>
+              </div>
             </div>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2">
-            <div className="rounded-lg bg-surface-container-low p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-primary">{profile.division_name} Division</p>
-            </div>
-            <div className="rounded-lg bg-surface-container-low p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{profile.phone || 'Not provided'}</p>
-            </div>
-            <div className="rounded-lg bg-surface-container-low p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Date of birth</p>
-              <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.date_of_birth)}</p>
-            </div>
-            <div className="rounded-lg bg-surface-container-low p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Joining date</p>
-              <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.joining_date)}</p>
+            <div className="mt-3 grid w-full grid-cols-2 gap-2">
+              <div className="rounded-lg bg-surface-container-low p-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
+                <p className="mt-0.5 truncate text-sm font-semibold text-primary">{profile.division_name} Division</p>
+              </div>
+              <div className="rounded-lg bg-surface-container-low p-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
+                <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{profile.phone || 'Not provided'}</p>
+              </div>
+              <div className="rounded-lg bg-surface-container-low p-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Date of birth</p>
+                <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.date_of_birth)}</p>
+              </div>
+              <div className="rounded-lg bg-surface-container-low p-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Date of joining</p>
+                <p className="mt-0.5 text-sm font-semibold text-on-surface">{formatProfileDate(profile.joining_date)}</p>
+              </div>
             </div>
           </div>
           <div className="grid w-full grid-cols-2 gap-3">
@@ -168,7 +170,7 @@ function HomeGuardProfileDialog({ profile, onClose }: { profile: GuardProfile; o
               </button>
             </div>
             <div className="rounded-xl bg-surface-container-low p-3">
-              <p className="text-xs font-semibold text-on-surface-variant">Memos on file</p>
+              <p className="text-xs font-semibold text-on-surface-variant">Memo</p>
               <p className="mt-1 text-xl font-extrabold text-primary">{loading ? '…' : memoCount ?? 0}</p>
               <GuardPersonnelMemos guardId={profile.id} onNavigate={onClose} />
             </div>

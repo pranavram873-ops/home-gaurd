@@ -6,6 +6,14 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/authContext';
 import { loadGuardPersonnelMemos, type GuardPersonnelMemo } from '@/lib/services/simpleAttendanceService';
 import { Icon } from '@/components/ui/Icon';
+import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
+
+const reportCategoryLabels: Record<string, string> = {
+  attendance: 'Attendance or duty',
+  conduct: 'Conduct or behaviour',
+  safety: 'Safety concern',
+  other: 'Other',
+};
 
 function formatMemoDate(date: string) {
   const [year, month, day] = date.split('-').map(Number);
@@ -61,10 +69,10 @@ export function GuardPersonnelMemos({
         type="button"
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg px-3 text-sm font-semibold text-primary hover:bg-surface-container-low"
+        className="flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 text-[11px] font-semibold leading-tight text-primary hover:bg-surface-container-low sm:px-3 sm:text-xs"
       >
-        <span>View memos by event</span>
-        <Icon icon="chevron_right" size={20} />
+        <span className="min-w-0 flex-1 break-words text-left">Reports &amp; actions</span>
+        <Icon icon="chevron_right" size={18} className="shrink-0" />
       </button>
       {open && createPortal(
         <div
@@ -74,7 +82,7 @@ export function GuardPersonnelMemos({
         >
           <section role="dialog" aria-modal="true" aria-labelledby="personnel-memos-title" className="overlay-panel flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <header className="flex shrink-0 items-center justify-between bg-primary p-4 text-on-primary">
-              <h2 id="personnel-memos-title" className="font-bold">Personnel memos by event</h2>
+              <h2 id="personnel-memos-title" className="font-bold">Reports and acknowledgements</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close memos" className="rounded p-1 hover:bg-white/10">
                 <Icon icon="close" size={20} />
               </button>
@@ -90,6 +98,7 @@ export function GuardPersonnelMemos({
                 <ul className="divide-y divide-outline-variant">
                   {memos.map((memo) => {
                     const eventName = memo.event_name || 'Event not specified';
+                    const acknowledged = Boolean(memo.acknowledged_at);
                     const href = memo.event_date && role === 'admin'
                       ? `/admin/events/${memo.division_id}.${memo.event_date}`
                       : memo.event_date && role === 'incharge'
@@ -97,23 +106,61 @@ export function GuardPersonnelMemos({
                         : null;
 
                     return (
-                      <li key={memo.id} className="py-3 first:pt-0 last:pb-0">
-                        {href ? (
-                          <Link
-                            href={href}
-                            onClick={() => { setOpen(false); onNavigate?.(); }}
-                            className="block rounded-md text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-                          >
-                            {eventName}
-                          </Link>
-                        ) : (
-                          <p className="text-sm font-semibold text-on-surface">{eventName}</p>
-                        )}
-                        <p className="mt-1 text-xs text-on-surface-variant">
-                          {memo.event_date ? formatMemoDate(memo.event_date) : 'Event date not specified'}
-                          {' · Filed '}
-                          {new Date(memo.created_at).toLocaleDateString('en-IN')}
+                      <li key={memo.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            {href ? (
+                              <Link
+                                href={href}
+                                onClick={() => { setOpen(false); onNavigate?.(); }}
+                                className="block rounded-md text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                              >
+                                {eventName}
+                              </Link>
+                            ) : (
+                              <p className="text-sm font-semibold text-on-surface">{eventName}</p>
+                            )}
+                            <p className="mt-1 text-xs text-on-surface-variant">
+                              {memo.event_date ? formatMemoDate(memo.event_date) : 'Event date not specified'}
+                              {' · Filed '}
+                              {new Date(memo.created_at).toLocaleDateString('en-IN')}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold capitalize ${
+                            acknowledged || memo.status === 'resolved'
+                              ? 'bg-tertiary-container text-on-tertiary-container'
+                              : 'bg-secondary-container text-on-secondary-container'
+                          }`}>
+                            {acknowledged ? 'Acknowledged' : memo.status.replaceAll('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-secondary">
+                          {reportCategoryLabels[memo.category] ?? 'Other'}
                         </p>
+                        <p className="whitespace-pre-wrap text-sm text-on-surface">{memo.description}</p>
+                        {memo.evidence_photo && (
+                          <EvidencePhotoPreview
+                            src={memo.evidence_photo}
+                            alt={`Memo photo for ${eventName}`}
+                          />
+                        )}
+                        {memo.reporter_name && (
+                          <p className="text-xs text-on-surface-variant">
+                            Filed by {memo.reporter_name}
+                            {memo.reporter_personnel_id ? ` · ${memo.reporter_personnel_id}` : ''}
+                          </p>
+                        )}
+                        {acknowledged && (
+                          <div className="rounded-lg bg-surface-container-low p-3 text-sm">
+                            <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+                              Action taken
+                              {memo.acknowledged_at && ` · ${new Date(memo.acknowledged_at).toLocaleDateString('en-IN')}`}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-on-surface">
+                              {memo.action_taken || 'No action details recorded.'}
+                            </p>
+                          </div>
+                        )}
                       </li>
                     );
                   })}

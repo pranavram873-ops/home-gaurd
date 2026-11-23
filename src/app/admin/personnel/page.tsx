@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   listPersonnel,
@@ -10,7 +10,7 @@ import {
   setAccountStatus,
 } from '@/lib/services/personnelService';
 import { listDistricts } from '@/lib/services/referenceService';
-import { addRosterGuard, attendanceEventId, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, saveGuardProfileDates, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
+import { addRosterGuard, attendanceEventId, compressImage, deactivateHomeGuard, filePersonnelReport, listDivisionRoster, loadGuardDutyHistory, saveGuardProfileDetails, type GuardDutyHistory, type RosterGuard } from '@/lib/services/simpleAttendanceService';
 import { useLiveQuery } from '@/lib/hooks/useLiveQuery';
 import { District, Profile } from '@/types';
 import { Icon } from '@/components/ui/Icon';
@@ -19,6 +19,7 @@ import { useDivision } from '@/lib/attendance/divisionContext';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
 import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
 import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
+import { DocumentScanner } from '@/components/reports/DocumentScanner';
 
 const blankRecruit = {
   full_name: '',
@@ -39,6 +40,10 @@ function formatProfileDate(date: string | null | undefined) {
   });
 }
 
+function formatProfilePhone(phone: string | null | undefined) {
+  return (phone ?? '').replace(/\D/g, '').slice(-10);
+}
+
 const PERSONNEL_DISTRICT_NAMES = [
   'Avinashi',
   'Dharapuram',
@@ -51,13 +56,17 @@ function normalizeDistrictName(name: string) {
   return name.trim().replace(/\s+district$/i, '').toLocaleLowerCase('en-IN');
 }
 
-export default function PersonnelDirectoryPage() {
+function PersonnelDirectoryContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const profileId = searchParams.get('profile');
   const { divisionId, setDivisionId, resolved: divisionResolved } = useDivision();
   const [search, setSearch] = useState('');
   const [districtFilter, setDistrictFilter] = useState('scope-error');
   const [divisionFilterReady, setDivisionFilterReady] = useState(false);
   const [districtScopeError, setDistrictScopeError] = useState<string | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [selectedProfileState, setSelectedProfile] = useState<Profile | null>(null);
   const [deletingProfile, setDeletingProfile] = useState(false);
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
@@ -72,7 +81,10 @@ export default function PersonnelDirectoryPage() {
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
   const [compressingPhoto, setCompressingPhoto] = useState(false);
+  const [documentScannerOpen, setDocumentScannerOpen] = useState(false);
+  const galleryPhotoInput = useRef<HTMLInputElement>(null);
   const [memoCounts, setMemoCounts] = useState<Record<string, number>>({});
+  const [memoCountsError, setMemoCountsError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [rosterSyncError, setRosterSyncError] = useState<string | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -139,36 +151,64 @@ export default function PersonnelDirectoryPage() {
       } satisfies Profile));
     return [...profiles, ...attendanceOnly];
   }, [rosterQuery.data, attendanceRosterQuery.data, selectedDistrict]);
+  const selectedProfile = profileId
+    ? selectedProfileState?.id === profileId
+      ? selectedProfileState
+      : personnel.find((profile) => profile.id === profileId) ?? null
+    : null;
+
+  function openProfile(profile: Profile) {
+    setReportSuccess(false);
+    setDeleteProfileError(null);
+    setTempPassword(null);
+    setSelectedProfile(profile);
+    router.push(`${pathname}?profile=${encodeURIComponent(profile.id)}`, { scroll: false });
+  }
+
+  function closeProfile() {
+    setSelectedProfile(null);
+    setConfirmDeleteProfile(false);
+    router.replace(pathname, { scroll: false });
+  }
 
   useEffect(() => {
     let live = true;
     const supabase = createClient();
     const loadMemoCounts = async () => {
-      const [legacyReports, personnelReports] = await Promise.all([
-        supabase.from('guard_reports').select('subject_id'),
-        supabase.from('personnel_reports').select('home_guard_code'),
-      ]);
-      if (!live) return;
-      if (legacyReports.error || personnelReports.error) {
-        console.error('Could not load personnel memo counts:', legacyReports.error || personnelReports.error);
-        return;
-      }
+      try {
+        const [legacyReports, personnelReports] = await Promise.all([
+          supabase.from('guard_reports').select('subject_id'),
+          supabase.from('personnel_reports').select('home_guard_code'),
+        ]);
+        if (!live) return;
+        const queryError = legacyReports.error ?? personnelReports.error;
+        if (queryError) {
+          console.error('Could not load personnel memo counts:', queryError);
+          setMemoCountsError(queryError.message);
+          return;
+        }
 
-      const counts: Record<string, number> = {};
-      for (const row of legacyReports.data ?? []) {
-        counts[row.subject_id] = (counts[row.subject_id] ?? 0) + 1;
-      }
+        const counts: Record<string, number> = {};
+        for (const row of legacyReports.data ?? []) {
+          counts[row.subject_id] = (counts[row.subject_id] ?? 0) + 1;
+        }
 
-      const profileIdByCode = new Map(
-        personnel
-          .filter((profile) => profile.personnel_id)
-          .map((profile) => [profile.personnel_id!.toUpperCase(), profile.id]),
-      );
-      for (const report of personnelReports.data ?? []) {
-        const profileId = profileIdByCode.get(report.home_guard_code.toUpperCase());
-        if (profileId) counts[profileId] = (counts[profileId] ?? 0) + 1;
+        const profileIdByCode = new Map(
+          personnel
+            .filter((profile) => profile.personnel_id)
+            .map((profile) => [profile.personnel_id!.toUpperCase(), profile.id]),
+        );
+        for (const report of personnelReports.data ?? []) {
+          const profileId = profileIdByCode.get(report.home_guard_code.toUpperCase());
+          if (profileId) counts[profileId] = (counts[profileId] ?? 0) + 1;
+        }
+        setMemoCounts(counts);
+        setMemoCountsError(null);
+      } catch (error) {
+        if (!live) return;
+        console.error('Could not load personnel memo counts:', error);
+        setMemoCountsError(error instanceof Error ? error.message : 'The memo counts could not be loaded.');
       }
-      setMemoCounts(counts);
     };
     void loadMemoCounts();
     const channel = supabase.channel('personnel-memo-counts')
@@ -194,23 +234,29 @@ export default function PersonnelDirectoryPage() {
     );
     if (!legacyGuards.length) return;
     const supabase = createClient();
-    void supabase.from('home_guard_roster').upsert(
-      legacyGuards.map((profile) => ({
-        division_id: divisionId,
-        full_name: profile.full_name,
-        phone: profile.phone!,
-        home_guard_code: profile.personnel_id!,
-        is_active: true,
-      })),
-      { onConflict: 'home_guard_code' },
-    ).then(({ error }) => {
-      if (error) {
-        setRosterSyncError(`Existing Home Guards could not be added to the event roster: ${error.message}`);
-      } else {
-        setRosterSyncError(null);
-        void attendanceRosterQuery.refresh();
+    void (async () => {
+      try {
+        const { error } = await supabase.from('home_guard_roster').upsert(
+          legacyGuards.map((profile) => ({
+            division_id: divisionId,
+            full_name: profile.full_name,
+            phone: profile.phone!,
+            home_guard_code: profile.personnel_id!,
+            is_active: true,
+          })),
+          { onConflict: 'home_guard_code' },
+        );
+        if (error) {
+          setRosterSyncError(`Existing Home Guards could not be added to the event roster: ${error.message}`);
+        } else {
+          setRosterSyncError(null);
+          void attendanceRosterQuery.refresh();
+        }
+      } catch (error) {
+        console.error('Could not sync existing Home Guards to the event roster:', error);
+        setRosterSyncError('Existing Home Guards could not be added to the event roster. Please refresh and try again.');
       }
-    });
+    })();
   }, [divisionId, selectedDistrict, rosterQuery.data, rosterQuery.loading, rosterQuery.error]);
 
   useEffect(() => {
@@ -256,7 +302,7 @@ export default function PersonnelDirectoryPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState(false);
 
-  // Password reset state (shown once inside the profile modal)
+  // Password reset state (shown once on the profile page)
   const [resettingPassword, setResettingPassword] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
@@ -325,7 +371,7 @@ export default function PersonnelDirectoryPage() {
         throw new Error('This Home Guard is not in the attendance roster, so there is nothing to delete.');
       }
       setConfirmDeleteProfile(false);
-      setSelectedProfile(null);
+      closeProfile();
       void rosterQuery.refresh();
       void attendanceRosterQuery.refresh();
     } catch (error) {
@@ -335,9 +381,7 @@ export default function PersonnelDirectoryPage() {
     }
   }
 
-  async function attachReportPhoto(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+  async function processReportPhoto(file: File) {
     if (!file) return;
     setCompressingPhoto(true);
     setReportError(null);
@@ -350,6 +394,17 @@ export default function PersonnelDirectoryPage() {
     }
   }
 
+  async function attachReportPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) await processReportPhoto(file);
+  }
+
+  function chooseGalleryFromScanner() {
+    setDocumentScannerOpen(false);
+    galleryPhotoInput.current?.click();
+  }
+
   async function openReportModal() {
     if (!selectedProfile) return;
     setReportCategory('attendance');
@@ -360,15 +415,22 @@ export default function PersonnelDirectoryPage() {
     setReportError(null);
     setReportSuccess(false);
     const code = selectedProfile.personnel_id || '';
-    const supabase = createClient();
-    const { data: rosterGuard } = code
-      ? await supabase.from('home_guard_roster').select('id, division_id').eq('home_guard_code', code).maybeSingle()
-      : { data: null };
-    setReportTarget(rosterGuard
-      ? { guardId: rosterGuard.id, divisionId: rosterGuard.division_id, name: selectedProfile.full_name, code }
-      : null);
-    if (!rosterGuard) {
-      setReportError('This person is not in the attendance roster, so a report cannot be filed against them.');
+    try {
+      const supabase = createClient();
+      const { data: rosterGuard, error } = code
+        ? await supabase.from('home_guard_roster').select('id, division_id').eq('home_guard_code', code).maybeSingle()
+        : { data: null, error: null };
+      if (error) throw new Error(error.message);
+      setReportTarget(rosterGuard
+        ? { guardId: rosterGuard.id, divisionId: rosterGuard.division_id, name: selectedProfile.full_name, code }
+        : null);
+      if (!rosterGuard) {
+        setReportError('This person is not in the attendance roster, so a report cannot be filed against them.');
+      }
+    } catch (error) {
+      console.error('Could not load the Home Guard report target:', error);
+      setReportTarget(null);
+      setReportError(error instanceof Error ? error.message : 'Could not load the Home Guard for this report.');
     }
     setReportOpen(true);
   }
@@ -458,8 +520,10 @@ export default function PersonnelDirectoryPage() {
 
   return (
     <DashboardLayout
-      title="Personnel Directory & Roster"
-      subtitle={selectedDistrict ? `Tamil Nadu Home Guards • ${selectedDistrict.name}` : 'Tamil Nadu Home Guards • Selected district'}
+      title={profileId ? 'Home Guard Profile' : 'Personnel Directory & Roster'}
+      subtitle={profileId && selectedProfile
+        ? selectedProfile.district?.name || 'Home Guard profile'
+        : selectedDistrict ? `Tamil Nadu Home Guards • ${selectedDistrict.name}` : 'Tamil Nadu Home Guards • Selected district'}
     >
       <div className="flex flex-col gap-6 max-w-7xl mx-auto xl:max-w-none">
         {rosterSyncError && (
@@ -467,6 +531,121 @@ export default function PersonnelDirectoryPage() {
             {rosterSyncError}
           </div>
         )}
+        {profileId ? (
+          selectedProfile ? (
+            <section className="mx-auto w-full max-w-5xl">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={closeProfile}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-surface-container"
+                >
+                  <Icon icon="arrow_back" size={18} />
+                  Back to guards
+                </button>
+                <span className="text-xs font-semibold text-on-surface-variant">Home Guard profile</span>
+              </div>
+
+              <GuardProfileSections
+                profile={selectedProfile}
+                districts={districts}
+                memoCount={memoCounts[selectedProfile.id] ?? 0}
+                memoCountsError={memoCountsError}
+                guardId={attendanceRosterQuery.data?.find(
+                  (guard) => guard.home_guard_code.toUpperCase() === selectedProfile.personnel_id?.toUpperCase(),
+                )?.id ?? null}
+                onMemoNavigate={() => setSelectedProfile(null)}
+                onProfileUpdated={(details) => {
+                  setSelectedProfile({
+                    ...selectedProfile,
+                    full_name: details.fullName,
+                    phone: details.phone,
+                    personnel_id: details.homeGuardCode,
+                    district_id: details.districtId,
+                    district: districts.find((district) => district.id === details.districtId) ?? null,
+                  });
+                  void rosterQuery.refresh();
+                  void attendanceRosterQuery.refresh();
+                }}
+              />
+
+              <div className="mt-3 space-y-2">
+                {reportSuccess && (
+                  <p role="status" className="rounded-lg bg-tertiary-fixed px-3 py-2 text-xs font-semibold text-on-tertiary-fixed-variant">
+                    Report filed — command review initiated.
+                  </p>
+                )}
+                {deleteProfileError && (
+                  <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container">
+                    {deleteProfileError}
+                  </p>
+                )}
+                {tempPassword && (
+                  <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">New temporary password</p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <code className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-primary">{tempPassword}</code>
+                      <button
+                        type="button"
+                        onClick={() => void navigator.clipboard?.writeText(tempPassword)}
+                        className="shrink-0 rounded-md bg-primary-fixed px-2.5 py-1 text-xs font-bold text-on-primary-fixed hover:bg-primary-container hover:text-on-primary"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="mt-1 text-[11px] text-on-surface-variant">Shown once — share it securely. The user must change it at next sign-in.</p>
+                  </div>
+                )}
+                <div className={`grid gap-2 ${selectedProfile.id.startsWith('attendance-') ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  <button
+                    type="button"
+                    onClick={() => void openReportModal()}
+                    className="flex min-h-10 items-center justify-center gap-1 rounded-lg border border-on-surface bg-secondary/20 px-1.5 text-[11px] font-bold text-on-secondary-fixed-variant hover:bg-secondary/25 sm:gap-1.5 sm:text-xs"
+                  >
+                    <Icon icon="report_problem" size={15} />
+                    Report
+                  </button>
+                  {!selectedProfile.id.startsWith('attendance-') && (
+                    <button
+                      type="button"
+                      onClick={() => void handleResetPassword()}
+                      disabled={resettingPassword}
+                      className="flex min-h-10 items-center justify-center gap-1 rounded-lg bg-surface-container-high px-1.5 text-[11px] font-bold text-on-surface hover:bg-surface-container-highest disabled:opacity-60 sm:gap-1.5 sm:text-xs"
+                    >
+                      {resettingPassword ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="key" size={15} />}
+                      Reset
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setDeleteProfileError(null); setConfirmDeleteProfile(true); }}
+                    disabled={deletingProfile}
+                    className="flex min-h-10 items-center justify-center gap-1 rounded-lg border border-on-surface bg-error/20 px-1.5 text-[11px] font-bold text-on-error-container hover:bg-error/25 disabled:opacity-60 sm:gap-1.5 sm:text-xs"
+                  >
+                    {deletingProfile ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="delete" size={15} />}
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : rosterQuery.loading || attendanceRosterQuery.loading || !divisionFilterReady ? (
+            <p className="rounded-xl border border-outline-variant bg-surface-container-lowest p-6 text-center text-sm text-on-surface-variant">
+              Loading Home Guard profile…
+            </p>
+          ) : rosterQuery.error ? (
+            <p role="alert" className="rounded-xl border border-outline-variant bg-error-container p-4 text-sm text-on-error-container">
+              {rosterQuery.error}
+            </p>
+          ) : (
+            <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-6 text-center">
+              <p className="text-sm font-semibold text-on-surface">This Home Guard could not be found in the selected division.</p>
+              <button type="button" onClick={closeProfile} className="mt-3 text-sm font-bold text-primary hover:underline">
+                Back to guards
+              </button>
+            </div>
+          )
+        ) : (
+          <>
         {/* Banner with Action Buttons */}
         <div className="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -570,7 +749,7 @@ export default function PersonnelDirectoryPage() {
                 <li key={p.id}>
                   <button
                     type="button"
-                    onClick={() => { setReportSuccess(false); setDeleteProfileError(null); setTempPassword(null); setSelectedProfile(p); }}
+                    onClick={() => openProfile(p)}
                     className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-all duration-200 hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer active:scale-[0.99]"
                     aria-label={`Open profile for ${p.full_name}`}
                   >
@@ -587,131 +766,10 @@ export default function PersonnelDirectoryPage() {
             </ul>
           )}
         </div>
+          </>
+        )}
       </div>
 
-      {/* Profile modal: identity and assigned division. */}
-      {portalReady && selectedProfile && createPortal((
-        <div className="overlay-enter fixed inset-0 z-50 flex items-center justify-center bg-surface-container/40 p-3 backdrop-blur-xs sm:p-4">
-          <div className="overlay-panel flex h-auto max-h-[92dvh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
-            <div className="p-4 bg-primary text-on-primary flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon icon="shield" size={20} className="text-on-primary" />
-                <h3 className="font-bold text-sm">Personnel Profile</h3>
-              </div>
-              <button
-                onClick={() => setSelectedProfile(null)}
-                className="text-on-primary hover:text-outline cursor-pointer"
-              >
-                <Icon icon="close" size={20} />
-              </button>
-            </div>
-
-            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4 text-left sm:p-5">
-              <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-on-primary">
-                  {selectedProfile.full_name.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-on-surface">{selectedProfile.full_name}</p>
-                  <p className="font-mono text-xs font-bold text-primary">{selectedProfile.personnel_id || 'Badge not yet issued'}</p>
-                </div>
-              </div>
-              <div className="grid w-full grid-cols-2 gap-2">
-                <div className="rounded-lg bg-surface-container-low p-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Division</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold text-primary">{selectedProfile.district?.name || 'Not assigned'}</p>
-                </div>
-                <div className="rounded-lg bg-surface-container-low p-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{selectedProfile.phone || 'Not provided'}</p>
-                </div>
-              </div>
-
-              <DutyHistorySection phone={selectedProfile.phone} />
-
-              <div className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-4 py-3 text-left">
-                <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Memos on file</p>
-                <p className="mt-1 flex items-center gap-2 text-lg font-extrabold text-primary">
-                  {memoCounts[selectedProfile.id] ?? 0}
-                  <span className="text-sm font-medium text-on-surface-variant">{(memoCounts[selectedProfile.id] ?? 0) === 1 ? 'memo' : 'memos'}</span>
-                </p>
-                <GuardPersonnelMemos
-                  guardId={attendanceRosterQuery.data?.find(
-                    (guard) => guard.home_guard_code.toUpperCase() === selectedProfile.personnel_id?.toUpperCase(),
-                  )?.id ?? null}
-                  onNavigate={() => setSelectedProfile(null)}
-                />
-              </div>
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 border-t border-outline-variant/60 bg-surface-container-lowest p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              {reportSuccess && (
-                <p role="status" className="flex items-center gap-2 rounded-lg bg-tertiary-fixed px-3 py-2 text-xs font-semibold text-on-tertiary-fixed-variant">
-                  <Icon icon="check_circle" size={16} fill className="shrink-0" />
-                  Report filed — command review initiated.
-                </p>
-              )}
-              {deleteProfileError && (
-                <p role="alert" className="w-full rounded-lg bg-error-container px-3 py-2 text-left text-xs font-semibold text-on-error-container">
-                  {deleteProfileError}
-                </p>
-              )}
-              {tempPassword && (
-                <div className="w-full rounded-lg border border-outline-variant bg-surface-container-low p-3 text-left">
-                  <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">New temporary password</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <code className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-primary">{tempPassword}</code>
-                    <button
-                      type="button"
-                      onClick={() => void navigator.clipboard?.writeText(tempPassword)}
-                      className="shrink-0 rounded-md bg-primary-fixed px-2.5 py-1 text-xs font-bold text-on-primary-fixed hover:bg-primary-container hover:text-on-primary"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[11px] text-on-surface-variant">Shown once — share it securely. The user must change it at next sign-in.</p>
-                </div>
-              )}
-              <button
-                onClick={() => setSelectedProfile(null)}
-                className="w-full px-4 py-2.5 rounded-lg bg-surface-container text-on-surface-variant font-semibold hover:bg-surface-container-high cursor-pointer"
-              >
-                Close
-              </button>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void openReportModal()}
-                  className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-secondary-fixed text-on-secondary-fixed-variant font-bold text-xs hover:bg-secondary-fixed/70 cursor-pointer"
-                >
-                  <Icon icon="report_problem" size={15} />
-                  Report
-                </button>
-                {!selectedProfile.id.startsWith('attendance-') && (
-                  <button
-                    type="button"
-                    onClick={() => void handleResetPassword()}
-                    disabled={resettingPassword}
-                    className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-xs hover:bg-surface-container-highest cursor-pointer disabled:opacity-60"
-                  >
-                    {resettingPassword ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="key" size={15} />}
-                    Reset
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => { setDeleteProfileError(null); setConfirmDeleteProfile(true); }}
-                  disabled={deletingProfile}
-                  className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg bg-error-container text-on-error-container font-bold text-xs hover:bg-error-container/80 cursor-pointer disabled:opacity-60"
-                >
-                  {deletingProfile ? <Icon icon="sync" size={15} className="animate-spin" /> : <Icon icon="delete" size={15} />}
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
       {selectedProfile && confirmDeleteProfile && (
         <EventDeleteDialog
           title={`Delete ${selectedProfile.full_name}?`}
@@ -823,16 +881,33 @@ export default function PersonnelDirectoryPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                      {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
+                    <button
+                      type="button"
+                      onClick={() => setDocumentScannerOpen(true)}
+                      disabled={compressingPhoto}
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="document_scanner" size={18} />}
                       {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
-                    </label>
-                    <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryPhotoInput.current?.click()}
+                      disabled={compressingPhoto}
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       <Icon icon="add_photo_alternate" size={18} />
                       Choose from gallery
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => void attachReportPhoto(e)} disabled={compressingPhoto} />
-                    </label>
+                    </button>
+                    <input
+                      ref={galleryPhotoInput}
+                      type="file"
+                      accept="image/*"
+                      aria-label="Choose a memo photo from gallery"
+                      className="hidden"
+                      onChange={(event) => void attachReportPhoto(event)}
+                      disabled={compressingPhoto}
+                    />
                   </div>
                 )}
               </div>
@@ -864,6 +939,17 @@ export default function PersonnelDirectoryPage() {
           </div>
         </div>
       ), document.body)}
+
+      {portalReady && documentScannerOpen && (
+        <DocumentScanner
+          onClose={() => setDocumentScannerOpen(false)}
+          onUseGallery={chooseGalleryFromScanner}
+          onConfirm={(file) => {
+            setDocumentScannerOpen(false);
+            void processReportPhoto(file);
+          }}
+        />
+      )}
 
       {/* Add Personnel Modal */}
       {showAddModal && (
@@ -1047,35 +1133,59 @@ export default function PersonnelDirectoryPage() {
   );
 }
 
+export default function PersonnelDirectoryPage() {
+  return (
+    <Suspense fallback={<p className="p-8 text-center text-sm text-on-surface-variant">Loading personnel…</p>}>
+      <PersonnelDirectoryContent />
+    </Suspense>
+  );
+}
+
 /**
- * Muster-register block inside the profile: current duty count and clickable event dates.
- * The register is looked up lazily when a profile opens, keyed on the mobile
- * number, because `profiles` and the roster have no shared id.
+ * Profile summary, dates, duty count, and memo cards for a Home Guard.
  */
-function DutyHistorySection({ phone }: { phone?: string | null }) {
+function GuardProfileSections({
+  profile,
+  districts,
+  memoCount,
+  memoCountsError,
+  guardId,
+  onMemoNavigate,
+  onProfileUpdated,
+}: {
+  profile: Profile;
+  districts: District[];
+  memoCount: number;
+  memoCountsError: string | null;
+  guardId: string | null;
+  onMemoNavigate: () => void;
+  onProfileUpdated: (details: {
+    fullName: string;
+    phone: string;
+    homeGuardCode: string;
+    districtId: string;
+  }) => void;
+}) {
   const router = useRouter();
+  const phone = profile.phone;
   const [history, setHistory] = useState<GuardDutyHistory | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [showHistory, setShowHistory] = useState(false);
-  const [editingDates, setEditingDates] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileFullName, setProfileFullName] = useState(profile.full_name);
+  const [profilePhone, setProfilePhone] = useState(formatProfilePhone(profile.phone));
+  const [profileCode, setProfileCode] = useState(profile.personnel_id ?? '');
+  const [profileDistrictId, setProfileDistrictId] = useState(profile.district_id ?? '');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [joiningDate, setJoiningDate] = useState('');
-  const [savingDates, setSavingDates] = useState(false);
-  const [datesError, setDatesError] = useState('');
-
-  async function loadHistory() {
-    const result = await loadGuardDutyHistory(phone);
-    setHistory(result);
-    setDateOfBirth(result?.dateOfBirth ?? '');
-    setJoiningDate(result?.joiningDate ?? '');
-    setState('ready');
-  }
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileEditError, setProfileEditError] = useState('');
 
   useEffect(() => {
     let live = true;
     setState('loading');
     setShowHistory(false);
-    setEditingDates(false);
+    setEditingProfile(false);
     loadGuardDutyHistory(phone)
       .then((result) => {
         if (!live) return;
@@ -1090,86 +1200,195 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
     return () => {
       live = false;
     };
-  }, [phone]);
+  }, [phone, profile.district_id]);
 
-  async function submitDates(event: React.FormEvent<HTMLFormElement>) {
+  function openProfileEditor() {
+    setProfileFullName(profile.full_name);
+    setProfilePhone(formatProfilePhone(profile.phone));
+    setProfileCode(profile.personnel_id ?? '');
+    setProfileDistrictId(profile.district_id ?? districts.find(
+      (district) => district.name === profile.district?.name,
+    )?.id ?? '');
+    setDateOfBirth(history?.dateOfBirth ?? '');
+    setJoiningDate(history?.joiningDate ?? '');
+    setProfileEditError('');
+    setEditingProfile(true);
+  }
+
+  async function submitProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!history) return;
-    setSavingDates(true);
-    setDatesError('');
+    if (!history) {
+      setProfileEditError('This Home Guard is not linked to an attendance roster.');
+      return;
+    }
+    const district = districts.find((item) => item.id === profileDistrictId);
+    if (!district) {
+      setProfileEditError('Select a valid division.');
+      return;
+    }
+
+    setSavingProfile(true);
+    setProfileEditError('');
     try {
-      await saveGuardProfileDates(history.guardId, dateOfBirth, joiningDate);
-      await loadHistory();
-      setEditingDates(false);
+      const { data: division, error: divisionError } = await createClient()
+        .from('attendance_divisions')
+        .select('id')
+        .eq('code', district.code)
+        .maybeSingle();
+      if (divisionError || !division) {
+        throw new Error(divisionError?.message ?? 'The selected division has no matching attendance roster.');
+      }
+
+      const homeGuardCode = profileCode.trim().toUpperCase();
+      await saveGuardProfileDetails({
+        guardId: history.guardId,
+        profileId: profile.id.startsWith('attendance-') ? null : profile.id,
+        fullName: profileFullName,
+        phone: profilePhone,
+        homeGuardCode,
+        divisionId: division.id,
+        districtId: district.id,
+        dateOfBirth,
+        joiningDate,
+      });
+      onProfileUpdated({
+        fullName: profileFullName.trim(),
+        phone: profilePhone.trim(),
+        homeGuardCode,
+        districtId: district.id,
+      });
+      setHistory((current) => current ? {
+        ...current,
+        homeGuardCode,
+        dateOfBirth,
+        joiningDate,
+      } : current);
+      setEditingProfile(false);
     } catch (reason) {
-      setDatesError(reason instanceof Error ? reason.message : 'Could not save Home Guard dates.');
+      setProfileEditError(reason instanceof Error ? reason.message : 'Could not save the Home Guard profile.');
     } finally {
-      setSavingDates(false);
+      setSavingProfile(false);
     }
   }
 
-  function closeDateEditor() {
-    if (savingDates) return;
-    setEditingDates(false);
-    setDatesError('');
-    setDateOfBirth(history?.dateOfBirth ?? '');
-    setJoiningDate(history?.joiningDate ?? '');
+  function closeProfileEditor() {
+    if (savingProfile) return;
+    setEditingProfile(false);
+    setProfileEditError('');
   }
 
   return (
-    <div className="w-full border border-outline-variant rounded-lg divide-y divide-outline-variant text-left">
-      {state === 'loading' && (
-        <p className="px-4 py-3 text-[13px] text-on-surface-variant">Checking the attendance register…</p>
-      )}
-      {state === 'error' && (
-        <p className="px-4 py-3 text-[13px] font-semibold text-on-error-container">
-          The attendance register could not be loaded.
-        </p>
-      )}
-      {state === 'ready' && !history && (
-        <p className="px-4 py-3 text-[13px] text-on-surface-variant">
-          Not found in the attendance register, so duty counts are unavailable for this account.
-        </p>
-      )}
-      {state === 'ready' && history && (
-        <>
-          <div className="px-4 py-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] font-semibold text-on-surface-variant">Date of birth</span>
-              <span className="text-[13px] font-semibold text-on-surface">{formatProfileDate(history.dateOfBirth)}</span>
+    <div className="space-y-3">
+      <section className="min-w-0 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 shadow-xs sm:p-4">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-base font-extrabold text-on-primary">
+              {profile.full_name.charAt(0)}
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] font-semibold text-on-surface-variant">Joining date</span>
-              <span className="text-[13px] font-semibold text-on-surface">{formatProfileDate(history.joiningDate)}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => { setDatesError(''); setEditingDates(true); }}
-              className="self-end text-xs font-semibold text-primary underline underline-offset-2"
-            >
-              Edit dates
-            </button>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] font-semibold text-on-surface-variant">
-                Duties this month{history.divisionName ? ` · ${history.divisionName}` : ''}
-              </span>
-              <span className="text-lg font-extrabold text-primary tabular-nums">
+            <h2 className="min-w-0 break-words text-sm font-bold leading-tight text-on-surface sm:text-base">
+              {profile.full_name}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={openProfileEditor}
+            disabled={!history || state !== 'ready'}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-outline-variant px-2 text-[10px] font-bold text-primary hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-xs"
+          >
+            <Icon icon="edit" size={15} />
+            Edit profile
+          </button>
+        </div>
+
+        <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-outline-variant pt-3 sm:gap-x-5 sm:gap-y-3">
+          <div className="min-w-0">
+            <dt className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant">Home Guard code</dt>
+            <dd className="break-all font-mono text-[11px] font-semibold text-on-surface sm:text-xs">
+              {profile.personnel_id || 'Not issued'}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant">Division</dt>
+            <dd className="break-words text-[11px] font-semibold text-on-surface sm:text-xs">
+              {profile.district?.name || 'Not assigned'}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant">Mobile</dt>
+            <dd className="break-all text-[11px] font-semibold text-on-surface sm:text-xs">
+              {profile.phone || 'Not provided'}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant">Date of birth</dt>
+            <dd className="text-[11px] font-semibold text-on-surface sm:text-xs">
+              {state === 'loading' ? 'Loading…' : state === 'error' ? 'Unavailable' : formatProfileDate(history?.dateOfBirth)}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant">Date of joining</dt>
+            <dd className="text-[11px] font-semibold text-on-surface sm:text-xs">
+              {state === 'loading' ? 'Loading…' : state === 'error' ? 'Unavailable' : formatProfileDate(history?.joiningDate)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <section className="min-w-0 rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-xs sm:p-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant sm:text-xs">Duties this month</h3>
+          {state === 'loading' && (
+            <p className="mt-2 text-[11px] text-on-surface-variant">Checking attendance…</p>
+          )}
+          {state === 'error' && (
+            <p role="alert" className="mt-2 text-[11px] font-semibold text-on-error-container">
+              Attendance could not be loaded.
+            </p>
+          )}
+          {state === 'ready' && !history && (
+            <p className="mt-2 text-[11px] text-on-surface-variant">Duty count unavailable.</p>
+          )}
+          {state === 'ready' && history && (
+            <>
+              <p className="mt-2 break-words text-[10px] text-on-surface-variant">{history.divisionName || 'Current division'}</p>
+              <p className="text-xl font-extrabold text-primary tabular-nums sm:text-2xl">
                 {history.months[0]?.present ?? 0}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowHistory(true)}
+                className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 text-[10px] font-bold text-primary transition-colors hover:bg-surface-container-low sm:text-xs"
+              >
+                <Icon icon="history" size={16} />
+                <span>Event dates</span>
+              </button>
+            </>
+          )}
+        </section>
+
+        <section className="flex h-full min-w-0 flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-xs sm:p-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant sm:text-xs">Memos</h3>
+          {memoCountsError ? (
+            <p role="alert" className="mt-2 break-words text-[10px] font-semibold text-on-error-container">
+              Count unavailable.
+            </p>
+          ) : (
+            <p className="mt-1 text-xl font-extrabold text-primary sm:text-2xl">
+              {memoCount}{' '}
+              <span className="text-[10px] font-medium text-on-surface-variant sm:text-xs">
+                {memoCount === 1 ? 'memo' : 'memos'}
               </span>
-            </div>
+            </p>
+          )}
+          {memoCountsError && (
+            <p className="mt-1 break-words text-[10px] text-on-error-container">{memoCountsError}</p>
+          )}
+          <div className="mt-auto pt-2">
+            <GuardPersonnelMemos guardId={history?.guardId ?? guardId} onNavigate={onMemoNavigate} />
           </div>
-          <div className="px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => setShowHistory(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary font-bold text-sm hover:bg-surface-container-low transition-colors cursor-pointer"
-            >
-              <Icon icon="history" size={18} />
-              <span>View event dates</span>
-            </button>
-          </div>
-        </>
-      )}
+        </section>
+      </div>
+
       {showHistory && history && createPortal(
         <div
           className="overlay-enter fixed inset-0 z-[90] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs"
@@ -1218,20 +1437,69 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
         </div>,
         document.body,
       )}
-      {editingDates && history && createPortal(
+      {editingProfile && history && createPortal(
         <div
           className="overlay-enter fixed inset-0 z-[100] flex items-center justify-center bg-surface-container/50 p-4 backdrop-blur-xs"
           role="presentation"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) closeDateEditor(); }}
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closeProfileEditor(); }}
         >
-          <section role="dialog" aria-modal="true" aria-labelledby="edit-home-guard-dates-title" className="overlay-panel w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-home-guard-profile-title" className="overlay-panel w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl">
             <header className="flex items-center justify-between bg-primary p-4 text-on-primary">
-              <h2 id="edit-home-guard-dates-title" className="font-bold">Edit Home Guard dates</h2>
-              <button type="button" onClick={closeDateEditor} disabled={savingDates} aria-label="Close date editor" className="rounded p-1 hover:bg-white/10 disabled:opacity-50">
+              <h2 id="edit-home-guard-profile-title" className="font-bold">Edit Home Guard profile</h2>
+              <button type="button" onClick={closeProfileEditor} disabled={savingProfile} aria-label="Close profile editor" className="rounded p-1 hover:bg-white/10 disabled:opacity-50">
                 <Icon icon="close" size={20} />
               </button>
             </header>
-            <form onSubmit={(event) => void submitDates(event)} className="space-y-4 p-4">
+            <form onSubmit={(event) => void submitProfile(event)} className="max-h-[75dvh] space-y-3 overflow-y-auto p-4">
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Full name
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  value={profileFullName}
+                  onChange={(event) => setProfileFullName(event.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Home Guard code
+                <input
+                  type="text"
+                  required
+                  maxLength={40}
+                  pattern="(HG|WHG)[A-Z0-9-]+"
+                  value={profileCode}
+                  onChange={(event) => setProfileCode(event.target.value.toUpperCase())}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm uppercase text-on-surface"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Mobile number
+                <input
+                  type="tel"
+                  required
+                  pattern="[0-9]{10}"
+                  maxLength={10}
+                  value={profilePhone}
+                  onChange={(event) => setProfilePhone(event.target.value.replace(/\D/g, ''))}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-on-surface-variant">
+                Division
+                <select
+                  required
+                  value={profileDistrictId}
+                  onChange={(event) => setProfileDistrictId(event.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
+                >
+                  <option value="">Select division</option>
+                  {districts.map((district) => (
+                    <option key={district.id} value={district.id}>{district.name}</option>
+                  ))}
+                </select>
+              </label>
               <label className="block text-sm font-semibold text-on-surface-variant">
                 Date of birth
                 <input
@@ -1255,13 +1523,13 @@ function DutyHistorySection({ phone }: { phone?: string | null }) {
                   className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm text-on-surface"
                 />
               </label>
-              {datesError && <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{datesError}</p>}
+              {profileEditError && <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{profileEditError}</p>}
               <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
-                <button type="button" onClick={closeDateEditor} disabled={savingDates} className="min-h-10 rounded-lg px-4 text-sm font-semibold text-on-surface-variant hover:bg-surface-container disabled:opacity-50">
+                <button type="button" onClick={closeProfileEditor} disabled={savingProfile} className="min-h-10 rounded-lg px-4 text-sm font-semibold text-on-surface-variant hover:bg-surface-container disabled:opacity-50">
                   Cancel
                 </button>
-                <button type="submit" disabled={savingDates || !dateOfBirth || !joiningDate} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">
-                  {savingDates ? 'Saving dates…' : 'Save dates'}
+                <button type="submit" disabled={savingProfile || !dateOfBirth || !joiningDate} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:opacity-50">
+                  {savingProfile ? 'Saving profile…' : 'Save profile'}
                 </button>
               </div>
             </form>
