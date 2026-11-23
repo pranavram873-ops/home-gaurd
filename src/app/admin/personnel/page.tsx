@@ -40,6 +40,14 @@ function formatProfileDate(date: string | null | undefined) {
   });
 }
 
+function formatDutyMonth(month: string) {
+  const [year, value] = month.split('-').map(Number);
+  return new Date(year, value - 1, 1).toLocaleDateString('en-IN', {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 function formatProfilePhone(phone: string | null | undefined) {
   return (phone ?? '').replace(/\D/g, '').slice(-10);
 }
@@ -1170,6 +1178,7 @@ function GuardProfileSections({
   const phone = profile.phone;
   const [history, setHistory] = useState<GuardDutyHistory | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [selectedDutyMonth, setSelectedDutyMonth] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileFullName, setProfileFullName] = useState(profile.full_name);
@@ -1184,6 +1193,7 @@ function GuardProfileSections({
   useEffect(() => {
     let live = true;
     setState('loading');
+    setSelectedDutyMonth(0);
     setShowHistory(false);
     setEditingProfile(false);
     loadGuardDutyHistory(phone)
@@ -1336,7 +1346,31 @@ function GuardProfileSections({
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <section className="min-w-0 rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-xs sm:p-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant sm:text-xs">Duties this month</h3>
+          <div className="flex items-center justify-between gap-1">
+            <h3 className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant sm:text-xs">Duties</h3>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setSelectedDutyMonth((month) => Math.min(month + 1, history?.months.length ?? month + 1))}
+                disabled={!history || selectedDutyMonth >= history.months.length - 1}
+                aria-label="Show previous month duty data"
+                title="Show previous month"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon icon="chevron_left" size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDutyMonth((month) => Math.max(month - 1, 0))}
+                disabled={selectedDutyMonth === 0}
+                aria-label="Show next month duty data"
+                title="Show next month"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon icon="chevron_right" size={18} />
+              </button>
+            </div>
+          </div>
           {state === 'loading' && (
             <p className="mt-2 text-[11px] text-on-surface-variant">Checking attendance…</p>
           )}
@@ -1350,10 +1384,29 @@ function GuardProfileSections({
           )}
           {state === 'ready' && history && (
             <>
-              <p className="mt-2 break-words text-[10px] text-on-surface-variant">{history.divisionName || 'Current division'}</p>
-              <p className="text-xl font-extrabold text-primary tabular-nums sm:text-2xl">
-                {history.months[0]?.present ?? 0}
+              <p className="mt-1 text-[10px] font-semibold text-on-surface-variant">
+                {formatDutyMonth(history.months[selectedDutyMonth]?.month ?? history.months[0].month)}
               </p>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                <div className="min-w-0 rounded-md bg-surface-container-low p-1.5 text-center">
+                  <p className="break-words text-[9px] font-semibold leading-tight text-on-surface-variant">Total duties</p>
+                  <p className="mt-1 text-base font-extrabold text-primary tabular-nums">
+                    {(history.months[selectedDutyMonth]?.present ?? 0) + (history.months[selectedDutyMonth]?.absent ?? 0)}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-md bg-surface-container-low p-1.5 text-center">
+                  <p className="break-words text-[9px] font-semibold leading-tight text-on-surface-variant">Present duties</p>
+                  <p className="mt-1 text-base font-extrabold text-primary tabular-nums">
+                    {history.months[selectedDutyMonth]?.present ?? 0}
+                  </p>
+                </div>
+                <div className="min-w-0 rounded-md bg-surface-container-low p-1.5 text-center">
+                  <p className="break-words text-[9px] font-semibold leading-tight text-on-surface-variant">Leave duties</p>
+                  <p className="mt-1 text-base font-extrabold text-secondary tabular-nums">
+                    {history.months[selectedDutyMonth]?.absent ?? 0}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowHistory(true)}

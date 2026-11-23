@@ -24,23 +24,6 @@ function formatActivityTime(value: string) {
   }).format(date);
 }
 
-function getReportChange(current: number, previous: number) {
-  if (previous === 0) {
-    return current === 0
-      ? { icon: 'remove', label: '0% no change', tone: 'text-on-surface-variant' }
-      : { icon: 'arrow_upward', label: 'New this month', tone: 'text-tertiary' };
-  }
-
-  const percent = Math.round(((current - previous) / previous) * 100);
-  if (percent === 0) {
-    return { icon: 'remove', label: '0% no change', tone: 'text-on-surface-variant' };
-  }
-  if (percent > 0) {
-    return { icon: 'arrow_upward', label: `${percent}% more`, tone: 'text-tertiary' };
-  }
-  return { icon: 'arrow_downward', label: `${Math.abs(percent)}% less`, tone: 'text-error' };
-}
-
 const reportOverviewPeriods = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
@@ -276,44 +259,6 @@ export default function AdminDashboardPage() {
             </div>
           ) : (
             <p className="px-5 py-10 text-center text-sm text-on-surface-variant">No report data available.</p>
-          )}
-        </section>
-
-        <section className="overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest shadow-xs">
-          <div className="border-b border-outline-variant/60 px-4 py-4 sm:px-5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Icon icon="location_on" size={21} className="shrink-0 text-primary" />
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-on-surface sm:text-lg">Division-wise report</h2>
-                <p className="text-xs text-on-surface-variant">This month compared with the previous month.</p>
-              </div>
-            </div>
-          </div>
-          {divisionStats?.divisionReportComparison.length ? (
-            <ul className="grid grid-cols-2 divide-x divide-y divide-outline-variant/50 sm:grid-cols-4">
-              {divisionStats.divisionReportComparison.map((division) => {
-                const change = getReportChange(division.currentMonth, division.previousMonth);
-                return (
-                  <li key={division.divisionId} className="min-w-0 px-3 py-3 sm:px-4">
-                    <p className="truncate text-xs font-semibold text-on-surface sm:text-sm">{division.divisionName}</p>
-                    <p className="mt-1 flex items-baseline gap-1.5">
-                      <span className="text-xl font-bold leading-none tabular-nums text-on-surface">{division.currentMonth}</span>
-                      <span className="text-[10px] text-on-surface-variant">reports this month</span>
-                    </p>
-                    <p
-                      className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold sm:text-xs ${change.tone}`}
-                      aria-label={`${change.label} compared with ${division.previousMonth} reports last month`}
-                      title={`${division.currentMonth} this month; ${division.previousMonth} last month`}
-                    >
-                      <Icon icon={change.icon} size={13} />
-                      {change.label}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="px-5 py-8 text-center text-sm text-on-surface-variant">Division report counts are unavailable.</p>
           )}
         </section>
 

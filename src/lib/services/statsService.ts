@@ -29,12 +29,6 @@ export interface AdminDivisionDashboard {
     actionTaken: string | null;
     acknowledgedAt: string | null;
   }>;
-  divisionReportComparison: Array<{
-    divisionId: string;
-    divisionName: string;
-    currentMonth: number;
-    previousMonth: number;
-  }>;
 }
 
 function localDateString(date: Date) {
@@ -94,12 +88,10 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
   try {
     const now = new Date();
     const today = localDateString(now);
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const reportHistoryStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const currentMonth = today.slice(0, 7);
-    const currentMonthStartKey = currentMonthStart.toISOString();
     const nextMonthStartKey = nextMonthStart.toISOString();
     const previousMonthStartKey = previousMonthStart.toISOString();
     const reportHistoryStartKey = reportHistoryStart.toISOString();
@@ -110,17 +102,12 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
       .from('personnel_reports')
       .select('id, division_id, division_name, guard_name, home_guard_code, category, description, event_name, event_date, status, created_at, action_taken, acknowledged_at');
     if (divisionId) recentReportsQuery = recentReportsQuery.eq('division_id', divisionId);
-    const [attendanceEvents, reports, monthlyReports, rosterCount, reportHistory] = await Promise.all([
+    const [attendanceEvents, reports, rosterCount, reportHistory] = await Promise.all([
       divisionId ? loadAttendanceEvents(currentMonth, divisionId) : Promise.resolve([]),
       recentReportsQuery
         .or(`acknowledged_at.is.null,created_at.gte.${previousMonthStartKey}`)
         .order('created_at', { ascending: false })
         .limit(100),
-      supabase
-        .from('personnel_reports')
-        .select('division_id, created_at')
-        .gte('created_at', previousMonthStartKey)
-        .lt('created_at', nextMonthStartKey),
       divisionId ? supabase
         .from('home_guard_roster')
         .select('id', { count: 'exact', head: true })
@@ -145,16 +132,7 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
       })(),
     ]);
     if (reports.error) throw new Error(describeQueryError(reports.error) ?? 'Could not load division reports.');
-    if (monthlyReports.error) throw new Error(describeQueryError(monthlyReports.error) ?? 'Could not load monthly division reports.');
     if (rosterCount.error) throw new Error(describeQueryError(rosterCount.error) ?? 'Could not load the division roster.');
-
-    const countsByDivision = new Map<string, { currentMonth: number; previousMonth: number }>();
-    for (const report of monthlyReports.data ?? []) {
-      const counts = countsByDivision.get(report.division_id) ?? { currentMonth: 0, previousMonth: 0 };
-      if (report.created_at >= currentMonthStartKey && report.created_at < nextMonthStartKey) counts.currentMonth += 1;
-      else if (report.created_at >= previousMonthStartKey && report.created_at < currentMonthStartKey) counts.previousMonth += 1;
-      countsByDivision.set(report.division_id, counts);
-    }
 
     const reportRows = (reports.data ?? []).filter((report) => !divisionId || report.division_id === divisionId);
     const recentReports = reportRows.slice(0, 8).map((report) => ({
@@ -172,15 +150,6 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
       actionTaken: report.action_taken,
       acknowledgedAt: report.acknowledged_at,
     }));
-    const divisionReportComparison = divisions.map((division) => {
-      const counts = countsByDivision.get(division.id);
-      return {
-        divisionId: division.id,
-        divisionName: division.name,
-        currentMonth: counts?.currentMonth ?? 0,
-        previousMonth: counts?.previousMonth ?? 0,
-      };
-    }).sort((a, b) => a.divisionName.localeCompare(b.divisionName));
     const todayEvents = attendanceEvents.filter((event) => event.date === today);
 
     return {
@@ -192,7 +161,6 @@ export async function getAdminDivisionDashboard(divisionId: string): Promise<One
         absentToday: todayEvents.reduce((total, event) => total + event.absentCount, 0),
         reportOverview: buildReportOverview(reportHistory, now),
         recentReports,
-        divisionReportComparison,
       },
       error: null,
     };
