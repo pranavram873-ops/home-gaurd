@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/authContext';
 import { Icon } from '@/components/ui/Icon';
 import { usePresence } from '@/lib/hooks/usePresence';
+import { listAllRosterGuards } from '@/lib/services/simpleAttendanceService';
 
 type Item = { label: string; href: string; icon: string; matches?: string[] };
 
@@ -25,6 +26,8 @@ export function Sidebar({
   const { user, role, logout } = useAuth();
   const moreMenu = usePresence(moreOpen, 320);
   const admin = role === 'admin';
+  const [exportingRoster, setExportingRoster] = React.useState(false);
+  const [rosterExportError, setRosterExportError] = React.useState<string | null>(null);
   const primary: Item[] = admin
     ? [
         { label: 'Dashboard', href: '/admin/dashboard', icon: 'home' },
@@ -67,6 +70,46 @@ export function Sidebar({
 
   const active = (item: Item) =>
     (item.matches ?? [item.href]).some((href) => pathname === href || pathname.startsWith(`${href}/`));
+
+  async function exportHomeGuardRoster() {
+    setExportingRoster(true);
+    setRosterExportError(null);
+    try {
+      const result = await listAllRosterGuards();
+      if (result.error) throw new Error(result.error);
+
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Home Guards');
+      worksheet.columns = [
+        { header: 'Full Name', key: 'full_name', width: 28 },
+        { header: 'Home Guard Code', key: 'home_guard_code', width: 20 },
+        { header: 'Phone', key: 'phone', width: 16 },
+        { header: 'Division', key: 'division_name', width: 24 },
+        { header: 'Division Code', key: 'division_code', width: 16 },
+        { header: 'Date of Birth', key: 'date_of_birth', width: 16 },
+        { header: 'Joining Date', key: 'joining_date', width: 16 },
+        { header: 'Status', key: 'status', width: 12 },
+      ];
+      worksheet.addRows(result.data.map((guard) => ({
+        ...guard,
+        status: guard.is_active ? 'Active' : 'Inactive',
+      })));
+      const buffer = await workbook.xlsx.writeBuffer();
+      const url = URL.createObjectURL(new Blob([buffer]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `home-guards-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setRosterExportError(error instanceof Error ? error.message : 'The Home Guard roster could not be exported.');
+    } finally {
+      setExportingRoster(false);
+    }
+  }
 
   const railLink = (item: Item) => {
     const selected = active(item);
@@ -173,7 +216,23 @@ export function Sidebar({
                     <span>{item.label}</span>
                   </Link>
                 ))}
+                {admin && (
+                  <button
+                    type="button"
+                    onClick={() => void exportHomeGuardRoster()}
+                    disabled={exportingRoster}
+                    className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-label-md text-on-surface transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60"
+                  >
+                    <Icon icon={exportingRoster ? 'sync' : 'download'} size={20} className={`text-primary ${exportingRoster ? 'animate-spin' : ''}`} />
+                    <span>{exportingRoster ? 'Exporting Home Guards…' : 'Export Home Guards to Excel'}</span>
+                  </button>
+                )}
               </nav>
+              {rosterExportError && (
+                <p role="alert" className="mb-4 rounded-lg bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container">
+                  {rosterExportError}
+                </p>
+              )}
               <div className="border-t border-outline-variant/60 pt-4">
                 <button
                   onClick={() => { onMoreClose(); void logout(); }}

@@ -32,6 +32,11 @@ export interface RosterGuard {
   joining_date: string | null;
 }
 
+export interface ExportRosterGuard extends RosterGuard {
+  division_name: string;
+  division_code: string;
+}
+
 export interface DailyMark {
   id: string;
   guard_id: string;
@@ -152,6 +157,49 @@ export async function listDivisionRoster(divisionId: string): Promise<ListResult
     return { data: (data ?? []) as RosterGuard[], error: null };
   } catch (error) {
     return { data: [], error: describeThrownError(error, 'Could not load the division roster.') };
+  }
+}
+
+/** All divisions, including inactive guards, for the administrator's export. */
+export async function listAllRosterGuards(): Promise<ListResult<ExportRosterGuard>> {
+  try {
+    const supabase = createClient();
+    const { data: divisions, error: divisionsError } = await supabase
+      .from('attendance_divisions')
+      .select('id, name, code');
+    if (divisionsError) return { data: [], error: describeQueryError(divisionsError) };
+
+    const divisionById = new Map(
+      ((divisions ?? []) as AttendanceDivision[]).map((division) => [division.id, division]),
+    );
+    const guards: RosterGuard[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase
+        .from('home_guard_roster')
+        .select('id, division_id, full_name, phone, home_guard_code, is_active, date_of_birth, joining_date')
+        .order('full_name')
+        .order('id')
+        .range(offset, offset + 999);
+      if (error) return { data: [], error: describeQueryError(error) };
+
+      const page = (data ?? []) as RosterGuard[];
+      guards.push(...page);
+      if (page.length < 1000) break;
+    }
+
+    return {
+      data: guards.map((guard) => {
+        const division = divisionById.get(guard.division_id);
+        return {
+          ...guard,
+          division_name: division?.name ?? '',
+          division_code: division?.code ?? '',
+        };
+      }),
+      error: null,
+    };
+  } catch (error) {
+    return { data: [], error: describeThrownError(error, 'Could not load the Home Guard roster for export.') };
   }
 }
 
@@ -581,6 +629,8 @@ export async function addRosterGuards(inputs: Array<{
   phone: string;
   home_guard_code: string;
   division_id: string;
+  date_of_birth: string;
+  joining_date: string;
 }>) {
   if (!inputs.length) throw new Error('Paste at least one Home Guard row first.');
   const supabase = createClient();
@@ -590,7 +640,11 @@ export async function addRosterGuards(inputs: Array<{
     phone: input.phone.trim(),
     home_guard_code: input.home_guard_code.trim().toUpperCase(),
   })));
-  if (error) throw new Error(error.code === '23505' ? 'A Home Guard code in this list is already in use.' : error.message);
+  if (error) {
+    throw new Error(error.code === '23505'
+      ? 'A Home Guard code in this list is already in use.'
+      : describeQueryError(error) || 'The Home Guard rows could not be added.');
+  }
 }
 
 export interface DutyMonthCount {

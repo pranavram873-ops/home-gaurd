@@ -20,6 +20,7 @@ import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplet
 import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
 import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
 import { DocumentScanner } from '@/components/reports/DocumentScanner';
+import { HomeGuardExcelImport } from '@/components/admin/HomeGuardExcelImport';
 
 const blankRecruit = {
   full_name: '',
@@ -94,6 +95,7 @@ function PersonnelDirectoryContent() {
   const [memoCounts, setMemoCounts] = useState<Record<string, number>>({});
   const [memoCountsError, setMemoCountsError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [rosterSyncError, setRosterSyncError] = useState<string | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -662,6 +664,15 @@ function PersonnelDirectoryContent() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              disabled={!divisionId || !selectedDistrict}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon icon="upload_file" size={16} />
+              <span>Import Excel</span>
+            </button>
+            <button
               onClick={() => {
                 resetForm();
                 setShowAddModal(true);
@@ -1135,6 +1146,15 @@ function PersonnelDirectoryContent() {
             )}
           </div>
         </div>
+      )}
+
+      {showImportModal && (
+        <HomeGuardExcelImport
+          divisionId={divisionId ?? ''}
+          divisionName={selectedDistrict?.name ?? 'selected division'}
+          onClose={() => setShowImportModal(false)}
+          onImported={() => { void attendanceRosterQuery.refresh(); }}
+        />
       )}
 
     </DashboardLayout>
