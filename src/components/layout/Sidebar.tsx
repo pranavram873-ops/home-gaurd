@@ -86,15 +86,10 @@ export function Sidebar({
         { header: 'Home Guard Code', key: 'home_guard_code', width: 20 },
         { header: 'Phone', key: 'phone', width: 16 },
         { header: 'Division', key: 'division_name', width: 24 },
-        { header: 'Division Code', key: 'division_code', width: 16 },
         { header: 'Date of Birth', key: 'date_of_birth', width: 16 },
         { header: 'Joining Date', key: 'joining_date', width: 16 },
-        { header: 'Status', key: 'status', width: 12 },
       ];
-      worksheet.addRows(result.data.map((guard) => ({
-        ...guard,
-        status: guard.is_active ? 'Active' : 'Inactive',
-      })));
+      worksheet.addRows(result.data);
       const buffer = await workbook.xlsx.writeBuffer();
       const url = URL.createObjectURL(new Blob([buffer]));
       const link = document.createElement('a');

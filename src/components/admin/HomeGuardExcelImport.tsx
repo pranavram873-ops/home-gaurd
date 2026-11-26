@@ -170,15 +170,17 @@ async function downloadTemplate() {
   const worksheet = workbook.addWorksheet('Home Guards');
   worksheet.addRow([
     'Full Name',
-    'Phone',
     'Home Guard Code',
+    'Phone',
+    'Division',
     'Date of Birth',
     'Joining Date',
   ]);
   worksheet.columns = [
     { width: 28 },
-    { width: 16, numFmt: '@' },
     { width: 22 },
+    { width: 16, numFmt: '@' },
+    { width: 24 },
     { width: 18, numFmt: 'dd/mm/yyyy' },
     { width: 18, numFmt: 'dd/mm/yyyy' },
   ];
@@ -187,7 +189,7 @@ async function downloadTemplate() {
   instructions.addRows([
     ['Home Guard spreadsheet import'],
     ['Add one Home Guard per row on the Home Guards sheet.'],
-    ['All five columns are required. Keep the header row unchanged.'],
+    ['All six columns are required. Keep the header row unchanged.'],
     ['Phone numbers must contain 10 digits. Format the Phone column as Text to preserve leading zeroes.'],
     ['Dates may be Excel dates or YYYY-MM-DD / DD-MM-YYYY values.'],
     ['This file will be imported into the division selected on the Guards page.'],
