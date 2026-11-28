@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 type Point = { x: number; y: number };
 type Quad = [Point, Point, Point, Point];
 type ImageSize = { width: number; height: number };
+type CropHandle = { label: string; point: Point; cornerIndex?: number; edge?: [number, number] };
 
 interface DocumentScannerProps {
   onClose: () => void;
@@ -127,6 +128,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const loadedInitialFile = useRef<File | null>(null);
+  const draggingHandle = useRef<{ index: number; clientX: number; clientY: number; corners: Quad } | null>(null);
   const [cameraRequested, setCameraRequested] = useState(!initialFile);
   const [cv, setCv] = useState<CV | null>(null);
   const [cameraError, setCameraError] = useState('');
@@ -322,18 +324,37 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
     }
   }
 
-  function moveCorner(index: number, clientX: number, clientY: number) {
+  function moveHandle(index: number, clientX: number, clientY: number) {
     const bounds = previewRef.current?.getBoundingClientRect();
-    if (!bounds || !imageSize || !corners) return;
-    const next = [...corners] as Quad;
-    next[index] = {
-      x: Math.max(0, Math.min(imageSize.width, (clientX - bounds.left) / bounds.width * imageSize.width)),
-      y: Math.max(0, Math.min(imageSize.height, (clientY - bounds.top) / bounds.height * imageSize.height)),
-    };
+    const drag = draggingHandle.current;
+    if (!bounds || !imageSize || !drag || drag.index !== index) return;
+    const deltaX = (clientX - drag.clientX) / bounds.width * imageSize.width;
+    const deltaY = (clientY - drag.clientY) / bounds.height * imageSize.height;
+    const next = drag.corners.map((point) => ({ ...point })) as Quad;
+    if (index < 4) {
+      const point = drag.corners[index];
+      next[index] = {
+        x: Math.max(0, Math.min(imageSize.width, point.x + deltaX)),
+        y: Math.max(0, Math.min(imageSize.height, point.y + deltaY)),
+      };
+    } else {
+      const edges: Array<[number, number]> = [[0, 1], [1, 2], [2, 3], [3, 0]];
+      const [first, second] = edges[index - 4];
+      const firstPoint = drag.corners[first];
+      const secondPoint = drag.corners[second];
+      const minX = Math.max(-firstPoint.x, -secondPoint.x);
+      const maxX = Math.min(imageSize.width - firstPoint.x, imageSize.width - secondPoint.x);
+      const minY = Math.max(-firstPoint.y, -secondPoint.y);
+      const maxY = Math.min(imageSize.height - firstPoint.y, imageSize.height - secondPoint.y);
+      const safeX = Math.max(minX, Math.min(maxX, deltaX));
+      const safeY = Math.max(minY, Math.min(maxY, deltaY));
+      next[first] = { x: firstPoint.x + safeX, y: firstPoint.y + safeY };
+      next[second] = { x: secondPoint.x + safeX, y: secondPoint.y + safeY };
+    }
     setCorners(next);
   }
 
-  function handleCornerKey(index: number, event: React.KeyboardEvent<HTMLButtonElement>) {
+  function handleCropKey(index: number, event: React.KeyboardEvent<HTMLButtonElement>) {
     if (!imageSize || !corners) return;
     const step = event.shiftKey ? 20 : 5;
     const offsets: Record<string, Point> = {
@@ -345,11 +366,20 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
     const offset = offsets[event.key];
     if (!offset) return;
     event.preventDefault();
-    const next = [...corners] as Quad;
-    next[index] = {
-      x: Math.max(0, Math.min(imageSize.width, next[index].x + offset.x)),
-      y: Math.max(0, Math.min(imageSize.height, next[index].y + offset.y)),
-    };
+    const next = corners.map((point) => ({ ...point })) as Quad;
+    if (index < 4) {
+      next[index] = {
+        x: Math.max(0, Math.min(imageSize.width, next[index].x + offset.x)),
+        y: Math.max(0, Math.min(imageSize.height, next[index].y + offset.y)),
+      };
+    } else {
+      const edges: Array<[number, number]> = [[0, 1], [1, 2], [2, 3], [3, 0]];
+      const [first, second] = edges[index - 4];
+      const safeX = Math.max(Math.max(-next[first].x, -next[second].x), Math.min(Math.min(imageSize.width - next[first].x, imageSize.width - next[second].x), offset.x));
+      const safeY = Math.max(Math.max(-next[first].y, -next[second].y), Math.min(Math.min(imageSize.height - next[first].y, imageSize.height - next[second].y), offset.y));
+      next[first] = { x: next[first].x + safeX, y: next[first].y + safeY };
+      next[second] = { x: next[second].x + safeX, y: next[second].y + safeY };
+    }
     setCorners(next);
   }
 
@@ -421,9 +451,10 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
       ]);
       const transform = cv.getPerspectiveTransform(sourcePoints, destinationPoints);
       const warped = new cv.Mat();
-      const gray = new cv.Mat();
       const enhanced = new cv.Mat();
-      resources.push(sourcePoints, destinationPoints, transform, warped, gray, enhanced);
+      const softened = new cv.Mat();
+      const polished = new cv.Mat();
+      resources.push(sourcePoints, destinationPoints, transform, warped, enhanced, softened, polished);
       cv.warpPerspective(
         source,
         warped,
@@ -433,27 +464,20 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
         cv.BORDER_CONSTANT,
         new cv.Scalar(255, 255, 255, 255),
       );
-      cv.cvtColor(warped, gray, cv.COLOR_RGBA2GRAY);
-      const smallestSide = Math.min(outputWidth, outputHeight);
-      const blockSize = smallestSide >= 31 ? 31 : smallestSide % 2 === 0 ? smallestSide - 1 : smallestSide;
-      cv.adaptiveThreshold(
-        gray,
-        enhanced,
-        255,
-        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv.THRESH_BINARY,
-        Math.max(3, blockSize),
-        10,
-      );
+      // Lift the paper tones and sharpen text while preserving colored stamps,
+      // handwriting, and the natural look of the original page.
+      cv.convertScaleAbs(warped, enhanced, 1.08, 6);
+      cv.GaussianBlur(enhanced, softened, new cv.Size(0, 0), 0.7);
+      cv.addWeighted(enhanced, 1.18, softened, -0.18, 0, polished);
       const outputCanvas = document.createElement('canvas');
       outputCanvas.width = outputWidth;
       outputCanvas.height = outputHeight;
-      cv.imshow(outputCanvas, enhanced);
+      cv.imshow(outputCanvas, polished);
       const blob = await new Promise<Blob>((resolve, reject) => {
         outputCanvas.toBlob((result) => {
           if (result) resolve(result);
           else reject(new Error('Could not create the scanned memo image.'));
-        }, 'image/jpeg', 0.94);
+        }, 'image/jpeg', 0.97);
       });
       onConfirm(new File([blob], 'home-guard-memo-scan.jpg', { type: 'image/jpeg' }));
     } catch (error) {
@@ -468,6 +492,16 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
   if (typeof document === 'undefined') return null;
   const detectedPoints = detectedCorners?.map((point) => `${point.x},${point.y}`).join(' ');
   const reviewPoints = corners?.map((point) => `${point.x},${point.y}`).join(' ');
+  const cropHandles: CropHandle[] = corners ? [
+    { label: 'Top left corner', point: corners[0], cornerIndex: 0 },
+    { label: 'Top right corner', point: corners[1], cornerIndex: 1 },
+    { label: 'Bottom right corner', point: corners[2], cornerIndex: 2 },
+    { label: 'Bottom left corner', point: corners[3], cornerIndex: 3 },
+    { label: 'Top edge midpoint', point: { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 }, edge: [0, 1] },
+    { label: 'Right edge midpoint', point: { x: (corners[1].x + corners[2].x) / 2, y: (corners[1].y + corners[2].y) / 2 }, edge: [1, 2] },
+    { label: 'Bottom edge midpoint', point: { x: (corners[2].x + corners[3].x) / 2, y: (corners[2].y + corners[3].y) / 2 }, edge: [2, 3] },
+    { label: 'Left edge midpoint', point: { x: (corners[3].x + corners[0].x) / 2, y: (corners[3].y + corners[0].y) / 2 }, edge: [3, 0] },
+  ] : [];
   const cornersValid = Boolean(imageSize && corners && isValidQuad(corners, imageSize));
 
   return createPortal(
@@ -551,7 +585,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
           ) : imageSize && corners ? (
             <div className="mx-auto flex max-w-2xl flex-col gap-3">
               <p className="text-center text-xs text-on-surface-variant">
-                {captureDetected ? 'Check the detected edges. Drag the corners or use arrow keys to adjust.' : 'Does this photo look okay? Drag each corner around the memo, then tap the checkmark to create the PDF.'}
+                {captureDetected ? 'Check the detected edges. Drag any corner or edge point, or use arrow keys to adjust.' : 'Does this photo look okay? Drag the corner and edge points to frame the memo, then save it as a PDF.'}
               </p>
               <div
                 ref={previewRef}
@@ -562,29 +596,33 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
                 <svg viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
                   <polygon points={reviewPoints ?? ''} fill="rgba(34,197,94,.14)" stroke="#16a34a" strokeWidth={Math.max(2, imageSize.width / 300)} />
                 </svg>
-                {corners.map((point, index) => (
+                {cropHandles.map(({ label, point }, index) => (
                   <button
                     key={index}
                     type="button"
                     role="slider"
-                    aria-label={`${['Top left', 'Top right', 'Bottom right', 'Bottom left'][index]} crop corner`}
+                    aria-label={`${label} crop handle`}
                     aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={Math.round(point.x / imageSize.width * 100)}
+                    aria-valuemax={imageSize.width}
+                    aria-valuenow={Math.round(point.x)}
+                    aria-valuetext={`${Math.round(point.x)}, ${Math.round(point.y)}`}
                     onPointerDown={(event) => {
                       event.preventDefault();
+                      draggingHandle.current = { index, clientX: event.clientX, clientY: event.clientY, corners: corners! };
                       event.currentTarget.setPointerCapture(event.pointerId);
                     }}
-                    onKeyDown={(event) => handleCornerKey(index, event)}
-                    className="absolute z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-[3px] border-white bg-primary shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    onKeyDown={(event) => handleCropKey(index, event)}
+                    className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-[3px] shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${index < 4 ? 'h-11 w-11 border-white bg-primary' : 'h-8 w-8 border-primary bg-white'}`}
                     style={{ left: `${point.x / imageSize.width * 100}%`, top: `${point.y / imageSize.height * 100}%` }}
                     onPointerMove={(event) => {
-                      if (event.currentTarget.hasPointerCapture(event.pointerId)) moveCorner(index, event.clientX, event.clientY);
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) moveHandle(index, event.clientX, event.clientY);
                     }}
                     onPointerUp={(event) => {
+                      draggingHandle.current = null;
                       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
                     }}
                     onPointerCancel={(event) => {
+                      draggingHandle.current = null;
                       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
                     }}
                   />
@@ -653,7 +691,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile,
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {processing ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
-                {processing ? 'Creating PDF…' : '✓ Photo looks good — make PDF'}
+                {processing ? 'Creating PDF…' : 'Save as PDF'}
               </button>
             </>
           )}

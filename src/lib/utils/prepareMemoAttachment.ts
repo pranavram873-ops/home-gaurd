@@ -17,7 +17,7 @@ function fileToDataUrl(file: File): Promise<string> {
 
 /** Produce the thumbnail and one-page PDF used by every personnel report form. */
 export async function prepareMemoAttachment(file: File): Promise<PreparedMemoAttachment> {
-  const photo = await compressImage(file, 1200, 1200, 0.82);
+  const photo = await compressImage(file, 1600, 2200, 0.9);
   const jpeg = await (await fetch(photo)).blob();
   const pdf = await createImagePdf(jpeg);
   return { photo, document: await fileToDataUrl(pdf) };

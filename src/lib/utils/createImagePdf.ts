@@ -4,9 +4,11 @@ export async function createImagePdf(jpeg: Blob): Promise<File> {
 
   const bitmap = await createImageBitmap(jpeg);
   try {
-    const pageWidth = 595.28;
-    const pageHeight = 841.89;
-    const scale = Math.min(pageWidth / bitmap.width, pageHeight / bitmap.height);
+    const isPortrait = bitmap.height >= bitmap.width;
+    const pageWidth = isPortrait ? 595.28 : 841.89;
+    const pageHeight = isPortrait ? 841.89 : 595.28;
+    const margin = 22;
+    const scale = Math.min((pageWidth - margin * 2) / bitmap.width, (pageHeight - margin * 2) / bitmap.height);
     const drawWidth = bitmap.width * scale;
     const drawHeight = bitmap.height * scale;
     const drawX = (pageWidth - drawWidth) / 2;
