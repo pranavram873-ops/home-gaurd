@@ -13,6 +13,8 @@ interface DocumentScannerProps {
   onClose: () => void;
   onConfirm: (file: File) => void;
   onUseGallery: () => void;
+  initialFile?: File;
+  onRetake?: () => void;
 }
 
 function orderCorners(points: Point[]): Quad | null {
@@ -121,10 +123,11 @@ function cameraMessage(error: unknown) {
   return 'The camera could not be started. Check browser camera permissions and try again, or choose an image from your gallery.';
 }
 
-export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentScannerProps) {
+export function DocumentScanner({ onClose, onConfirm, onUseGallery, initialFile, onRetake }: DocumentScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const [cameraRequested, setCameraRequested] = useState(true);
+  const loadedInitialFile = useRef<File | null>(null);
+  const [cameraRequested, setCameraRequested] = useState(!initialFile);
   const [cv, setCv] = useState<CV | null>(null);
   const [cameraError, setCameraError] = useState('');
   const [scannerError, setScannerError] = useState('');
@@ -136,6 +139,54 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
   const [corners, setCorners] = useState<Quad | null>(null);
   const [processing, setProcessing] = useState(false);
   const [captureDetected, setCaptureDetected] = useState(false);
+  const [loadingInitialImage, setLoadingInitialImage] = useState(Boolean(initialFile));
+
+  useEffect(() => {
+    if (!initialFile || loadedInitialFile.current === initialFile) return;
+    loadedInitialFile.current = initialFile;
+    let active = true;
+    const reader = new FileReader();
+    reader.onerror = () => {
+      if (!active) return;
+      setScannerError('The camera photo could not be opened. Take it again or choose a different image.');
+      setLoadingInitialImage(false);
+    };
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      const image = new Image();
+      image.onerror = () => {
+        if (!active) return;
+        setScannerError('The camera photo could not be opened. Take it again or choose a different image.');
+        setLoadingInitialImage(false);
+      };
+      image.onload = () => {
+        if (!active) return;
+        const scale = Math.min(1, 2400 / image.naturalWidth);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) {
+          setScannerError('The camera photo could not be prepared for cropping. Take it again.');
+          setLoadingInitialImage(false);
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const size = { width: canvas.width, height: canvas.height };
+        setCapturedImage(canvas.toDataURL('image/jpeg', 0.94));
+        setImageSize(size);
+        setCorners(defaultCorners(size));
+        setCaptureDetected(false);
+        setLoadingInitialImage(false);
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(initialFile);
+    return () => {
+      active = false;
+      if (reader.readyState === FileReader.LOADING) reader.abort();
+    };
+  }, [initialFile]);
 
   useEffect(() => {
     let active = true;
@@ -443,7 +494,13 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           {!capturedImage ? (
             <div className="flex h-full flex-col items-center justify-center gap-3">
-              {cameraError ? (
+              {initialFile ? (
+                <div className="max-w-md rounded-xl border border-outline-variant bg-surface-container-low p-5 text-center">
+                  {loadingInitialImage ? <Icon icon="sync" size={28} className="mx-auto animate-spin text-primary" /> : <Icon icon="error" size={28} className="mx-auto text-error" />}
+                  <p role={scannerError ? 'alert' : undefined} className="mt-2 text-sm font-semibold text-on-surface">{scannerError || 'Preparing your camera photo for cropping…'}</p>
+                  {!loadingInitialImage && <button type="button" onClick={onRetake ?? onUseGallery} className="mt-3 min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary">Take photo again</button>}
+                </div>
+              ) : cameraError ? (
                 <div className="max-w-md rounded-xl border border-outline-variant bg-surface-container-low p-4 text-center">
                   <Icon icon="no_photography" size={28} className="mx-auto text-primary" />
                   <p role="alert" className="mt-2 text-sm font-semibold text-on-surface">{cameraError}</p>
@@ -494,7 +551,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
           ) : imageSize && corners ? (
             <div className="mx-auto flex max-w-2xl flex-col gap-3">
               <p className="text-center text-xs text-on-surface-variant">
-                {captureDetected ? 'Check the detected edges. Drag the corner handles or use arrow keys to adjust.' : 'Edges were not detected. Drag each corner around the memo.'}
+                {captureDetected ? 'Check the detected edges. Drag the corners or use arrow keys to adjust.' : 'Does this photo look okay? Drag each corner around the memo, then tap the checkmark to create the PDF.'}
               </p>
               <div
                 ref={previewRef}
@@ -542,18 +599,25 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-outline-variant bg-surface-container-lowest p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {!capturedImage ? (
             <>
-              <button type="button" onClick={onUseGallery} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-on-surface-variant hover:bg-surface-container">
-                Use gallery instead
+              <button type="button" onClick={initialFile ? (onRetake ?? onUseGallery) : onUseGallery} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-on-surface-variant hover:bg-surface-container">
+                {initialFile ? 'Retake photo' : 'Use gallery instead'}
               </button>
-              <button
-                type="button"
-                onClick={() => void captureMemo()}
-                disabled={!cameraReady || loadingCv || Boolean(cameraError) || Boolean(scannerError && !cv) || processing}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {processing || loadingCv ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
-                {processing ? 'Processing…' : loadingCv ? 'Loading scanner…' : 'Capture memo'}
-              </button>
+              {initialFile ? (
+                <span className="inline-flex min-h-11 items-center gap-2 px-2 text-xs font-semibold text-on-surface-variant">
+                  {loadingInitialImage || loadingCv ? <Icon icon="sync" size={18} className="animate-spin" /> : null}
+                  {loadingInitialImage ? 'Loading photo…' : loadingCv ? 'Preparing crop…' : 'Photo ready to adjust'}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void captureMemo()}
+                  disabled={!cameraReady || loadingCv || Boolean(cameraError) || Boolean(scannerError && !cv) || processing}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {processing || loadingCv ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
+                  {processing ? 'Processing…' : loadingCv ? 'Loading scanner…' : 'Capture memo'}
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -561,6 +625,10 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
                 <button
                   type="button"
                   onClick={() => {
+                    if (initialFile && onRetake) {
+                      onRetake();
+                      return;
+                    }
                     setCapturedImage(null);
                     setImageSize(null);
                     setCorners(null);
@@ -571,7 +639,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
                   disabled={processing}
                   className="min-h-10 rounded-lg px-3 text-xs font-semibold text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
                 >
-                  Retake
+                  Retake photo
                 </button>
                 <button type="button" onClick={() => void rotateCapture()} disabled={processing} aria-label="Rotate memo clockwise" className="inline-flex min-h-10 items-center gap-1 rounded-lg px-3 text-xs font-semibold text-on-surface-variant hover:bg-surface-container disabled:opacity-50">
                   <Icon icon="rotate_right" size={16} />
@@ -581,11 +649,11 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
               <button
                 type="button"
                 onClick={() => void confirmScan()}
-                disabled={!cornersValid || processing}
+                disabled={!cv || loadingCv || !cornersValid || processing}
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {processing ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="check" size={18} />}
-                {processing ? 'Preparing scan…' : 'Use this scan'}
+                {processing ? 'Creating PDF…' : '✓ Photo looks good — make PDF'}
               </button>
             </>
           )}

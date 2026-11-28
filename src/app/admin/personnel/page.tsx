@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -19,8 +19,8 @@ import { useDivision } from '@/lib/attendance/divisionContext';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
 import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
 import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
-import { DocumentScanner } from '@/components/reports/DocumentScanner';
-import { createImagePdf } from '@/lib/utils/createImagePdf';
+import { MemoAttachmentField } from '@/components/reports/MemoAttachmentField';
+import { prepareMemoAttachment } from '@/lib/utils/prepareMemoAttachment';
 import { HomeGuardExcelImport } from '@/components/admin/HomeGuardExcelImport';
 
 const blankRecruit = {
@@ -92,8 +92,6 @@ function PersonnelDirectoryContent() {
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
   const [reportDocument, setReportDocument] = useState<string | null>(null);
   const [compressingPhoto, setCompressingPhoto] = useState(false);
-  const [documentScannerOpen, setDocumentScannerOpen] = useState(false);
-  const galleryPhotoInput = useRef<HTMLInputElement>(null);
   const [memoCounts, setMemoCounts] = useState<Record<string, number>>({});
   const [memoCountsError, setMemoCountsError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -398,33 +396,14 @@ function PersonnelDirectoryContent() {
     setCompressingPhoto(true);
     setReportError(null);
     try {
-      const compressedPhoto = await compressImage(file, 1200, 1200, 0.8);
-      const jpeg = await (await fetch(compressedPhoto)).blob();
-      const pdf = await createImagePdf(jpeg);
-      const documentDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not prepare the memo PDF.'));
-        reader.onerror = () => reject(new Error('Could not prepare the memo PDF.'));
-        reader.readAsDataURL(pdf);
-      });
-      setReportPhoto(compressedPhoto);
-      setReportDocument(documentDataUrl);
+      const attachment = await prepareMemoAttachment(file);
+      setReportPhoto(attachment.photo);
+      setReportDocument(attachment.document);
     } catch {
       setReportError('Could not prepare the memo image and PDF. Please try another photo.');
     } finally {
       setCompressingPhoto(false);
     }
-  }
-
-  async function attachReportPhoto(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) await processReportPhoto(file);
-  }
-
-  function chooseGalleryFromScanner() {
-    setDocumentScannerOpen(false);
-    galleryPhotoInput.current?.click();
   }
 
   async function openReportModal() {
@@ -900,53 +879,13 @@ function PersonnelDirectoryContent() {
                 <span className="mb-1 block text-xs font-bold text-on-surface-variant">
                   Memo photo <span className="text-error">(required)</span>
                 </span>
-                {reportPhoto ? (
-                  <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
-                    <img src={reportPhoto} alt="Report memo" className="h-14 w-20 rounded-md object-cover" />
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1 text-xs font-bold text-primary">
-                        <Icon icon="verified" size={14} className="shrink-0 text-tertiary" />
-                        Memo image and PDF attached
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-3">
-                        {reportDocument && <a href={reportDocument} download="home-guard-memo.pdf" className="text-[11px] font-bold text-primary hover:underline">Download PDF</a>}
-                        <button type="button" onClick={() => { setReportPhoto(null); setReportDocument(null); }} className="text-[11px] font-bold text-error hover:underline">
-                          Remove attachment
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setDocumentScannerOpen(true)}
-                      disabled={compressingPhoto}
-                      className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="document_scanner" size={18} />}
-                      {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => galleryPhotoInput.current?.click()}
-                      disabled={compressingPhoto}
-                      className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Icon icon="add_photo_alternate" size={18} />
-                      Choose from gallery
-                    </button>
-                    <input
-                      ref={galleryPhotoInput}
-                      type="file"
-                      accept="image/*"
-                      aria-label="Choose a memo photo from gallery"
-                      className="hidden"
-                      onChange={(event) => void attachReportPhoto(event)}
-                      disabled={compressingPhoto}
-                    />
-                  </div>
-                )}
+                <MemoAttachmentField
+                  photo={reportPhoto}
+                  document={reportDocument}
+                  busy={compressingPhoto}
+                  onAttach={processReportPhoto}
+                  onRemove={() => { setReportPhoto(null); setReportDocument(null); }}
+                />
               </div>
 
               {reportError && (
@@ -965,7 +904,7 @@ function PersonnelDirectoryContent() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingReport || !reportTarget || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportEventDate || !reportPhoto}
+                  disabled={submittingReport || compressingPhoto || !reportTarget || reportDescription.trim().length < 10 || !reportEventName.trim() || !reportEventDate || !reportPhoto || !reportDocument}
                   className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-50"
                 >
                   {submittingReport ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}
@@ -976,17 +915,6 @@ function PersonnelDirectoryContent() {
           </div>
         </div>
       ), document.body)}
-
-      {portalReady && documentScannerOpen && (
-        <DocumentScanner
-          onClose={() => setDocumentScannerOpen(false)}
-          onUseGallery={chooseGalleryFromScanner}
-          onConfirm={(file) => {
-            setDocumentScannerOpen(false);
-            void processReportPhoto(file);
-          }}
-        />
-      )}
 
       {/* Add Personnel Modal */}
       {showAddModal && (

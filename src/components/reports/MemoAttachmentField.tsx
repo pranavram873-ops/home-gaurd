@@ -19,7 +19,9 @@ export function MemoAttachmentField({
   onRemove: () => void;
 }) {
   const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const isBusy = busy || processing;
 
@@ -37,11 +39,23 @@ export function MemoAttachmentField({
     if (event) {
       const file = event.target.files?.[0];
       event.target.value = '';
-      void attach(file);
+      if (file) {
+        setReviewFile(file);
+        setScannerOpen(true);
+      }
     } else {
       setScannerOpen(false);
+      setReviewFile(null);
       window.setTimeout(() => galleryRef.current?.click(), 0);
     }
+  }
+
+  function chooseCamera(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setReviewFile(file);
+    setScannerOpen(true);
   }
 
   return (
@@ -61,22 +75,30 @@ export function MemoAttachmentField({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button type="button" onClick={() => setScannerOpen(true)} disabled={isBusy} className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm font-semibold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60">
-            {isBusy ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="document_scanner" size={18} />}
+          <button type="button" onClick={() => cameraRef.current?.click()} disabled={isBusy} className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm font-semibold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60">
+            {isBusy ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
             {isBusy ? 'Preparing image and PDF…' : 'Take memo photo'}
           </button>
           <button type="button" onClick={() => chooseGallery()} disabled={isBusy} className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm font-semibold text-primary transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60">
             <Icon icon="add_photo_alternate" size={18} /> Choose from gallery
           </button>
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" aria-label="Take a memo photo" className="hidden" onChange={chooseCamera} />
           <input ref={galleryRef} type="file" accept="image/*" aria-label="Choose a memo image" className="hidden" onChange={chooseGallery} />
         </div>
       )}
       {scannerOpen && (
         <DocumentScanner
-          onClose={() => setScannerOpen(false)}
+          initialFile={reviewFile ?? undefined}
+          onClose={() => { setScannerOpen(false); setReviewFile(null); }}
           onUseGallery={() => chooseGallery()}
+          onRetake={() => {
+            setScannerOpen(false);
+            setReviewFile(null);
+            cameraRef.current?.click();
+          }}
           onConfirm={(file) => {
             setScannerOpen(false);
+            setReviewFile(null);
             void attach(file);
           }}
         />
