@@ -9,9 +9,11 @@ import { Icon } from '@/components/ui/Icon';
 import { createClient } from '@/lib/supabase/client';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
 import { useDivision } from '@/lib/attendance/divisionContext';
-import { compressImage, filePersonnelReport } from '@/lib/services/simpleAttendanceService';
+import { filePersonnelReport } from '@/lib/services/simpleAttendanceService';
 import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
+import { MemoAttachmentField } from '@/components/reports/MemoAttachmentField';
+import { prepareMemoAttachment } from '@/lib/utils/prepareMemoAttachment';
 
 type PersonnelReport = {
   id: string;
@@ -52,6 +54,8 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [evidenceDocument, setEvidenceDocument] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
@@ -128,21 +132,23 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [reportToDelete, deletingReportId]);
 
-  async function attachEvidence(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+  async function attachEvidence(file: File) {
     setError('');
+    setCompressingPhoto(true);
     try {
-      setEvidencePhoto(await compressImage(file, 1200, 1200, 0.8));
+      const attachment = await prepareMemoAttachment(file);
+      setEvidencePhoto(attachment.photo);
+      setEvidenceDocument(attachment.document);
     } catch {
-      setError('Could not process that photo. Please choose another image.');
+      setError('Could not prepare the memo image and PDF. Try scanning it again or choose another image.');
+    } finally {
+      setCompressingPhoto(false);
     }
   }
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!divisionId || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto) return;
+    if (!divisionId || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto || !evidenceDocument) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -153,6 +159,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
         category,
         description: description.trim(),
         evidencePhoto,
+        evidenceDocument,
         eventName,
         eventDate,
       });
@@ -164,6 +171,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
       setEventName('');
       setEventDate(new Date().toISOString().slice(0, 10));
       setEvidencePhoto(null);
+      setEvidenceDocument(null);
       setShowForm(false);
       await load();
     } catch (cause) {
@@ -350,27 +358,17 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
             </label>
             <div>
               <span className="mb-1.5 block text-label-md text-on-surface">Memo photo <span className="text-error">(required)</span></span>
-              {evidencePhoto ? (
-                <div className="flex items-center gap-3 rounded-lg bg-surface-container-low p-2">
-                  <Image src={evidencePhoto} alt="Report memo preview" width={80} height={56} unoptimized className="h-14 w-20 rounded-md object-cover" />
-                  <button type="button" onClick={() => setEvidencePhoto(null)} className="text-xs font-bold text-error underline">Remove photo</button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-semibold text-primary hover:bg-surface-container">
-                    <Icon icon="photo_camera" size={18} />Take memo photo
-                    <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => void attachEvidence(event)} />
-                  </label>
-                  <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-semibold text-primary hover:bg-surface-container">
-                    <Icon icon="add_photo_alternate" size={18} />Choose from gallery
-                    <input type="file" accept="image/*" className="sr-only" onChange={(event) => void attachEvidence(event)} />
-                  </label>
-                </div>
-              )}
+              <MemoAttachmentField
+                photo={evidencePhoto}
+                document={evidenceDocument}
+                busy={compressingPhoto}
+                onAttach={attachEvidence}
+                onRemove={() => { setEvidencePhoto(null); setEvidenceDocument(null); }}
+              />
             </div>
             {error && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
             <div className="flex justify-end border-t border-outline-variant pt-3">
-              <button type="submit" disabled={saving || !selectedGuardId || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
+              <button type="submit" disabled={saving || compressingPhoto || !selectedGuardId || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto || !evidenceDocument} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-sm font-semibold text-on-primary disabled:opacity-50">
                 {saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}
                 {saving ? 'Submitting…' : 'Submit report'}
               </button>

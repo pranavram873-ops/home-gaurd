@@ -8,10 +8,12 @@ import { Card, Chip, EmptyState } from '@/components/ui/primitives';
 import { useAuth } from '@/lib/auth/authContext';
 import { createClient } from '@/lib/supabase/client';
 import { HomeGuardProfileLink } from '@/components/attendance/HomeGuardProfileLink';
-import { compressImage, filePersonnelReport } from '@/lib/services/simpleAttendanceService';
+import { filePersonnelReport } from '@/lib/services/simpleAttendanceService';
 import { useDivision } from '@/lib/attendance/divisionContext';
 import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview';
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
+import { MemoAttachmentField } from '@/components/reports/MemoAttachmentField';
+import { prepareMemoAttachment } from '@/lib/utils/prepareMemoAttachment';
 
 type GuardOption = { id: string; full_name: string; home_guard_code: string; division_id: string; division_name: string };
 type FiledReport = { id: string; division_id: string; guard_name: string; home_guard_code: string; division_name: string; category: string; description: string; event_name: string | null; event_date: string | null; status: string; created_at: string; evidence_photo: string | null; evidence_document: string | null };
@@ -34,6 +36,7 @@ export function InchargePersonnelReports() {
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [evidenceDocument, setEvidenceDocument] = useState<string | null>(null);
   const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,16 +89,15 @@ export function InchargePersonnelReports() {
     return guards.filter((guard) => `${guard.full_name} ${guard.home_guard_code} ${guard.division_name}`.toLowerCase().includes(value)).slice(0, 10);
   }, [guards, query, selectedGuard]);
 
-  async function attachEvidencePhoto(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+  async function attachEvidencePhoto(file: File) {
     setCompressingPhoto(true);
     setError('');
     try {
-      setEvidencePhoto(await compressImage(file, 1200, 1200, 0.8));
+      const attachment = await prepareMemoAttachment(file);
+      setEvidencePhoto(attachment.photo);
+      setEvidenceDocument(attachment.document);
     } catch {
-      setError('Could not process that photo. Please try a different image.');
+      setError('Could not prepare the memo image and PDF. Try scanning it again or choose another image.');
     } finally {
       setCompressingPhoto(false);
     }
@@ -103,7 +105,7 @@ export function InchargePersonnelReports() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto) return;
+    if (!user || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !evidencePhoto || !evidenceDocument) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -114,6 +116,7 @@ export function InchargePersonnelReports() {
         category,
         description: description.trim(),
         evidencePhoto,
+        evidenceDocument,
         eventName,
         eventDate,
       });
@@ -122,6 +125,7 @@ export function InchargePersonnelReports() {
       setEventName('');
       setEventDate(new Date().toISOString().slice(0, 10));
       setEvidencePhoto(null);
+      setEvidenceDocument(null);
       setQuery('');
       setSelectedGuard(null);
       setShowForm(false);
@@ -203,30 +207,15 @@ export function InchargePersonnelReports() {
           <label className="block text-label-md text-on-surface">Event date<input required type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-sm" /></label>
           <div>
             <span className="mb-1.5 block text-label-md text-on-surface">Memo photo <span className="text-error">(required)</span></span>
-            {evidencePhoto ? (
-              <div className="flex items-center gap-2.5 rounded-lg bg-surface-container-low p-2">
-                <img src={evidencePhoto} alt="Report memo" className="h-14 w-20 rounded-md object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1 text-xs font-bold text-primary"><Icon icon="verified" size={14} className="shrink-0 text-tertiary" />Memo attached</p>
-                  <button type="button" onClick={() => setEvidencePhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">Remove photo</button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                  {compressingPhoto ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="photo_camera" size={18} />}
-                  {compressingPhoto ? 'Processing photo…' : 'Take memo photo'}
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
-                </label>
-                <label className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-label-md font-bold text-primary transition-colors hover:bg-surface-container ${compressingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
-                  <Icon icon="add_photo_alternate" size={18} />
-                  Choose from gallery
-                  <input type="file" accept="image/*" className="hidden" onChange={(event) => void attachEvidencePhoto(event)} disabled={compressingPhoto} />
-                </label>
-              </div>
-            )}
+            <MemoAttachmentField
+              photo={evidencePhoto}
+              document={evidenceDocument}
+              busy={compressingPhoto}
+              onAttach={attachEvidencePhoto}
+              onRemove={() => { setEvidencePhoto(null); setEvidenceDocument(null); }}
+            />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setEventName(''); setEventDate(new Date().toISOString().slice(0, 10)); setEvidencePhoto(null); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setSelectedGuard(null); setQuery(''); setDescription(''); setEventName(''); setEventDate(new Date().toISOString().slice(0, 10)); setEvidencePhoto(null); setEvidenceDocument(null); setError(''); }} className="min-h-11 rounded-lg px-4 text-label-md text-on-surface-variant hover:bg-surface-container">Clear</button><button type="submit" disabled={saving || compressingPhoto || !selectedGuard || description.trim().length < 10 || !eventName.trim() || !eventDate || !evidencePhoto || !evidenceDocument} className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-container px-5 text-label-md text-on-primary disabled:opacity-50">{saving ? <Icon icon="sync" size={18} className="animate-spin" /> : <Icon icon="send" size={18} />}{saving ? 'Filing…' : 'File report'}</button></div>
         </form>
           </section>
         </div>,

@@ -124,7 +124,6 @@ function cameraMessage(error: unknown) {
 export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const draggingCorner = useRef<number | null>(null);
   const [cameraRequested, setCameraRequested] = useState(true);
   const [cv, setCv] = useState<CV | null>(null);
   const [cameraError, setCameraError] = useState('');
@@ -421,7 +420,7 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
   const cornersValid = Boolean(imageSize && corners && isValidQuad(corners, imageSize));
 
   return createPortal(
-    <div className="overlay-enter fixed inset-0 z-[80] flex items-center justify-center bg-surface-container/60 p-2 backdrop-blur-xs sm:p-4">
+    <div className="overlay-enter fixed inset-0 z-[130] flex items-center justify-center bg-surface-container/70 p-2 backdrop-blur-xs sm:p-4">
       <section
         role="dialog"
         aria-modal="true"
@@ -501,11 +500,6 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
                 ref={previewRef}
                 className="relative mx-auto w-full touch-none select-none"
                 style={{ aspectRatio: `${imageSize.width}/${imageSize.height}` }}
-                onPointerMove={(event) => {
-                  if (draggingCorner.current !== null) moveCorner(draggingCorner.current, event.clientX, event.clientY);
-                }}
-                onPointerUp={() => { draggingCorner.current = null; }}
-                onPointerCancel={() => { draggingCorner.current = null; }}
               >
                 <img src={capturedImage} alt="Captured memo with adjustable crop outline" className="absolute inset-0 h-full w-full rounded-lg object-fill" />
                 <svg viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
@@ -522,12 +516,20 @@ export function DocumentScanner({ onClose, onConfirm, onUseGallery }: DocumentSc
                     aria-valuenow={Math.round(point.x / imageSize.width * 100)}
                     onPointerDown={(event) => {
                       event.preventDefault();
-                      draggingCorner.current = index;
                       event.currentTarget.setPointerCapture(event.pointerId);
                     }}
                     onKeyDown={(event) => handleCornerKey(index, event)}
-                    className="absolute z-10 h-8 w-8 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-[3px] border-white bg-primary shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="absolute z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center rounded-full border-[3px] border-white bg-primary shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     style={{ left: `${point.x / imageSize.width * 100}%`, top: `${point.y / imageSize.height * 100}%` }}
+                    onPointerMove={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) moveCorner(index, event.clientX, event.clientY);
+                    }}
+                    onPointerUp={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                    }}
+                    onPointerCancel={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                    }}
                   />
                 ))}
               </div>
