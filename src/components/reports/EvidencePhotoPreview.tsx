@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Icon } from '@/components/ui/Icon';
 
-export function EvidencePhotoPreview({ src, alt }: { src: string; alt: string }) {
+export function EvidencePhotoPreview({ src, alt, documentSrc }: { src: string; alt: string; documentSrc?: string | null }) {
   const [open, setOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -21,10 +21,13 @@ export function EvidencePhotoPreview({ src, alt }: { src: string; alt: string })
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label={`Enlarge ${alt}`} className="group block overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-        <Image src={src} alt={alt} width={112} height={80} unoptimized className="h-20 w-28 rounded-lg border border-outline-variant/50 object-cover transition-transform group-hover:scale-105" />
-        <span className="sr-only">Tap to enlarge</span>
-      </button>
+      <div className="flex flex-col items-start gap-1.5">
+        <button type="button" onClick={() => setOpen(true)} aria-label={`Enlarge ${alt}`} className="group block overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+          <Image src={src} alt={alt} width={112} height={80} unoptimized className="h-20 w-28 rounded-lg border border-outline-variant/50 object-cover transition-transform group-hover:scale-105" />
+          <span className="sr-only">Tap to enlarge</span>
+        </button>
+        {documentSrc && <a href={documentSrc} download="home-guard-memo.pdf" className="text-xs font-semibold text-primary underline underline-offset-2">Download memo PDF</a>}
+      </div>
       {portalReady && open && createPortal(
         <div className="overlay-enter fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
           <section role="dialog" aria-modal="true" aria-label="Memo photo" className="overlay-panel relative flex max-h-[95dvh] max-w-[95vw] items-center justify-center">

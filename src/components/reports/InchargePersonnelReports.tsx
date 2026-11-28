@@ -14,7 +14,7 @@ import { EvidencePhotoPreview } from '@/components/reports/EvidencePhotoPreview'
 import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplete';
 
 type GuardOption = { id: string; full_name: string; home_guard_code: string; division_id: string; division_name: string };
-type FiledReport = { id: string; division_id: string; guard_name: string; home_guard_code: string; division_name: string; category: string; description: string; event_name: string | null; event_date: string | null; status: string; created_at: string; evidence_photo: string | null };
+type FiledReport = { id: string; division_id: string; guard_name: string; home_guard_code: string; division_name: string; category: string; description: string; event_name: string | null; event_date: string | null; status: string; created_at: string; evidence_photo: string | null; evidence_document: string | null };
 const categoryOptions = [
   { value: 'conduct', label: 'Conduct or behaviour' },
   { value: 'attendance', label: 'Attendance or duty' },
@@ -56,7 +56,7 @@ export function InchargePersonnelReports() {
     const supabase = createClient();
     const [rosterResult, reportResult] = await Promise.all([
       supabase.from('home_guard_roster').select('id,full_name,home_guard_code,division_id,attendance_divisions(name)').eq('division_id', divisionId).eq('is_active', true).order('full_name'),
-      supabase.from('personnel_reports').select('id,division_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo').eq('division_id', divisionId).order('created_at', { ascending: false }),
+      supabase.from('personnel_reports').select('id,division_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo,evidence_document').eq('division_id', divisionId).order('created_at', { ascending: false }),
     ]);
     if (rosterResult.error || reportResult.error) {
       setError(rosterResult.error?.message ?? reportResult.error?.message ?? 'Could not load reports.');
@@ -157,7 +157,7 @@ export function InchargePersonnelReports() {
                 {report.event_date && ` · ${new Date(`${report.event_date}T00:00:00`).toLocaleDateString('en-IN')}`}
               </p>
               <p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
-              {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Memo photo for report on ${report.guard_name}`} />}
+              {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} documentSrc={report.evidence_document} alt={`Memo photo for report on ${report.guard_name}`} />}
             </li>)}
           </ul>
         ) : <EmptyState icon="inbox" title="No reports filed yet" body="Use Create report to file a report about a Home Guard." />}

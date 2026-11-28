@@ -28,6 +28,7 @@ type PersonnelReport = {
   status: string;
   created_at: string;
   evidence_photo: string | null;
+  evidence_document: string | null;
   action_taken: string | null;
   acknowledged_at: string | null;
 };
@@ -87,7 +88,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
     const [reportResult, rosterResult] = await Promise.all([
       supabase
         .from('personnel_reports')
-        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo,action_taken,acknowledged_at')
+        .select('id,division_id,reporter_name,reporter_personnel_id,guard_name,home_guard_code,division_name,category,description,event_name,event_date,status,created_at,evidence_photo,evidence_document,action_taken,acknowledged_at')
         .eq('division_id', divisionId)
         .order('created_at', { ascending: false }),
       supabase
@@ -261,7 +262,7 @@ export function AdminPersonnelReports({ searchTerm = '' }: { searchTerm?: string
                   {report.event_date && ` · ${new Date(`${report.event_date}T00:00:00`).toLocaleDateString('en-IN')}`}
                 </p>
                 <p className="whitespace-pre-wrap text-sm text-on-surface">{report.description}</p>
-                {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} alt={`Memo photo for report on ${report.guard_name}`} />}
+                {report.evidence_photo && <EvidencePhotoPreview src={report.evidence_photo} documentSrc={report.evidence_document} alt={`Memo photo for report on ${report.guard_name}`} />}
                 <p className="text-xs text-on-surface-variant">Filed by {report.reporter_name}{report.reporter_personnel_id ? ` · ${report.reporter_personnel_id}` : ''}</p>
                 {report.acknowledged_at && (
                   <div className="rounded-lg bg-surface-container-low p-3 text-sm">

@@ -141,6 +141,7 @@ export function GuardPersonnelMemos({
                         {memo.evidence_photo && (
                           <EvidencePhotoPreview
                             src={memo.evidence_photo}
+                            documentSrc={memo.evidence_document}
                             alt={`Memo photo for ${eventName}`}
                           />
                         )}

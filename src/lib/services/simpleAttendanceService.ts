@@ -860,6 +860,7 @@ export async function filePersonnelReport(input: {
   category: string;
   description: string;
   evidencePhoto: string;
+  evidenceDocument?: string;
   eventName: string;
   eventDate: string;
 }) {
@@ -883,6 +884,7 @@ export async function filePersonnelReport(input: {
     category: input.category,
     description,
     evidence_photo: input.evidencePhoto,
+    ...(input.evidenceDocument ? { evidence_document: input.evidenceDocument } : {}),
     event_name: input.eventName.trim(),
     event_date: input.eventDate,
   });
@@ -934,6 +936,7 @@ export interface GuardPersonnelMemo {
   reporter_name: string | null;
   reporter_personnel_id: string | null;
   evidence_photo: string | null;
+  evidence_document: string | null;
   action_taken: string | null;
   acknowledged_at: string | null;
 }
@@ -941,7 +944,7 @@ export interface GuardPersonnelMemo {
 export async function loadGuardPersonnelMemos(guardId: string): Promise<GuardPersonnelMemo[]> {
   const { data, error } = await createClient()
     .from('personnel_reports')
-    .select('id,division_id,event_name,event_date,created_at,category,description,status,reporter_name,reporter_personnel_id,evidence_photo,action_taken,acknowledged_at')
+    .select('id,division_id,event_name,event_date,created_at,category,description,status,reporter_name,reporter_personnel_id,evidence_photo,evidence_document,action_taken,acknowledged_at')
     .eq('guard_id', guardId)
     .order('created_at', { ascending: false });
 

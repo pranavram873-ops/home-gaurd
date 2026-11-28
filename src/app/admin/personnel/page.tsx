@@ -20,6 +20,7 @@ import { EventNameAutocomplete } from '@/components/reports/EventNameAutocomplet
 import { GuardPersonnelMemos } from '@/components/attendance/GuardPersonnelMemos';
 import { EventDeleteDialog } from '@/components/attendance/EventDeleteDialog';
 import { DocumentScanner } from '@/components/reports/DocumentScanner';
+import { createImagePdf } from '@/lib/utils/createImagePdf';
 import { HomeGuardExcelImport } from '@/components/admin/HomeGuardExcelImport';
 
 const blankRecruit = {
@@ -89,6 +90,7 @@ function PersonnelDirectoryContent() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
+  const [reportDocument, setReportDocument] = useState<string | null>(null);
   const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [documentScannerOpen, setDocumentScannerOpen] = useState(false);
   const galleryPhotoInput = useRef<HTMLInputElement>(null);
@@ -396,9 +398,19 @@ function PersonnelDirectoryContent() {
     setCompressingPhoto(true);
     setReportError(null);
     try {
-      setReportPhoto(await compressImage(file, 1200, 1200, 0.8));
+      const compressedPhoto = await compressImage(file, 1200, 1200, 0.8);
+      const jpeg = await (await fetch(compressedPhoto)).blob();
+      const pdf = await createImagePdf(jpeg);
+      const documentDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not prepare the memo PDF.'));
+        reader.onerror = () => reject(new Error('Could not prepare the memo PDF.'));
+        reader.readAsDataURL(pdf);
+      });
+      setReportPhoto(compressedPhoto);
+      setReportDocument(documentDataUrl);
     } catch {
-      setReportError('Could not process that photo. Please try a different image.');
+      setReportError('Could not prepare the memo image and PDF. Please try another photo.');
     } finally {
       setCompressingPhoto(false);
     }
@@ -422,6 +434,7 @@ function PersonnelDirectoryContent() {
     setReportEventName('');
     setReportEventDate(new Date().toISOString().slice(0, 10));
     setReportPhoto(null);
+    setReportDocument(null);
     setReportError(null);
     setReportSuccess(false);
     const code = selectedProfile.personnel_id || '';
@@ -457,6 +470,7 @@ function PersonnelDirectoryContent() {
         category: reportCategory,
         description: reportDescription,
         evidencePhoto: reportPhoto,
+        evidenceDocument: reportDocument ?? undefined,
         eventName: reportEventName,
         eventDate: reportEventDate,
       });
@@ -470,6 +484,7 @@ function PersonnelDirectoryContent() {
       setReportDescription('');
       setReportEventName('');
       setReportPhoto(null);
+      setReportDocument(null);
       setReportSuccess(true);
     } catch (error) {
       setReportError(error instanceof Error ? error.message : 'Could not submit the report. Try again.');
@@ -891,11 +906,14 @@ function PersonnelDirectoryContent() {
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1 text-xs font-bold text-primary">
                         <Icon icon="verified" size={14} className="shrink-0 text-tertiary" />
-                        Memo attached
+                        Memo image and PDF attached
                       </p>
-                      <button type="button" onClick={() => setReportPhoto(null)} className="mt-0.5 text-[11px] font-bold text-error hover:underline">
-                        Remove photo
-                      </button>
+                      <div className="mt-0.5 flex items-center gap-3">
+                        {reportDocument && <a href={reportDocument} download="home-guard-memo.pdf" className="text-[11px] font-bold text-primary hover:underline">Download PDF</a>}
+                        <button type="button" onClick={() => { setReportPhoto(null); setReportDocument(null); }} className="text-[11px] font-bold text-error hover:underline">
+                          Remove attachment
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
